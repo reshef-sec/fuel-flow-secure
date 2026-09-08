@@ -11,10 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkerRouteImport } from './routes/worker'
 import { Route as VouchersRouteImport } from './routes/vouchers'
-import { Route as UsersRouteImport } from './routes/users'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
-import { Route as AuditRouteImport } from './routes/audit'
 import { Route as AllocationsRouteImport } from './routes/allocations'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as Char91__mockupChar93PreviewSplatRouteImport } from './routes/[__mockup].preview.$'
@@ -30,11 +28,6 @@ const VouchersRoute = VouchersRouteImport.update({
   path: '/vouchers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UsersRoute = UsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -43,11 +36,6 @@ const SettingsRoute = SettingsRouteImport.update({
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuditRoute = AuditRouteImport.update({
-  id: '/audit',
-  path: '/audit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AllocationsRoute = AllocationsRouteImport.update({
@@ -76,10 +64,8 @@ const Char91__componentChar93PreviewSplatRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/allocations': typeof AllocationsRoute
-  '/audit': typeof AuditRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
-  '/users': typeof UsersRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
@@ -88,10 +74,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/allocations': typeof AllocationsRoute
-  '/audit': typeof AuditRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
-  '/users': typeof UsersRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
@@ -101,10 +85,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/allocations': typeof AllocationsRoute
-  '/audit': typeof AuditRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
-  '/users': typeof UsersRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
@@ -115,10 +97,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/allocations'
-    | '/audit'
     | '/reports'
     | '/settings'
-    | '/users'
     | '/vouchers'
     | '/worker'
     | '/__component/preview/$'
@@ -127,10 +107,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/allocations'
-    | '/audit'
     | '/reports'
     | '/settings'
-    | '/users'
     | '/vouchers'
     | '/worker'
     | '/__component/preview/$'
@@ -139,10 +117,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/allocations'
-    | '/audit'
     | '/reports'
     | '/settings'
-    | '/users'
     | '/vouchers'
     | '/worker'
     | '/__component/preview/$'
@@ -152,10 +128,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AllocationsRoute: typeof AllocationsRoute
-  AuditRoute: typeof AuditRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
-  UsersRoute: typeof UsersRoute
   VouchersRoute: typeof VouchersRoute
   WorkerRoute: typeof WorkerRoute
   Char91__componentChar93PreviewSplatRoute: typeof Char91__componentChar93PreviewSplatRoute
@@ -178,13 +152,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VouchersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/users': {
-      id: '/users'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof UsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -197,13 +164,6 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/audit': {
-      id: '/audit'
-      path: '/audit'
-      fullPath: '/audit'
-      preLoaderRoute: typeof AuditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/allocations': {
@@ -240,10 +200,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AllocationsRoute: AllocationsRoute,
-  AuditRoute: AuditRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
-  UsersRoute: UsersRoute,
   VouchersRoute: VouchersRoute,
   WorkerRoute: WorkerRoute,
   Char91__componentChar93PreviewSplatRoute:
