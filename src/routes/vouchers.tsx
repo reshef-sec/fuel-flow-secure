@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { FileSpreadsheet, UploadCloud } from "lucide-react";
+import { FileDown, FileSpreadsheet, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
@@ -18,8 +18,12 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
-import { heDate, statusVariant } from "@/components/dashboard/statusVariant";
-import type { VoucherRecord } from "@/components/dashboard/voucherData";
+import { downloadCsv, heDate, statusVariant } from "@/components/dashboard/statusVariant";
+import {
+  MAIN_POOL,
+  formatAssignment,
+  type VoucherRecord,
+} from "@/components/dashboard/voucherData";
 import { useAppStore } from "@/store/appStore";
 
 export const Route = createFileRoute("/vouchers")({
@@ -28,7 +32,7 @@ export const Route = createFileRoute("/vouchers")({
       { title: "מאגר שוברים | רשף ביטחון" },
       {
         name: "description",
-        content: "מאגר שוברי הדלק: ייבוא קבצי אקסל, מלאי, קודים וסטטוסים.",
+        content: "מאגר שוברי הדלק: ייבוא קבצי אקסל, תבנית ייבוא, מלאי, קודים וסטטוסים.",
       },
       { property: "og:title", content: "מאגר שוברים | רשף ביטחון" },
       { property: "og:description", content: "ייבוא שוברי דלק וניהול מלאי השוברים." },
@@ -37,11 +41,27 @@ export const Route = createFileRoute("/vouchers")({
   component: VouchersPage,
 });
 
+const templateColumns = [
+  { name: 'מס"ד', example: "019949" },
+  { name: "סיריאלי", example: "RB-4417-9902" },
+  { name: "סכום", example: "150" },
+  { name: "תאריך הזנה", example: "2026-09-01" },
+];
+
 function VouchersPage() {
   const [dragging, setDragging] = useState(false);
   const [imported, setImported] = useState<VoucherRecord[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const importVouchers = useAppStore((s) => s.importVouchers);
+
+  function downloadTemplate() {
+    downloadCsv(
+      "vouchers-template.csv",
+      templateColumns.map((c) => c.name),
+      [templateColumns.map((c) => c.example)],
+    );
+    toast.success("תבנית האקסל הורדה");
+  }
 
   function handleFiles(files: FileList | null) {
     const file = files?.[0];
@@ -53,8 +73,9 @@ function VouchersPage() {
     const today = new Date().toISOString().slice(0, 10);
     const rows: VoucherRecord[] = Array.from({ length: 8 }, () => ({
       serial: String(Math.floor(100000 + Math.random() * 899999)),
+      realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
       amount: [100, 200, 300, 500][Math.floor(Math.random() * 4)]!,
-      assignedTo: "מאגר ראשי",
+      branch: MAIN_POOL,
       status: "טרם שומש",
       updatedAt: today,
     }));
@@ -68,6 +89,10 @@ function VouchersPage() {
       <Card padding="lg">
         <CardHeader>
           <CardTitle>ייבוא שוברים מקובץ אקסל</CardTitle>
+          <Button variant="outline" onClick={downloadTemplate}>
+            <FileDown className="size-4" />
+            הורד תבנית אקסל
+          </Button>
         </CardHeader>
         <div
           onDragOver={(e) => {
@@ -107,6 +132,43 @@ function VouchersPage() {
             onChange={(e) => handleFiles(e.target.files)}
           />
         </div>
+
+        <div className="mt-6 rounded-xl border border-border bg-surface-muted p-5">
+          <p className="font-display text-sm font-extrabold text-secondary">
+            עמודות נדרשות בקובץ הייבוא
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-md text-start text-sm">
+              <thead>
+                <tr>
+                  {templateColumns.map((c) => (
+                    <th
+                      key={c.name}
+                      className="border border-border bg-surface px-3 py-2 text-start font-semibold text-secondary"
+                    >
+                      {c.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {templateColumns.map((c) => (
+                    <td
+                      key={c.name}
+                      className="border border-border bg-surface px-3 py-2 tabular-nums text-muted-foreground"
+                    >
+                      {c.example}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            שורת הכותרות חייבת להיות ראשונה בקובץ, בסדר העמודות המוצג למעלה.
+          </p>
+        </div>
       </Card>
 
       <section className="mt-8">
@@ -116,16 +178,17 @@ function VouchersPage() {
             <TableHead>
               <TableRow>
                 <TableHeaderCell>מס"ד</TableHeaderCell>
+                <TableHeaderCell>סיריאלי</TableHeaderCell>
                 <TableHeaderCell>סכום</TableHeaderCell>
                 <TableHeaderCell>שויך ל</TableHeaderCell>
                 <TableHeaderCell>סטטוס</TableHeaderCell>
-                <TableHeaderCell>תאריך עדכון</TableHeaderCell>
+                <TableHeaderCell>תאריך הזנה</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {imported.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                     עדיין לא יובאו שוברים בהעלאה זו
                   </TableCell>
                 </TableRow>
@@ -133,10 +196,13 @@ function VouchersPage() {
                 imported.map((v) => (
                   <TableRow key={v.serial}>
                     <TableCell className="font-semibold tabular-nums">{v.serial}</TableCell>
+                    <TableCell dir="ltr" className="text-start tabular-nums">
+                      {v.realCode}
+                    </TableCell>
                     <TableCell className="tabular-nums">
                       {v.amount.toLocaleString("he-IL")} ₪
                     </TableCell>
-                    <TableCell>{v.assignedTo}</TableCell>
+                    <TableCell>{formatAssignment(v)}</TableCell>
                     <TableCell>
                       <Badge variant={statusVariant[v.status]} size="md">
                         {v.status}
