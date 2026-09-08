@@ -138,32 +138,24 @@ function VouchersPage() {
             עמודות נדרשות בקובץ הייבוא
           </p>
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-md text-start text-sm">
-              <thead>
-                <tr>
+            <Table>
+              <TableHead>
+                <TableRow>
                   {templateColumns.map((c) => (
-                    <th
-                      key={c.name}
-                      className="border border-border bg-surface px-3 py-2 text-start font-semibold text-secondary"
-                    >
-                      {c.name}
-                    </th>
+                    <TableHeaderCell key={c.name}>{c.name}</TableHeaderCell>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow>
                   {templateColumns.map((c) => (
-                    <td
-                      key={c.name}
-                      className="border border-border bg-surface px-3 py-2 tabular-nums text-muted-foreground"
-                    >
+                    <TableCell key={c.name} className="tabular-nums text-muted-foreground">
                       {c.example}
-                    </td>
+                    </TableCell>
                   ))}
-                </tr>
-              </tbody>
-            </table>
+                </TableRow>
+              </TableBody>
+            </Table>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
             שורת הכותרות חייבת להיות ראשונה בקובץ, בסדר העמודות המוצג למעלה.
