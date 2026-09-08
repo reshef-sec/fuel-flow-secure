@@ -2,19 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Wallet, Ticket, CheckCircle2, Ban } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
-import {
-  Badge,
-  Card,
-  CardHeader,
-  CardTitle,
-  StatCard,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-} from "@/design-system/delek-1ea111";
+import { VoucherTable } from "@/components/dashboard/VoucherTable";
+import { Card, StatCard } from "@/design-system/delek-1ea111";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -34,19 +24,6 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-const rows = [
-  { id: "19949", code: "D12345", branch: "צפון", client: 'סלולר בע"מ', amount: "150 ₪", status: "מוקצה" },
-  { id: "271008", code: "D12346", branch: "צפון", client: "לקוח כללי", amount: "150 ₪", status: "מומש" },
-  { id: "225902", code: "D12347", branch: "מרכז", client: "ירושלים", amount: "150 ₪", status: "מוקצה" },
-  { id: "225393", code: "D12348", branch: "מרכז", client: "ירושלים", amount: "200 ₪", status: "חסום" },
-  { id: "012345", code: "D12349", branch: "ירושלים", client: "לקוח כללי", amount: "150 ₪", status: "מומש" },
-];
-
-const statusVariant = {
-  מוקצה: "info",
-  מומש: "success",
-  חסום: "danger",
-} as const;
 
 function Dashboard() {
   return (
@@ -82,44 +59,8 @@ function Dashboard() {
         ))}
       </div>
 
-      <Card className="mt-6" padding="none">
-        <CardHeader className="p-5 pb-0">
-          <CardTitle>שוברים אחרונים</CardTitle>
-          <Badge variant="brand" size="md">
-            5 רשומות
-          </Badge>
-        </CardHeader>
-        <div className="p-5 pt-4">
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>מס״ד</TableHeaderCell>
-                <TableHeaderCell>קוד שובר</TableHeaderCell>
-                <TableHeaderCell>סניף</TableHeaderCell>
-                <TableHeaderCell>לקוח</TableHeaderCell>
-                <TableHeaderCell>סכום</TableHeaderCell>
-                <TableHeaderCell>סטטוס</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="tabular-nums">{r.id}</TableCell>
-                  <TableCell className="font-semibold">{r.code}</TableCell>
-                  <TableCell>{r.branch}</TableCell>
-                  <TableCell>{r.client}</TableCell>
-                  <TableCell className="tabular-nums">{r.amount}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusVariant[r.status as keyof typeof statusVariant]}>
-                      {r.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+      <VoucherTable />
+
     </InternalLayout>
   );
 }
