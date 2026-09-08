@@ -22,26 +22,17 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { AllocationDialog } from "./AllocationDialog";
-import { vouchers, type VoucherRecord, type VoucherStatus } from "./voucherData";
-
-const statusVariant: Record<VoucherStatus, "success" | "info" | "danger"> = {
-  "מומש סופית": "success",
-  "טרם שומש": "info",
-  חסום: "danger",
-};
-
-const dateFormatter = new Intl.DateTimeFormat("he-IL", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
+import type { VoucherRecord } from "./voucherData";
+import { downloadCsv, heDate, statusVariant } from "./statusVariant";
+import { useAppStore } from "@/store/appStore";
 
 const columnHelper = createColumnHelper<VoucherRecord>();
 
 export function VoucherTable() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [balance, setBalance] = useState(15000);
+  const vouchers = useAppStore((s) => s.vouchers);
+  const role = useAppStore((s) => s.role);
 
   const columns = useMemo(
     () => [
@@ -68,7 +59,7 @@ export function VoucherTable() {
         header: "תאריך עדכון",
         cell: (info) => (
           <span className="tabular-nums text-muted-foreground">
-            {dateFormatter.format(new Date(info.getValue()))}
+            {heDate.format(new Date(info.getValue()))}
           </span>
         ),
       }),
@@ -85,9 +76,7 @@ export function VoucherTable() {
       const q = String(filterValue).trim().toLowerCase();
       if (!q) return true;
       const v = row.original;
-      return (
-        v.serial.toLowerCase().includes(q) || v.assignedTo.toLowerCase().includes(q)
-      );
+      return v.serial.toLowerCase().includes(q) || v.assignedTo.toLowerCase().includes(q);
     },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -96,6 +85,20 @@ export function VoucherTable() {
   });
 
   const { pageIndex } = table.getState().pagination;
+
+  function exportCsv() {
+    const rows = table
+      .getFilteredRowModel()
+      .rows.map((r) => [
+        r.original.serial,
+        r.original.amount,
+        r.original.assignedTo,
+        r.original.status,
+        r.original.updatedAt,
+      ]);
+    downloadCsv("vouchers.csv", ['מס"ד', "סכום", "שויך ל", "סטטוס", "תאריך עדכון"], rows);
+    toast.success("הייצוא לאקסל הושלם בהצלחה");
+  }
 
   return (
     <section className="mt-8">
@@ -114,17 +117,16 @@ export function VoucherTable() {
               className="pe-9"
             />
           </div>
-          <Button
-            variant="outline"
-            onClick={() => toast.success("הייצוא לאקסל הושלם בהצלחה")}
-          >
+          <Button variant="outline" onClick={exportCsv}>
             <FileDown className="size-4" />
             ייצוא לאקסל
           </Button>
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="size-4" />
-            הקצאת שוברים
-          </Button>
+          {role !== "supervisor" ? (
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="size-4" />
+              הקצאת שוברים
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -144,7 +146,10 @@ export function VoucherTable() {
           <TableBody>
             {table.getRowModel().rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="py-10 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={columns.length}
+                  className="py-10 text-center text-muted-foreground"
+                >
                   לא נמצאו שוברים מתאימים
                 </TableCell>
               </TableRow>
@@ -163,9 +168,10 @@ export function VoucherTable() {
         </Table>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <span className="text-sm text-muted-foreground tabular-nums">
-          עמוד {pageIndex + 1} מתוך {table.getPageCount() || 1} · {table.getFilteredRowModel().rows.length} רשומות
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <span className="text-sm tabular-nums text-muted-foreground">
+          עמוד {pageIndex + 1} מתוך {table.getPageCount() || 1} ·{" "}
+          {table.getFilteredRowModel().rows.length} רשומות
         </span>
         <div className="flex items-center gap-2">
           <Button
@@ -189,12 +195,7 @@ export function VoucherTable() {
         </div>
       </div>
 
-      <AllocationDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        balance={balance}
-        onAllocate={(amount) => setBalance((b) => Math.max(0, b - amount))}
-      />
+      <AllocationDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
     </section>
   );
 }
