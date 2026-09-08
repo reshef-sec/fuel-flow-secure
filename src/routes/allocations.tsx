@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Building2, Ticket } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
-import { BranchesPanel } from "@/components/settings/BranchesPanel";
+
 import { Badge, Card } from "@/design-system/delek-1ea111";
 import { useAppStore } from "@/store/appStore";
 
@@ -90,10 +90,7 @@ function AllocationsPage() {
           )}
         </div>
       </section>
-
-      <div className="mt-10">
-        <BranchesPanel />
-      </div>
     </InternalLayout>
   );
 }
+

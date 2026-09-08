@@ -22,11 +22,10 @@ const navItems = [
   { to: "/", label: "דשבורד", icon: LayoutDashboard, roles: ["admin", "branch", "supervisor"] },
   { to: "/vouchers", label: "מאגר שוברים", icon: Ticket, roles: ["admin", "branch"] },
   { to: "/allocations", label: "הקצאות לסניפים", icon: Building2, roles: ["admin", "branch"] },
-  { to: "/users", label: "ניהול משתמשים", icon: Users, roles: ["admin"] },
   { to: "/reports", label: "דוחות", icon: FileBarChart, roles: ["admin", "branch", "supervisor"] },
-  { to: "/audit", label: "יומן פעולות", icon: ScrollText, roles: ["admin", "branch"] },
   { to: "/settings", label: "הגדרות", icon: Settings, roles: ["admin"] },
 ] as const;
+
 
 export function InternalLayout({ title, children }: { title: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);

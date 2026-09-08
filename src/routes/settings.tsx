@@ -7,6 +7,8 @@ import { ReasonsPanel } from "@/components/settings/ReasonsPanel";
 import { BranchesPanel } from "@/components/settings/BranchesPanel";
 import { UsersPanel } from "@/components/settings/UsersPanel";
 import { ClientsPanel } from "@/components/settings/ClientsPanel";
+import { AuditPanel } from "@/components/settings/AuditPanel";
+
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -28,6 +30,7 @@ const tabs = [
   { id: "branches", label: "ניהול סניפים" },
   { id: "users", label: "ניהול משתמשים" },
   { id: "clients", label: "לקוחות ואתרים" },
+  { id: "audit", label: "יומן פעילות" },
 ] as const;
 
 function SettingsPage() {
@@ -41,7 +44,9 @@ function SettingsPage() {
         {tab === "branches" ? <BranchesPanel /> : null}
         {tab === "users" ? <UsersPanel /> : null}
         {tab === "clients" ? <ClientsPanel /> : null}
+        {tab === "audit" ? <AuditPanel /> : null}
       </div>
+
     </InternalLayout>
   );
 }
