@@ -6,11 +6,23 @@ import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
 import { useAppStore } from "@/store/appStore";
 
-const targets = ["סניף מרכז", "מפקח דן", "לקוח - אתר 1"];
-
 export function AllocationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const balance = useAppStore((s) => s.balance);
   const allocate = useAppStore((s) => s.allocate);
+  const branchList = useAppStore((s) => s.branchList);
+  const users = useAppStore((s) => s.users);
+
+  const targets: { value: string; label: string; branch: string; supervisor?: string }[] = [
+    ...branchList.map((b) => ({ value: b.name, label: b.name, branch: b.name })),
+    ...users
+      .filter((u) => u.role === "supervisor")
+      .map((u) => ({
+        value: `${u.branch}|${u.name}`,
+        label: `${u.branch} (${u.name})`,
+        branch: u.branch,
+        supervisor: u.name,
+      })),
+  ];
   const [target, setTarget] = useState("");
   const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
