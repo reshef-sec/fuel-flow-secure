@@ -10,6 +10,7 @@ const badgeVariants = cva(
         neutral: "bg-surface-muted text-slate-600",
         info: "bg-blue-100 text-blue-700",
         brand: "bg-navy-100 text-navy-700",
+        purple: "bg-violet-100 text-violet-700",
         success: "bg-mint-100 text-teal-600",
         warning: "bg-[color-mix(in_srgb,var(--color-warning)_18%,white)] text-[#8a6210]",
         danger: "bg-[color-mix(in_srgb,var(--color-danger)_14%,white)] text-danger",

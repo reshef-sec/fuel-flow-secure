@@ -20,6 +20,10 @@
   --color-mint-500: #45cdba;
   --color-teal-600: #12a08c;
 
+  --color-violet-100: #ece9fd;
+  --color-violet-500: #7c5cf0;
+  --color-violet-700: #5b3bc4;
+
   --color-slate-50: #f7f9fc;
   --color-slate-100: #eef2f7;
   --color-slate-200: #e0e6ef;
@@ -66,8 +70,8 @@
   --radius-pill: 999px;
 
   /* Elevation */
-  --shadow-card: 0 1px 2px rgb(11 17 64 / 0.04), 0 8px 24px rgb(11 17 64 / 0.06);
-  --shadow-raised: 0 12px 32px rgb(11 17 64 / 0.12);
+  --shadow-card: 0 1px 2px rgb(11 17 64 / 0.03), 0 10px 30px rgb(11 17 64 / 0.045);
+  --shadow-raised: 0 16px 40px rgb(11 17 64 / 0.1);
   --shadow-focus: 0 0 0 3px rgb(31 95 208 / 0.25);
 }
 
