@@ -24,19 +24,6 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-const rows = [
-  { id: "19949", code: "D12345", branch: "צפון", client: 'סלולר בע"מ', amount: "150 ₪", status: "מוקצה" },
-  { id: "271008", code: "D12346", branch: "צפון", client: "לקוח כללי", amount: "150 ₪", status: "מומש" },
-  { id: "225902", code: "D12347", branch: "מרכז", client: "ירושלים", amount: "150 ₪", status: "מוקצה" },
-  { id: "225393", code: "D12348", branch: "מרכז", client: "ירושלים", amount: "200 ₪", status: "חסום" },
-  { id: "012345", code: "D12349", branch: "ירושלים", client: "לקוח כללי", amount: "150 ₪", status: "מומש" },
-];
-
-const statusVariant = {
-  מוקצה: "info",
-  מומש: "success",
-  חסום: "danger",
-} as const;
 
 function Dashboard() {
   return (
