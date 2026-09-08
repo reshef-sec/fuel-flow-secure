@@ -56,7 +56,8 @@ export function AllocationDialog({ open, onClose }: { open: boolean; onClose: ()
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      allocate(target, numeric);
+      const picked = targets.find((t) => t.value === target);
+      allocate(picked?.branch ?? target, picked?.supervisor, numeric);
       onClose();
       toast.success("ההקצאה בוצעה בהצלחה והיתרה עודכנה");
     }, 1000);
@@ -86,8 +87,8 @@ export function AllocationDialog({ open, onClose }: { open: boolean; onClose: ()
           >
             <option value="">בחר יעד…</option>
             {targets.map((t) => (
-              <option key={t} value={t}>
-                {t}
+              <option key={t.value} value={t.value}>
+                {t.label}
               </option>
             ))}
           </Select>
