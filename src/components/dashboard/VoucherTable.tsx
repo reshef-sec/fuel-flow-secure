@@ -7,7 +7,7 @@ import {
   getPaginationRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ChevronRight, ChevronLeft, FileDown, Search } from "lucide-react";
+import { ChevronRight, ChevronLeft, FileDown, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -21,6 +21,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/design-system/delek-1ea111";
+import { AllocationDialog } from "./AllocationDialog";
 import { vouchers, type VoucherRecord, type VoucherStatus } from "./voucherData";
 
 const statusVariant: Record<VoucherStatus, "success" | "info" | "danger"> = {
@@ -39,6 +40,8 @@ const columnHelper = createColumnHelper<VoucherRecord>();
 
 export function VoucherTable() {
   const [search, setSearch] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [balance, setBalance] = useState(15000);
 
   const columns = useMemo(
     () => [
@@ -118,6 +121,10 @@ export function VoucherTable() {
             <FileDown className="size-4" />
             ייצוא לאקסל
           </Button>
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="size-4" />
+            הקצאת שוברים
+          </Button>
         </div>
       </div>
 
@@ -181,6 +188,13 @@ export function VoucherTable() {
           </Button>
         </div>
       </div>
+
+      <AllocationDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        balance={balance}
+        onAllocate={(amount) => setBalance((b) => Math.max(0, b - amount))}
+      />
     </section>
   );
 }
