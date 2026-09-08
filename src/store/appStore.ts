@@ -104,7 +104,34 @@ export const useAppStore = create<AppState>((set) => ({
         vouchers: [...created, ...s.vouchers],
       };
     }),
+  assignToSupervisor: (branch, supervisor, amount) =>
+    set((s) => {
+      let left = amount;
+      const vouchers = s.vouchers.map((v) => {
+        if (left <= 0) return v;
+        if (v.branch !== branch || v.supervisor || v.status !== "טרם שומש") return v;
+        if (v.amount > left) return v;
+        left -= v.amount;
+        return { ...v, supervisor, status: "הוקצה לעובד" as const, updatedAt: today() };
+      });
+      return { vouchers };
+    }),
+  markPazRedeemed: (count) => {
+    let updated = 0;
+    set((s) => {
+      let left = count;
+      const vouchers = s.vouchers.map((v) => {
+        if (left <= 0 || v.status !== "הוקצה לעובד") return v;
+        left -= 1;
+        updated += 1;
+        return { ...v, status: "מומש סופית" as const, updatedAt: today() };
+      });
+      return { vouchers };
+    });
+    return updated;
+  },
   importVouchers: (rows) => set((s) => ({ vouchers: [...rows, ...s.vouchers] })),
+
 
   users: [
     { id: "312445678", name: "דנה כהן", phone: "052-1234567", role: "admin", branch: "סניף מרכז" },
