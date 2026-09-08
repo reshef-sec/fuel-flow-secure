@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "./design-system/delek-1ea111/design-system/styles/theme.css";
 
+@source "./design-system/delek-1ea111";
+
+
 @theme {
   --font-sans: "Assistant", "Heebo", system-ui, sans-serif;
   --font-display: "Assistant", "Heebo", system-ui, sans-serif;

@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { AllocationDialog } from "./AllocationDialog";
-import type { VoucherRecord } from "./voucherData";
+import { formatAssignment, type VoucherRecord } from "./voucherData";
 import { downloadCsv, heDate, statusVariant } from "./statusVariant";
 import { useAppStore } from "@/store/appStore";
 
@@ -46,7 +46,10 @@ export function VoucherTable() {
           <span className="tabular-nums">{info.getValue().toLocaleString("he-IL")} ₪</span>
         ),
       }),
-      columnHelper.accessor("assignedTo", { header: "שויך ל" }),
+      columnHelper.accessor((row) => formatAssignment(row), {
+        id: "assignedTo",
+        header: "שויך ל",
+      }),
       columnHelper.accessor("status", {
         header: "סטטוס",
         cell: (info) => (
@@ -76,7 +79,11 @@ export function VoucherTable() {
       const q = String(filterValue).trim().toLowerCase();
       if (!q) return true;
       const v = row.original;
-      return v.serial.toLowerCase().includes(q) || v.assignedTo.toLowerCase().includes(q);
+      return (
+        v.serial.toLowerCase().includes(q) ||
+        formatAssignment(v).toLowerCase().includes(q) ||
+        v.realCode.toLowerCase().includes(q)
+      );
     },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -92,7 +99,7 @@ export function VoucherTable() {
       .rows.map((r) => [
         r.original.serial,
         r.original.amount,
-        r.original.assignedTo,
+        formatAssignment(r.original),
         r.original.status,
         r.original.updatedAt,
       ]);

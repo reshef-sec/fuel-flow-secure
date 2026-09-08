@@ -1,22 +1,99 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2 } from "lucide-react";
+import { Building2, Ticket } from "lucide-react";
 
-import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
+import { InternalLayout } from "@/components/layout/InternalLayout";
+import { BranchesPanel } from "@/components/settings/BranchesPanel";
+import { Badge, Card } from "@/design-system/delek-1ea111";
+import { useAppStore } from "@/store/appStore";
 
 export const Route = createFileRoute("/allocations")({
   head: () => ({
     meta: [
       { title: "הקצאות לסניפים | רשף ביטחון" },
-      { name: "description", content: "הקצאת שוברי דלק לסניפים ומעקב על יתרות המלאי בכל סניף." },
+      {
+        name: "description",
+        content: "מלאי ויתרות שוברים בכל סניף וניהול הסניפים של רשף ביטחון.",
+      },
       { property: "og:title", content: "הקצאות לסניפים | רשף ביטחון" },
-      { property: "og:description", content: "הקצאת שוברים לסניפים ומעקב יתרות." },
+      { property: "og:description", content: "מלאי ויתרות סניפים וניהול סניפים." },
     ],
   }),
-  component: () => (
-    <PlaceholderPage
-      title="הקצאות לסניפים"
-      description="כאן תבוצע הקצאת שוברים לסניפים ולמפקחים, עם מעקב על יתרות ומלאי פתוח."
-      icon={Building2}
-    />
-  ),
+  component: AllocationsPage,
 });
+
+function AllocationsPage() {
+  const branchList = useAppStore((s) => s.branchList);
+  const vouchers = useAppStore((s) => s.vouchers);
+
+  const stats = branchList.map((b) => {
+    const rows = vouchers.filter((v) => v.branch === b.name);
+    const available = rows.filter((v) => v.status === "טרם שומש");
+    return {
+      ...b,
+      stock: rows.length,
+      availableCount: available.length,
+      balance: available.reduce((sum, v) => sum + v.amount, 0),
+      allocated: rows.filter((v) => v.status === "הוקצה לעובד").length,
+    };
+  });
+
+  return (
+    <InternalLayout title="הקצאות לסניפים">
+      <section>
+        <h2 className="font-display text-xl font-extrabold text-secondary">מלאי ויתרות סניפים</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {stats.length === 0 ? (
+            <Card padding="lg" className="text-sm text-muted-foreground">
+              לא הוגדרו סניפים במערכת
+            </Card>
+          ) : (
+            stats.map((b) => (
+              <Card key={b.id} padding="lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-display text-lg font-extrabold text-secondary">{b.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {b.manager || "—"} · {b.city || "—"}
+                    </p>
+                  </div>
+                  <span className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-100 text-blue-700">
+                    <Building2 className="size-5" />
+                  </span>
+                </div>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-lg bg-surface-muted p-4">
+                    <p className="text-xs font-semibold text-muted-foreground">שוברים במלאי</p>
+                    <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
+                      {b.stock.toLocaleString("he-IL")}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-mint-100 p-4">
+                    <p className="text-xs font-semibold text-muted-foreground">יתרה זמינה</p>
+                    <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
+                      {b.balance.toLocaleString("he-IL")} ₪
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <Badge variant="info" size="md">
+                    <Ticket className="size-3.5" />
+                    {b.availableCount} טרם שומשו
+                  </Badge>
+                  <Badge variant="purple" size="md">
+                    {b.allocated} הוקצו לעובדים
+                  </Badge>
+                </div>
+              </Card>
+            ))
+          )}
+        </div>
+      </section>
+
+      <div className="mt-10">
+        <BranchesPanel />
+      </div>
+    </InternalLayout>
+  );
+}
