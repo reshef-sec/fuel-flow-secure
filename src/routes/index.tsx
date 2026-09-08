@@ -4,7 +4,7 @@ import { Wallet, Ticket, CheckCircle2, Ban } from "lucide-react";
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { VoucherTable } from "@/components/dashboard/VoucherTable";
 import { Card, StatCard } from "@/design-system/delek-1ea111";
-
+import { useAppStore } from "@/store/appStore";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -24,43 +24,72 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-
 function Dashboard() {
+  const vouchers = useAppStore((s) => s.vouchers);
+  const balance = useAppStore((s) => s.balance);
+
+  const sum = (status: string) =>
+    vouchers.filter((v) => v.status === status).reduce((t, v) => t + v.amount, 0);
+  const claimed = sum("מומש סופית");
+  const allocated = sum("הוקצה לעובד");
+  const blocked = vouchers.filter((v) => v.status === "חסום").length;
+  const total = vouchers.reduce((t, v) => t + v.amount, 0);
+
   return (
     <InternalLayout title="דשבורד ניהול שוברים">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="סך תקציב" value="556,978 ₪" caption="תקציב שנתי מאושר" percent={75} />
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="שוברים זמינים"
-          value="224,470 ₪"
-          caption="מלאי לא מוקצה"
+          label="יתרה זמינה לחלוקה"
+          value={`${balance.toLocaleString("he-IL")} ₪`}
+          caption="ארנק וירטואלי"
+          percent={Math.min(100, Math.round((balance / 15000) * 100))}
+        />
+        <StatCard
+          label="שווי מלאי שוברים"
+          value={`${total.toLocaleString("he-IL")} ₪`}
+          caption="כלל השוברים במערכת"
           percent={70}
           tone="accent"
         />
-        <StatCard label="שוברים שמומשו" value="318,508 ₪" caption="מתחילת השנה" percent={57} tone="secondary" />
-        <StatCard label="שוברים חסומים" value="16" caption="ממתינים לבדיקה" percent={4} />
+        <StatCard
+          label="שוברים שמומשו"
+          value={`${claimed.toLocaleString("he-IL")} ₪`}
+          caption="מתחילת השנה"
+          percent={total ? Math.round((claimed / total) * 100) : 0}
+          tone="secondary"
+        />
+        <StatCard
+          label="שוברים חסומים"
+          value={blocked}
+          caption="ממתינים לבדיקה"
+          percent={vouchers.length ? Math.round((blocked / vouchers.length) * 100) : 0}
+        />
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: "תקציב", icon: Wallet },
-          { label: "מלאי", icon: Ticket },
-          { label: "מימושים", icon: CheckCircle2 },
-          { label: "חסומים", icon: Ban },
-        ].map(({ label, icon: Icon }) => (
-          <Card key={label} padding="sm" variant="outline" className="flex items-center gap-3">
+          { label: "תקציב", icon: Wallet, value: `${balance.toLocaleString("he-IL")} ₪` },
+          { label: "מלאי", icon: Ticket, value: `${vouchers.length} שוברים` },
+          { label: "מימושים", icon: CheckCircle2, value: `${claimed.toLocaleString("he-IL")} ₪` },
+          { label: "הוקצה לעובדים", icon: Ban, value: `${allocated.toLocaleString("he-IL")} ₪` },
+        ].map(({ label, icon: Icon, value }) => (
+          <Card key={label} padding="md" variant="outline" className="flex items-center gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-100 text-blue-700">
               <Icon className="size-5" />
             </span>
-            <span className="min-w-0 truncate text-sm font-semibold text-muted-foreground">
-              {label} — עדכון אחרון היום
+            <span className="min-w-0">
+              <span className="block truncate text-xs font-semibold text-muted-foreground">
+                {label}
+              </span>
+              <span className="block truncate text-sm font-bold tabular-nums text-secondary">
+                {value}
+              </span>
             </span>
           </Card>
         ))}
       </div>
 
       <VoucherTable />
-
     </InternalLayout>
   );
 }
