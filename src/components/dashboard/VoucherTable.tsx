@@ -100,8 +100,8 @@ export function VoucherTable() {
         <h2 className="font-display text-xl font-extrabold text-secondary">
           פעילות שוברים אחרונה
         </h2>
-        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
-          <div className="relative min-w-56 flex-1 sm:max-w-72">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <div className="relative w-full sm:w-72">
             <Search className="pointer-events-none absolute inset-y-0 end-3 my-auto size-4 text-slate-400" />
             <Input
               value={search}
