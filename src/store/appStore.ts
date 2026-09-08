@@ -56,7 +56,10 @@ interface AppState {
   balance: number;
   vouchers: VoucherRecord[];
   allocate: (branch: string, supervisor: string | undefined, amount: number) => void;
+  assignToSupervisor: (branch: string, supervisor: string, amount: number) => void;
+  markPazRedeemed: (count: number) => number;
   importVouchers: (rows: VoucherRecord[]) => void;
+
 
   users: UserRecord[];
   addUser: (user: UserRecord) => void;
