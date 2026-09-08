@@ -7,27 +7,34 @@ import {
   Users,
   FileBarChart,
   ScrollText,
+  Settings,
   Menu,
   Bell,
   UserCircle2,
   X,
 } from "lucide-react";
 
-import { Logo } from "@/design-system/delek-1ea111";
+import { Logo, Select } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
+import { roleLabels, useAppStore, type Role } from "@/store/appStore";
 
 const navItems = [
-  { to: "/", label: "דשבורד", icon: LayoutDashboard },
-  { to: "/vouchers", label: "מאגר שוברים", icon: Ticket },
-  { to: "/allocations", label: "הקצאות לסניפים", icon: Building2 },
-  { to: "/users", label: "ניהול משתמשים", icon: Users },
-  { to: "/reports", label: "דוחות", icon: FileBarChart },
-  { to: "/audit", label: "יומן פעולות", icon: ScrollText },
+  { to: "/", label: "דשבורד", icon: LayoutDashboard, roles: ["admin", "branch", "supervisor"] },
+  { to: "/vouchers", label: "מאגר שוברים", icon: Ticket, roles: ["admin", "branch"] },
+  { to: "/allocations", label: "הקצאות לסניפים", icon: Building2, roles: ["admin", "branch"] },
+  { to: "/users", label: "ניהול משתמשים", icon: Users, roles: ["admin"] },
+  { to: "/reports", label: "דוחות", icon: FileBarChart, roles: ["admin", "branch", "supervisor"] },
+  { to: "/audit", label: "יומן פעולות", icon: ScrollText, roles: ["admin", "branch"] },
+  { to: "/settings", label: "הגדרות", icon: Settings, roles: ["admin"] },
 ] as const;
 
 export function InternalLayout({ title, children }: { title: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const role = useAppStore((s) => s.role);
+  const setRole = useAppStore((s) => s.setRole);
+
+  const items = navItems.filter((item) => (item.roles as readonly string[]).includes(role));
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -57,7 +64,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
         </div>
 
         <nav className="flex flex-col gap-1 p-3">
-          {navItems.map(({ to, label, icon: Icon }) => {
+          {items.map(({ to, label, icon: Icon }) => {
             const active = pathname === to;
             return (
               <Link
@@ -67,7 +74,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors",
                   active
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-primary text-primary-foreground shadow-card"
                     : "text-secondary hover:bg-blue-100 hover:text-blue-700",
                 )}
               >
@@ -92,22 +99,32 @@ export function InternalLayout({ title, children }: { title: string; children: R
             {title}
           </h1>
           <div className="flex shrink-0 items-center gap-2">
+            <Select
+              value={role}
+              onChange={(e) => setRole(e.target.value as Role)}
+              aria-label="תפקיד לצפייה"
+              className="h-9 w-auto text-xs font-semibold"
+            >
+              {(Object.keys(roleLabels) as Role[]).map((r) => (
+                <option key={r} value={r}>
+                  תצוגה: {roleLabels[r]}
+                </option>
+              ))}
+            </Select>
             <button
               aria-label="התראות"
               className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted"
             >
               <Bell className="size-5" />
             </button>
-            <span className="flex items-center gap-2 rounded-pill bg-surface-muted px-3 py-1.5">
+            <span className="hidden items-center gap-2 rounded-pill bg-surface-muted px-3 py-1.5 sm:flex">
               <UserCircle2 className="size-5 text-secondary" />
-              <span className="hidden text-sm font-semibold text-secondary sm:inline">
-                אדמין מרכזי
-              </span>
+              <span className="text-sm font-semibold text-secondary">{roleLabels[role]}</span>
             </span>
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );
