@@ -81,8 +81,8 @@ function VouchersPage() {
             handleFiles(e.dataTransfer.files);
           }}
           className={cn(
-            "flex flex-col items-center gap-3 rounded-xl border-2 border-dashed p-10 text-center transition-colors",
-            dragging ? "border-primary bg-blue-100/60" : "border-border bg-surface-muted/60",
+            "flex flex-col items-center gap-3 rounded-xl border border-dashed p-10 text-center transition-colors",
+            dragging ? "border-primary bg-blue-100" : "border-border bg-surface-muted",
           )}
         >
           <span className="grid size-14 place-items-center rounded-xl bg-blue-100 text-blue-700">
