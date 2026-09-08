@@ -72,44 +72,8 @@ function Dashboard() {
         ))}
       </div>
 
-      <Card className="mt-6" padding="none">
-        <CardHeader className="p-5 pb-0">
-          <CardTitle>שוברים אחרונים</CardTitle>
-          <Badge variant="brand" size="md">
-            5 רשומות
-          </Badge>
-        </CardHeader>
-        <div className="p-5 pt-4">
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableHeaderCell>מס״ד</TableHeaderCell>
-                <TableHeaderCell>קוד שובר</TableHeaderCell>
-                <TableHeaderCell>סניף</TableHeaderCell>
-                <TableHeaderCell>לקוח</TableHeaderCell>
-                <TableHeaderCell>סכום</TableHeaderCell>
-                <TableHeaderCell>סטטוס</TableHeaderCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="tabular-nums">{r.id}</TableCell>
-                  <TableCell className="font-semibold">{r.code}</TableCell>
-                  <TableCell>{r.branch}</TableCell>
-                  <TableCell>{r.client}</TableCell>
-                  <TableCell className="tabular-nums">{r.amount}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusVariant[r.status as keyof typeof statusVariant]}>
-                      {r.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
+      <VoucherTable />
+
     </InternalLayout>
   );
 }
