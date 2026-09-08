@@ -99,8 +99,8 @@ export function AllocationDialog({
             </div>
           </div>
 
-          <FormField label="בחר יעד הקצאה" htmlFor="alloc-target">
-            <Select id="alloc-target" value={target} onChange={(e) => setTarget(e.target.value)}>
+          <FormField label="בחר יעד הקצאה">
+            <Select id="alloc-target" aria-label="בחר יעד הקצאה" value={target} onChange={(e) => setTarget(e.target.value)}>
               <option value="">בחר יעד…</option>
               {targets.map((t) => (
                 <option key={t} value={t}>
@@ -110,9 +110,10 @@ export function AllocationDialog({
             </Select>
           </FormField>
 
-          <FormField label="סכום להקצאה (₪)" htmlFor="alloc-amount">
+          <FormField label="סכום להקצאה (₪)">
             <Input
               id="alloc-amount"
+              aria-label="סכום להקצאה"
               type="number"
               min={1}
               inputMode="numeric"
@@ -123,8 +124,8 @@ export function AllocationDialog({
             />
           </FormField>
 
-          <FormField label="סיבת הנפקה" htmlFor="alloc-reason">
-            <Select id="alloc-reason" value={reason} onChange={(e) => setReason(e.target.value)}>
+          <FormField label="סיבת הנפקה">
+            <Select id="alloc-reason" aria-label="סיבת הנפקה" value={reason} onChange={(e) => setReason(e.target.value)}>
               <option value="">בחר סיבה…</option>
               {reasons.map((r) => (
                 <option key={r} value={r}>
