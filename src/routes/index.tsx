@@ -2,19 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Wallet, Ticket, CheckCircle2, Ban } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
-import {
-  Badge,
-  Card,
-  CardHeader,
-  CardTitle,
-  StatCard,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-} from "@/design-system/delek-1ea111";
+import { VoucherTable } from "@/components/dashboard/VoucherTable";
+import { Card, StatCard } from "@/design-system/delek-1ea111";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
