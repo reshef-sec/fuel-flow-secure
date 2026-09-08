@@ -64,7 +64,7 @@ export function SignatureField({
 
       <div
         ref={wrapRef}
-        onPointerUp={() => onChange(!padRef.current?.isEmpty())}
+        onPointerUp={() => { console.log("DBG pad", !!padRef.current, padRef.current?.isEmpty()); onChange(!padRef.current?.isEmpty()); }}
         onMouseUp={() => onChange(!padRef.current?.isEmpty())}
         onTouchEnd={() => onChange(!padRef.current?.isEmpty())}
         className={`relative w-full overflow-hidden rounded-md border-2 border-dashed bg-slate-50 ${
