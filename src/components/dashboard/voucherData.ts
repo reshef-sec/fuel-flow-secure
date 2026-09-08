@@ -1,4 +1,4 @@
-export type VoucherStatus = "מומש סופית" | "טרם שומש" | "חסום";
+export type VoucherStatus = "מומש סופית" | "טרם שומש" | "חסום" | "הוקצה לעובד";
 
 export interface VoucherRecord {
   serial: string;
