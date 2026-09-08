@@ -60,7 +60,7 @@ function WorkerForm() {
           </FormField>
 
           <div className="flex flex-col gap-1.5">
-            <span className="block text-sm font-semibold text-foreground">תתימה פיזית</span>
+            <span className="block text-sm font-semibold text-foreground">חתימה פיזית</span>
             <div className="flex h-40 flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-blue-300 bg-slate-50 text-center">
               <PenLine className="size-6 text-blue-500" />
               <span className="text-sm font-semibold text-muted-foreground">
