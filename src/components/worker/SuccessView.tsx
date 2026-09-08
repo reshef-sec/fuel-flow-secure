@@ -39,7 +39,7 @@ export function SuccessView({ code }: { code: string }) {
 
       <div className="w-full rounded-lg border-2 border-primary bg-blue-100/60 px-4 py-5">
         <span className="block text-xs font-semibold text-blue-700">קוד השובר</span>
-        <span className="mt-1 block font-display text-3xl font-extrabold tracking-widest tabular-nums text-secondary">
+        <span dir="ltr" className="mt-1 block font-display text-3xl font-extrabold tracking-widest tabular-nums text-secondary">
           {code}
         </span>
       </div>
