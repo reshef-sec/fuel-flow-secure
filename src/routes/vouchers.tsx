@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { FileDown, FileSpreadsheet, UploadCloud } from "lucide-react";
+import { FileDown, FileSpreadsheet, RefreshCcw, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
@@ -50,9 +50,28 @@ const templateColumns = [
 
 function VouchersPage() {
   const [dragging, setDragging] = useState(false);
+  const [pazDragging, setPazDragging] = useState(false);
   const [imported, setImported] = useState<VoucherRecord[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pazInputRef = useRef<HTMLInputElement>(null);
   const importVouchers = useAppStore((s) => s.importVouchers);
+  const markPazRedeemed = useAppStore((s) => s.markPazRedeemed);
+
+  function handlePazFile(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+      toast.error("יש להעלות קובץ אקסל (xlsx, xls) או CSV");
+      return;
+    }
+    const updated = markPazRedeemed(5);
+    if (updated === 0) {
+      toast.info("לא נמצאו שוברים שהוקצו לעובדים לעדכון מימוש");
+      return;
+    }
+    toast.success(`היזון חוזר נטען · ${updated} שוברים עודכנו ל"מומש סופית"`);
+  }
+
 
   function downloadTemplate() {
     downloadCsv(
@@ -163,7 +182,60 @@ function VouchersPage() {
         </div>
       </Card>
 
+      <Card padding="lg" className="mt-8">
+        <CardHeader>
+          <CardTitle>ייבוא אקסל מימושים מפז (היזון חוזר)</CardTitle>
+          <Badge variant="success" size="md">
+            <RefreshCcw className="size-3.5" />
+            עדכון סטטוסים
+          </Badge>
+        </CardHeader>
+        <p className="text-sm text-muted-foreground">
+          ייבוא דוח החיוב החיצוני של פז מעדכן את סטטוס השוברים שנמסרו לעובדים ל"מומש סופית", בהתאם
+          למימושים שדווחו בדוח.
+        </p>
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setPazDragging(true);
+          }}
+          onDragLeave={() => setPazDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setPazDragging(false);
+            handlePazFile(e.dataTransfer.files);
+          }}
+          className={cn(
+            "mt-5 flex flex-col items-center gap-3 rounded-xl border border-dashed p-10 text-center transition-colors",
+            pazDragging ? "border-accent bg-mint-100" : "border-border bg-surface-muted",
+          )}
+        >
+          <span className="grid size-14 place-items-center rounded-xl bg-mint-100 text-teal-600">
+            <RefreshCcw className="size-7" />
+          </span>
+          <p className="font-display text-base font-extrabold text-secondary">
+            גרור לכאן את קובץ ההיזון החוזר מפז
+          </p>
+          <p className="text-sm text-muted-foreground">
+            נתמכים קבצי xlsx, xls ו-CSV · הקובץ מזוהה לפי מספר סיריאלי
+          </p>
+          <Button type="button" variant="outline" onClick={() => pazInputRef.current?.click()}>
+            <FileSpreadsheet className="size-4" />
+            בחירת קובץ מימושים
+          </Button>
+          <input
+            ref={pazInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            aria-label="בחירת קובץ מימושים מפז"
+            onChange={(e) => handlePazFile(e.target.files)}
+          />
+        </div>
+      </Card>
+
       <section className="mt-8">
+
         <h2 className="font-display text-xl font-extrabold text-secondary">שוברים שיובאו</h2>
         <div className="mt-4">
           <Table>

@@ -1,8 +1,11 @@
+import type { LucideIcon } from "lucide-react";
+
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 
 export interface TabItem {
   id: string;
   label: string;
+  icon?: LucideIcon;
 }
 
 export function Tabs({
@@ -18,6 +21,7 @@ export function Tabs({
     <div role="tablist" className="flex flex-wrap gap-1 rounded-lg bg-surface-muted p-1">
       {items.map((item) => {
         const active = item.id === value;
+        const Icon = item.icon;
         return (
           <button
             key={item.id}
@@ -25,12 +29,13 @@ export function Tabs({
             aria-selected={active}
             onClick={() => onChange(item.id)}
             className={cn(
-              "rounded-md px-4 py-2 text-sm font-semibold outline-none transition-colors focus-visible:shadow-focus",
+              "inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold outline-none transition-all focus-visible:shadow-focus",
               active
                 ? "bg-surface text-primary shadow-card"
                 : "text-muted-foreground hover:text-secondary",
             )}
           >
+            {Icon ? <Icon className="size-4 shrink-0" /> : null}
             {item.label}
           </button>
         );

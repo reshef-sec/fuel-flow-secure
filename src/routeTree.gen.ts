@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkerRouteImport } from './routes/worker'
 import { Route as VouchersRouteImport } from './routes/vouchers'
+import { Route as SupervisorRouteImport } from './routes/supervisor'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as AllocationsRouteImport } from './routes/allocations'
@@ -26,6 +27,11 @@ const WorkerRoute = WorkerRouteImport.update({
 const VouchersRoute = VouchersRouteImport.update({
   id: '/vouchers',
   path: '/vouchers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupervisorRoute = SupervisorRouteImport.update({
+  id: '/supervisor',
+  path: '/supervisor',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/allocations': typeof AllocationsRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/allocations': typeof AllocationsRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/allocations': typeof AllocationsRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/allocations'
     | '/reports'
     | '/settings'
+    | '/supervisor'
     | '/vouchers'
     | '/worker'
     | '/__component/preview/$'
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/allocations'
     | '/reports'
     | '/settings'
+    | '/supervisor'
     | '/vouchers'
     | '/worker'
     | '/__component/preview/$'
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/allocations'
     | '/reports'
     | '/settings'
+    | '/supervisor'
     | '/vouchers'
     | '/worker'
     | '/__component/preview/$'
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   AllocationsRoute: typeof AllocationsRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
+  SupervisorRoute: typeof SupervisorRoute
   VouchersRoute: typeof VouchersRoute
   WorkerRoute: typeof WorkerRoute
   Char91__componentChar93PreviewSplatRoute: typeof Char91__componentChar93PreviewSplatRoute
@@ -150,6 +163,13 @@ declare module '@tanstack/react-router' {
       path: '/vouchers'
       fullPath: '/vouchers'
       preLoaderRoute: typeof VouchersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/supervisor': {
+      id: '/supervisor'
+      path: '/supervisor'
+      fullPath: '/supervisor'
+      preLoaderRoute: typeof SupervisorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   AllocationsRoute: AllocationsRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
+  SupervisorRoute: SupervisorRoute,
   VouchersRoute: VouchersRoute,
   WorkerRoute: WorkerRoute,
   Char91__componentChar93PreviewSplatRoute:
