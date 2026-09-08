@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkerRouteImport } from './routes/worker'
 import { Route as VouchersRouteImport } from './routes/vouchers'
 import { Route as UsersRouteImport } from './routes/users'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as AllocationsRouteImport } from './routes/allocations'
@@ -32,6 +33,11 @@ const VouchersRoute = VouchersRouteImport.update({
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/allocations': typeof AllocationsRoute
   '/audit': typeof AuditRoute
   '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRoute
@@ -83,6 +90,7 @@ export interface FileRoutesByTo {
   '/allocations': typeof AllocationsRoute
   '/audit': typeof AuditRoute
   '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRoute
@@ -95,6 +103,7 @@ export interface FileRoutesById {
   '/allocations': typeof AllocationsRoute
   '/audit': typeof AuditRoute
   '/reports': typeof ReportsRoute
+  '/settings': typeof SettingsRoute
   '/users': typeof UsersRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRoute
@@ -108,6 +117,7 @@ export interface FileRouteTypes {
     | '/allocations'
     | '/audit'
     | '/reports'
+    | '/settings'
     | '/users'
     | '/vouchers'
     | '/worker'
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/allocations'
     | '/audit'
     | '/reports'
+    | '/settings'
     | '/users'
     | '/vouchers'
     | '/worker'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/allocations'
     | '/audit'
     | '/reports'
+    | '/settings'
     | '/users'
     | '/vouchers'
     | '/worker'
@@ -142,6 +154,7 @@ export interface RootRouteChildren {
   AllocationsRoute: typeof AllocationsRoute
   AuditRoute: typeof AuditRoute
   ReportsRoute: typeof ReportsRoute
+  SettingsRoute: typeof SettingsRoute
   UsersRoute: typeof UsersRoute
   VouchersRoute: typeof VouchersRoute
   WorkerRoute: typeof WorkerRoute
@@ -170,6 +183,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -222,6 +242,7 @@ const rootRouteChildren: RootRouteChildren = {
   AllocationsRoute: AllocationsRoute,
   AuditRoute: AuditRoute,
   ReportsRoute: ReportsRoute,
+  SettingsRoute: SettingsRoute,
   UsersRoute: UsersRoute,
   VouchersRoute: VouchersRoute,
   WorkerRoute: WorkerRoute,
