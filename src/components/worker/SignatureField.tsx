@@ -13,27 +13,38 @@ export function SignatureField({
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const padRef = useRef<SignatureCanvas | null>(null);
+  const widthRef = useRef(0);
+
+  // Keep the latest callback in a ref so the resize effect stays stable and
+  // never re-runs (which would wipe an existing signature).
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const report = useCallback(() => {
+    onChangeRef.current(!padRef.current?.isEmpty());
+  }, []);
 
   // Keep the canvas bitmap in sync with its rendered size so strokes land
   // exactly under the finger on any screen width.
-  const resize = useCallback(() => {
-    const wrap = wrapRef.current;
-    const pad = padRef.current;
-    const canvas = pad?.getCanvas();
-    if (!wrap || !pad || !canvas) return;
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-    const width = wrap.clientWidth;
-    if (!width) return;
-    canvas.width = width * ratio;
-    canvas.height = HEIGHT * ratio;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${HEIGHT}px`;
-    canvas.getContext("2d")?.scale(ratio, ratio);
-    pad.clear();
-    onChange(false);
-  }, [onChange]);
-
   useEffect(() => {
+    const resize = () => {
+      const wrap = wrapRef.current;
+      const pad = padRef.current;
+      const canvas = pad?.getCanvas();
+      if (!wrap || !pad || !canvas) return;
+      const width = wrap.clientWidth;
+      if (!width || width === widthRef.current) return;
+      widthRef.current = width;
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      canvas.width = width * ratio;
+      canvas.height = HEIGHT * ratio;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${HEIGHT}px`;
+      canvas.getContext("2d")?.scale(ratio, ratio);
+      pad.clear();
+      onChangeRef.current(false);
+    };
+
     resize();
     const wrap = wrapRef.current;
     if (!wrap || typeof ResizeObserver === "undefined") {
@@ -43,7 +54,7 @@ export function SignatureField({
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [resize]);
+  }, []);
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -53,7 +64,7 @@ export function SignatureField({
           type="button"
           onClick={() => {
             padRef.current?.clear();
-            onChange(false);
+            onChangeRef.current(false);
           }}
           className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-semibold text-primary hover:bg-blue-100"
         >
@@ -64,9 +75,9 @@ export function SignatureField({
 
       <div
         ref={wrapRef}
-        onPointerUp={() => { console.log("DBG pad", !!padRef.current, padRef.current?.isEmpty()); onChange(!padRef.current?.isEmpty()); }}
-        onMouseUp={() => onChange(!padRef.current?.isEmpty())}
-        onTouchEnd={() => onChange(!padRef.current?.isEmpty())}
+        onPointerUp={report}
+        onMouseUp={report}
+        onTouchEnd={report}
         className={`relative w-full overflow-hidden rounded-md border-2 border-dashed bg-slate-50 ${
           error ? "border-danger" : "border-blue-300"
         }`}
@@ -78,7 +89,7 @@ export function SignatureField({
           }}
           penColor="#0b1140"
           canvasProps={{ className: "absolute inset-0 touch-none" }}
-          onEnd={() => onChange(!padRef.current?.isEmpty())}
+          onEnd={report}
         />
         <span className="pointer-events-none absolute inset-x-0 bottom-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
           <PenLine className="size-3.5" />
