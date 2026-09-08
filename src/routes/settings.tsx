@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { Briefcase, Building2, ListChecks, ScrollText, Users } from "lucide-react";
+
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { Tabs } from "@/components/ui/Tabs";
@@ -26,12 +28,13 @@ export const Route = createFileRoute("/settings")({
 });
 
 const tabs = [
-  { id: "reasons", label: "סיבות הנפקה" },
-  { id: "branches", label: "ניהול סניפים" },
-  { id: "users", label: "ניהול משתמשים" },
-  { id: "clients", label: "לקוחות ואתרים" },
-  { id: "audit", label: "יומן פעילות" },
+  { id: "reasons", label: "סיבות הנפקה", icon: ListChecks },
+  { id: "branches", label: "ניהול סניפים", icon: Building2 },
+  { id: "users", label: "ניהול משתמשים", icon: Users },
+  { id: "clients", label: "לקוחות ואתרים", icon: Briefcase },
+  { id: "audit", label: "יומן פעילות", icon: ScrollText },
 ] as const;
+
 
 function SettingsPage() {
   const [tab, setTab] = useState<string>("reasons");

@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, Ticket } from "lucide-react";
+import { Building2, Ticket, UserCheck, Wallet } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
-
-import { Badge, Card } from "@/design-system/delek-1ea111";
+import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
+import { Badge, Button, Card } from "@/design-system/delek-1ea111";
 import { useAppStore } from "@/store/appStore";
 
 export const Route = createFileRoute("/allocations")({
@@ -12,10 +13,10 @@ export const Route = createFileRoute("/allocations")({
       { title: "הקצאות לסניפים | רשף ביטחון" },
       {
         name: "description",
-        content: "מלאי ויתרות שוברים בכל סניף וניהול הסניפים של רשף ביטחון.",
+        content: "מלאי ויתרות שוברים בכל סניף והקצאת שוברים למפקחי הסניף.",
       },
       { property: "og:title", content: "הקצאות לסניפים | רשף ביטחון" },
-      { property: "og:description", content: "מלאי ויתרות סניפים וניהול סניפים." },
+      { property: "og:description", content: "יתרות סניפים והקצאת שוברים למפקחים." },
     ],
   }),
   component: AllocationsPage,
@@ -24,10 +25,13 @@ export const Route = createFileRoute("/allocations")({
 function AllocationsPage() {
   const branchList = useAppStore((s) => s.branchList);
   const vouchers = useAppStore((s) => s.vouchers);
+  const users = useAppStore((s) => s.users);
+  const role = useAppStore((s) => s.role);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const stats = branchList.map((b) => {
     const rows = vouchers.filter((v) => v.branch === b.name);
-    const available = rows.filter((v) => v.status === "טרם שומש");
+    const available = rows.filter((v) => v.status === "טרם שומש" && !v.supervisor);
     return {
       ...b,
       stock: rows.length,
@@ -37,8 +41,40 @@ function AllocationsPage() {
     };
   });
 
+  const myBranch =
+    users.find((u) => u.role === "branch")?.branch ?? branchList[0]?.name ?? "סניף מרכז";
+  const mine = stats.find((b) => b.name === myBranch);
+  const isBranchManager = role === "branch";
+
   return (
     <InternalLayout title="הקצאות לסניפים">
+      {isBranchManager && mine ? (
+        <Card padding="lg" className="mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-mint-100 text-teal-600">
+                <Wallet className="size-6" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground">
+                  היתרה הזמינה שלי · {mine.name}
+                </p>
+                <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">
+                  {mine.balance.toLocaleString("he-IL")} ₪
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {mine.availableCount} שוברים זמינים להקצאה למפקחי הסניף
+                </p>
+              </div>
+            </div>
+            <Button onClick={() => setDialogOpen(true)}>
+              <UserCheck className="size-4" />
+              הקצאה למפקח
+            </Button>
+          </div>
+        </Card>
+      ) : null}
+
       <section>
         <h2 className="font-display text-xl font-extrabold text-secondary">מלאי ויתרות סניפים</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -90,7 +126,13 @@ function AllocationsPage() {
           )}
         </div>
       </section>
+
+      <SupervisorAllocationDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        branch={myBranch}
+        branchBalance={mine?.balance ?? 0}
+      />
     </InternalLayout>
   );
 }
-
