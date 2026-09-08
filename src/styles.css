@@ -1,3 +1,6 @@
+@import "tailwindcss" source(none);
+@source "../src";
+
 * {
   margin: 0;
   padding: 0;

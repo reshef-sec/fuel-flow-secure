@@ -1,0 +1,87 @@
+/* Reshef Bitachon design system — canonical theme entry.
+   Import this one file to receive the full theme (tokens + base styles). */
+
+@theme {
+  /* Brand */
+  --color-navy-50: #eef1fa;
+  --color-navy-100: #d3daf1;
+  --color-navy-300: #7d8bc7;
+  --color-navy-500: #2c3d8f;
+  --color-navy-700: #16215e;
+  --color-navy-900: #0b1140;
+
+  --color-blue-100: #dceafb;
+  --color-blue-300: #8fb8f2;
+  --color-blue-500: #1f5fd0;
+  --color-blue-700: #17489f;
+
+  --color-mint-100: #d9faf3;
+  --color-mint-300: #8ee8db;
+  --color-mint-500: #45cdba;
+  --color-teal-600: #12a08c;
+
+  --color-slate-50: #f7f9fc;
+  --color-slate-100: #eef2f7;
+  --color-slate-200: #e0e6ef;
+  --color-slate-400: #94a2b8;
+  --color-slate-600: #566172;
+  --color-slate-900: #1b2432;
+
+  --color-success: #12a08c;
+  --color-warning: #e0a11b;
+  --color-danger: #d9414f;
+
+  /* Semantic */
+  --color-background: var(--color-slate-50);
+  --color-surface: #ffffff;
+  --color-surface-muted: var(--color-slate-100);
+  --color-foreground: var(--color-navy-900);
+  --color-muted-foreground: var(--color-slate-600);
+  --color-border: var(--color-slate-200);
+  --color-primary: var(--color-blue-500);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--color-navy-700);
+  --color-secondary-foreground: #ffffff;
+  --color-accent: var(--color-mint-500);
+  --color-accent-foreground: var(--color-navy-900);
+  --color-ring: var(--color-blue-500);
+
+  /* Typography */
+  --font-display: "Heebo", system-ui, sans-serif;
+  --font-sans: "Heebo", system-ui, sans-serif;
+  --font-assistant: "Assistant", "Heebo", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+
+  --text-display: 2.75rem;
+  --text-display--line-height: 1.1;
+  --text-display--font-weight: 800;
+
+  /* Radius */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgb(11 17 64 / 0.04), 0 8px 24px rgb(11 17 64 / 0.06);
+  --shadow-raised: 0 12px 32px rgb(11 17 64 / 0.12);
+  --shadow-focus: 0 0 0 3px rgb(31 95 208 / 0.25);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  [dir="rtl"] {
+    text-align: right;
+  }
+}
