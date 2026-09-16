@@ -19,12 +19,12 @@ import { useAppStore } from "@/store/appStore";
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
     meta: [
-      { title: "עמדת מפקח | רשף ביטחון" },
+      { title: "הפקת שובר לעובד | רשף ביטחון" },
       {
         name: "description",
         content: "הפקת לינק שובר דלק אישי לעובד: סכום, לקוח, אתר וסיבת הנפקה.",
       },
-      { property: "og:title", content: "עמדת מפקח | רשף ביטחון" },
+      { property: "og:title", content: "הפקת שובר לעובד | רשף ביטחון" },
       { property: "og:description", content: "הפקת שובר לעובד ושליחת לינק בוואטסאפ." },
     ],
   }),
@@ -91,7 +91,7 @@ function SupervisorPage() {
   }
 
   return (
-    <InternalLayout title="עמדת מפקח">
+    <InternalLayout title="הפקת שובר לעובד">
       <div className="grid gap-6 lg:grid-cols-2">
         <Card padding="lg">
           <CardHeader>

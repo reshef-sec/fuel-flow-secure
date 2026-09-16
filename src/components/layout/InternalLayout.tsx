@@ -24,7 +24,7 @@ const navItems = [
   { to: "/", label: "דשבורד", icon: LayoutDashboard, roles: ["admin", "branch", "supervisor"] },
   { to: "/vouchers", label: "מאגר שוברים", icon: Ticket, roles: ["admin", "branch"] },
   { to: "/allocations", label: "הקצאות לסניפים", icon: Building2, roles: ["admin", "branch"] },
-  { to: "/supervisor", label: "עמדת מפקח", icon: UserCheck, roles: ["admin", "supervisor"] },
+  { to: "/supervisor", label: "הפקת שובר לעובד", icon: UserCheck, roles: ["admin", "branch", "supervisor"] },
   { to: "/reports", label: "דוחות", icon: FileBarChart, roles: ["admin", "branch", "supervisor"] },
   { to: "/settings", label: "הגדרות", icon: Settings, roles: ["admin"] },
 ] as const;
