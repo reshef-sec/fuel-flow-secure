@@ -152,6 +152,18 @@ export const useAppStore = create<AppState>((set) => ({
     });
     return updated;
   },
+  markSerialsRedeemed: (serials) => {
+    const wanted = new Set(serials.map((s) => s.trim()).filter(Boolean));
+    let updated = 0;
+    set((s) => ({
+      vouchers: s.vouchers.map((v) => {
+        if (!wanted.has(v.serial) || v.status === "מומש סופית") return v;
+        updated += 1;
+        return { ...v, status: "מומש סופית" as const, updatedAt: today() };
+      }),
+    }));
+    return updated;
+  },
   importVouchers: (rows) => set((s) => ({ vouchers: [...rows, ...s.vouchers] })),
 
 
