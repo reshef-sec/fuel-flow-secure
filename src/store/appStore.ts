@@ -9,18 +9,31 @@ import {
 export type Role = "admin" | "branch" | "supervisor";
 
 export const roleLabels: Record<Role, string> = {
-  admin: "אדמין מרכזי",
+  admin: "אדמין",
   branch: "מנהל סניף",
   supervisor: "מפקח",
 };
 
 export interface UserRecord {
+  /** ת.ז */
   id: string;
-  name: string;
-  phone: string;
+  /** משפחה */
+  lastName: string;
+  /** פרטי */
+  firstName: string;
+  /** הרשאה */
   role: Role;
+  /** תפקיד */
+  title: string;
+  /** נייד */
+  phone: string;
+  /** סניף */
   branch: string;
 }
+
+/** "משפחה פרטי" for selects and voucher assignment labels. */
+export const fullName = (u: Pick<UserRecord, "lastName" | "firstName">) =>
+  `${u.lastName} ${u.firstName}`.trim();
 
 export interface BranchRecord {
   id: string;
@@ -39,11 +52,13 @@ export interface ClientRecord {
 const today = () => new Date().toISOString().slice(0, 10);
 
 const seedBranches: BranchRecord[] = [
-  { id: "b1", name: "סניף מרכז", manager: "דנה כהן", city: "תל אביב" },
-  { id: "b2", name: "סניף צפון", manager: "אורי לוי", city: "עפולה" },
-  { id: "b3", name: "סניף דרום", manager: "דן מזרחי", city: "באר שבע" },
-  { id: "b4", name: "סניף ירושלים", manager: "נועה ברק", city: "ירושלים" },
-  { id: "b5", name: "סניף חיפה", manager: "רון אלמוג", city: "חיפה" },
+  { id: "b1", name: "הנהלה", manager: "רון קלדרון", city: "מטה" },
+  { id: "b2", name: "צפון", manager: "גיא שכטר", city: "עפולה" },
+  { id: "b3", name: "מרכז", manager: "עופר קשי", city: "תל אביב" },
+  { id: "b4", name: "ירושלים", manager: "עידן כהן", city: "ירושלים" },
+  { id: "b5", name: "דרום", manager: "חיים אלמקייס", city: "באר שבע" },
+  { id: "b6", name: "שפלה", manager: "אבי ממן", city: "רחובות" },
+  { id: "b7", name: "מוקד", manager: "ליאור משה", city: "לוד" },
 ];
 
 /** Static list kept for forms that only need branch names. */
