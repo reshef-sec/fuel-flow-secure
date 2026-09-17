@@ -48,7 +48,7 @@ function ReportsPage() {
   const [filters, setFilters] = useState(empty);
 
   const supervisors = useMemo(
-    () => users.filter((u) => u.role === "supervisor").map((u) => u.name),
+    () => users.filter((u) => u.role === "supervisor").map((u) => fullName(u)),
     [users],
   );
   const clientOptions = useMemo(() => {

@@ -85,8 +85,8 @@ export function SupervisorAllocationDialog({
           >
             <option value="">בחר מפקח…</option>
             {supervisors.map((u) => (
-              <option key={u.id} value={u.name}>
-                {u.name}
+              <option key={u.id} value={fullName(u)}>
+                {fullName(u)}
               </option>
             ))}
           </Select>

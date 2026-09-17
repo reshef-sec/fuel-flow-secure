@@ -17,10 +17,10 @@ export function AllocationDialog({ open, onClose }: { open: boolean; onClose: ()
     ...users
       .filter((u) => u.role === "supervisor")
       .map((u) => ({
-        value: `${u.branch}|${u.name}`,
-        label: `${u.branch} (${u.name})`,
+        value: `${u.branch}|${fullName(u)}`,
+        label: `${u.branch} (${fullName(u)})`,
         branch: u.branch,
-        supervisor: u.name,
+        supervisor: fullName(u),
       })),
   ];
   const [target, setTarget] = useState("");
