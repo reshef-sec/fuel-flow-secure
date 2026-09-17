@@ -201,14 +201,14 @@ export const useAppStore = create<AppState>((set) => ({
     })),
   removeBranch: (id) => set((s) => ({ branchList: s.branchList.filter((b) => b.id !== id) })),
 
-  clients: [
-    { clientId: "1001", clientName: "מפעלי הצפון", siteId: "11", siteName: "אתר ייצור עפולה" },
-    { clientId: "1001", clientName: "מפעלי הצפון", siteId: "12", siteName: "מחסן לוגיסטי" },
-    { clientId: "1042", clientName: "קניון הדרום", siteId: "21", siteName: "חניון ראשי" },
-    { clientId: "1108", clientName: "בנק ירושלים", siteId: "31", siteName: "סניף מרכז העיר" },
-  ],
+  clients: seedClients,
   addClient: (client) => set((s) => ({ clients: [client, ...s.clients] })),
-  importClients: (rows) => set((s) => ({ clients: [...rows, ...s.clients] })),
+  /** Merges imported rows, replacing existing client+site combinations. */
+  importClients: (rows) =>
+    set((s) => {
+      const keys = new Set(rows.map((r) => `${r.clientId}|${r.siteId}`));
+      return { clients: [...rows, ...s.clients.filter((c) => !keys.has(`${c.clientId}|${c.siteId}`))] };
+    }),
   removeClient: (clientId, siteId) =>
     set((s) => ({
       clients: s.clients.filter((c) => !(c.clientId === clientId && c.siteId === siteId)),
