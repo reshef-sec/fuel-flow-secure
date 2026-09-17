@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { useAppStore } from "@/store/appStore";
+import { fullName, useAppStore } from "@/store/appStore";
 
 export function SupervisorAllocationDialog({
   open,
@@ -85,8 +85,8 @@ export function SupervisorAllocationDialog({
           >
             <option value="">בחר מפקח…</option>
             {supervisors.map((u) => (
-              <option key={u.id} value={u.name}>
-                {u.name}
+              <option key={u.id} value={fullName(u)}>
+                {fullName(u)}
               </option>
             ))}
           </Select>
