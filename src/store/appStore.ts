@@ -53,6 +53,9 @@ export interface ClientRecord {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/** Real clients & sites list (מס' לקוח, שם לקוח, מספר אתר, שם אתר). */
+const seedClients: ClientRecord[] = clientsSeed as ClientRecord[];
+
 const seedBranches: BranchRecord[] = [
   { id: "b1", name: "הנהלה", manager: "רון קלדרון", city: "מטה" },
   { id: "b2", name: "צפון", manager: "גיא שכטר", city: "עפולה" },
