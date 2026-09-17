@@ -82,25 +82,36 @@ function VouchersPage() {
     toast.success("תבנית האקסל הורדה");
   }
 
-  function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+    if (!isSheetFile(file.name)) {
       toast.error("יש להעלות קובץ אקסל (xlsx, xls) או CSV");
       return;
     }
-    const today = new Date().toISOString().slice(0, 10);
-    const rows: VoucherRecord[] = Array.from({ length: 8 }, () => ({
-      serial: String(Math.floor(100000 + Math.random() * 899999)),
-      realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
-      amount: [100, 200, 300, 500][Math.floor(Math.random() * 4)]!,
-      branch: MAIN_POOL,
-      status: "טרם שומש",
-      updatedAt: today,
-    }));
-    setImported(rows);
-    importVouchers(rows);
-    toast.success(`הקובץ "${file.name}" נטען · ${rows.length} שוברים נוספו למאגר`);
+    try {
+      const raw = stripHeader(await parseSheetFile(file), "מס");
+      const today = new Date().toISOString().slice(0, 10);
+      const rows: VoucherRecord[] = raw
+        .filter((r) => (r[0] ?? "").length > 0)
+        .map((r) => ({
+          serial: String(r[0] ?? "").trim(),
+          realCode: String(r[1] ?? "").trim(),
+          amount: Number(String(r[2] ?? "").replace(/[^\d.]/g, "")) || 0,
+          branch: MAIN_POOL,
+          status: "טרם שומש" as const,
+          updatedAt: String(r[3] ?? "").trim() || today,
+        }));
+      if (rows.length === 0) {
+        toast.error("לא נמצאו שורות תקינות בקובץ. יש להשתמש בתבנית האקסל");
+        return;
+      }
+      setImported(rows);
+      importVouchers(rows);
+      toast.success(`הקובץ "${file.name}" נטען · ${rows.length} שוברים נוספו למאגר`);
+    } catch {
+      toast.error("קריאת הקובץ נכשלה. יש לוודא שהקובץ תקין");
+    }
   }
 
   return (
