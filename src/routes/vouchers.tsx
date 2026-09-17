@@ -24,6 +24,7 @@ import {
   formatAssignment,
   type VoucherRecord,
 } from "@/components/dashboard/voucherData";
+import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { useAppStore } from "@/store/appStore";
 
 export const Route = createFileRoute("/vouchers")({
