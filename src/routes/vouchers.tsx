@@ -56,21 +56,31 @@ function VouchersPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const pazInputRef = useRef<HTMLInputElement>(null);
   const importVouchers = useAppStore((s) => s.importVouchers);
-  const markPazRedeemed = useAppStore((s) => s.markPazRedeemed);
+  const markSerialsRedeemed = useAppStore((s) => s.markSerialsRedeemed);
 
-  function handlePazFile(files: FileList | null) {
+  async function handlePazFile(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+    if (!isSheetFile(file.name)) {
       toast.error("יש להעלות קובץ אקסל (xlsx, xls) או CSV");
       return;
     }
-    const updated = markPazRedeemed(5);
-    if (updated === 0) {
-      toast.info("לא נמצאו שוברים שהוקצו לעובדים לעדכון מימוש");
-      return;
+    try {
+      const raw = stripHeader(await parseSheetFile(file), "מס");
+      const serials = raw.map((r) => String(r[0] ?? "").trim()).filter(Boolean);
+      if (serials.length === 0) {
+        toast.error("לא נמצאו מספרי שוברים בקובץ ההיזון החוזר");
+        return;
+      }
+      const updated = markSerialsRedeemed(serials);
+      if (updated === 0) {
+        toast.info("מספרי השוברים בקובץ לא נמצאו במאגר או שכבר מומשו");
+        return;
+      }
+      toast.success(`היזון חוזר נטען · ${updated} שוברים עודכנו ל"מומש סופית"`);
+    } catch {
+      toast.error("קריאת הקובץ נכשלה. יש לוודא שהקובץ תקין");
     }
-    toast.success(`היזון חוזר נטען · ${updated} שוברים עודכנו ל"מומש סופית"`);
   }
 
 
