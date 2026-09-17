@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { useAppStore } from "@/store/appStore";
+import { fullName, useAppStore } from "@/store/appStore";
 
 export function SupervisorAllocationDialog({
   open,

@@ -42,7 +42,7 @@ function AllocationsPage() {
   });
 
   const myBranch =
-    users.find((u) => u.role === "branch")?.branch ?? branchList[0]?.name ?? "סניף מרכז";
+    users.find((u) => u.role === "branch")?.branch ?? branchList[0]?.name ?? "מרכז";
   const mine = stats.find((b) => b.name === myBranch);
   const isBranchManager = role === "branch";
 

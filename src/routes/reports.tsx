@@ -20,7 +20,7 @@ import {
 } from "@/design-system/delek-1ea111";
 import { downloadCsv, heDate, statusVariant } from "@/components/dashboard/statusVariant";
 import { formatAssignment, type VoucherStatus } from "@/components/dashboard/voucherData";
-import { useAppStore } from "@/store/appStore";
+import { fullName, useAppStore } from "@/store/appStore";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
