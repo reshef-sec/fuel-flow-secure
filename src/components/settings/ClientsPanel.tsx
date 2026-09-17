@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { FileSpreadsheet, Plus, Trash2, UploadCloud } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, FileSpreadsheet, Plus, Search, Trash2, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -17,6 +17,7 @@ import {
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 import { downloadCsv } from "@/components/dashboard/statusVariant";
+import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { useAppStore } from "@/store/appStore";
 
 const empty = { clientId: "", clientName: "", siteId: "", siteName: "" };
@@ -31,23 +32,49 @@ export function ClientsPanel() {
   const [form, setForm] = useState(empty);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleFiles(files: FileList | null) {
+  const PAGE_SIZE = 25;
+  const filtered = useMemo(() => {
+    const q = query.trim();
+    if (!q) return clients;
+    return clients.filter((c) =>
+      [c.clientId, c.clientName, c.siteId, c.siteName].some((v) => v.includes(q)),
+    );
+  }, [clients, query]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = Math.min(page, pageCount - 1);
+  const visible = filtered.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
+
+  async function handleFiles(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
+    if (!isSheetFile(file.name)) {
       toast.error("יש להעלות קובץ אקסל (xlsx, xls) או CSV");
       return;
     }
-    const rows = Array.from({ length: 4 }, (_, i) => ({
-      clientId: String(2000 + Math.floor(Math.random() * 900)),
-      clientName: `לקוח מיובא ${i + 1}`,
-      siteId: String(10 + i),
-      siteName: `אתר ${i + 1}`,
-    }));
-    importClients(rows);
-    toast.success(`הקובץ "${file.name}" נטען · ${rows.length} אתרים נוספו`);
+    try {
+      const raw = stripHeader(await parseSheetFile(file), "לקוח");
+      const rows = raw
+        .filter((r) => (r[0] ?? "").length > 0 && (r[2] ?? "").length > 0)
+        .map((r) => ({
+          clientId: String(r[0] ?? "").trim(),
+          clientName: String(r[1] ?? "").trim(),
+          siteId: String(r[2] ?? "").trim(),
+          siteName: String(r[3] ?? "").trim(),
+        }));
+      if (rows.length === 0) {
+        toast.error("לא נמצאו שורות תקינות. עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר");
+        return;
+      }
+      importClients(rows);
+      setPage(0);
+      toast.success(`הקובץ "${file.name}" נטען · ${rows.length.toLocaleString("he-IL")} אתרים`);
+    } catch {
+      toast.error("קריאת הקובץ נכשלה. יש לוודא שהקובץ תקין");
+    }
   }
 
   function submit(e: React.FormEvent) {
@@ -75,8 +102,26 @@ export function ClientsPanel() {
   return (
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-extrabold text-secondary">לקוחות ואתרים</h2>
-        <div className="flex flex-wrap gap-2">
+        <h2 className="font-display text-xl font-extrabold text-secondary">
+          לקוחות ואתרים
+          <span className="ms-2 text-sm font-semibold text-muted-foreground">
+            {filtered.length.toLocaleString("he-IL")} מתוך {clients.length.toLocaleString("he-IL")}
+          </span>
+        </h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setPage(0);
+              }}
+              placeholder="חיפוש לקוח או אתר"
+              aria-label="חיפוש לקוחות ואתרים"
+              className="w-64 pe-9"
+            />
+          </div>
           <Button
             variant="outline"
             onClick={() => {
@@ -151,14 +196,14 @@ export function ClientsPanel() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {clients.length === 0 ? (
+            {visible.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                  לא הוגדרו לקוחות ואתרים
+                  לא נמצאו לקוחות או אתרים מתאימים
                 </TableCell>
               </TableRow>
             ) : (
-              clients.map((c) => (
+              visible.map((c) => (
                 <TableRow key={`${c.clientId}-${c.siteId}`}>
                   <TableCell className="tabular-nums font-semibold">{c.clientId}</TableCell>
                   <TableCell>{c.clientName}</TableCell>
@@ -181,6 +226,32 @@ export function ClientsPanel() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          עמוד {current + 1} מתוך {pageCount}
+        </p>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={current === 0}
+            onClick={() => setPage(current - 1)}
+          >
+            <ChevronRight className="size-4" />
+            הקודם
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={current >= pageCount - 1}
+            onClick={() => setPage(current + 1)}
+          >
+            הבא
+            <ChevronLeft className="size-4" />
+          </Button>
+        </div>
       </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title="הוספת לקוח ואתר">

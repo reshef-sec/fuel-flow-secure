@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+import clientsSeed from "@/data/clients.json";
+
 import {
   MAIN_POOL,
   vouchers as seedVouchers,
@@ -51,6 +53,9 @@ export interface ClientRecord {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+/** Real clients & sites list (מס' לקוח, שם לקוח, מספר אתר, שם אתר). */
+const seedClients: ClientRecord[] = clientsSeed as ClientRecord[];
+
 const seedBranches: BranchRecord[] = [
   { id: "b1", name: "הנהלה", manager: "רון קלדרון", city: "מטה" },
   { id: "b2", name: "צפון", manager: "גיא שכטר", city: "עפולה" },
@@ -73,6 +78,8 @@ interface AppState {
   allocate: (branch: string, supervisor: string | undefined, amount: number) => void;
   assignToSupervisor: (branch: string, supervisor: string, amount: number) => void;
   markPazRedeemed: (count: number) => number;
+  /** Marks vouchers redeemed by serial numbers from the Paz feedback file. */
+  markSerialsRedeemed: (serials: string[]) => number;
   importVouchers: (rows: VoucherRecord[]) => void;
 
 
@@ -145,6 +152,18 @@ export const useAppStore = create<AppState>((set) => ({
     });
     return updated;
   },
+  markSerialsRedeemed: (serials) => {
+    const wanted = new Set(serials.map((s) => s.trim()).filter(Boolean));
+    let updated = 0;
+    set((s) => ({
+      vouchers: s.vouchers.map((v) => {
+        if (!wanted.has(v.serial) || v.status === "מומש סופית") return v;
+        updated += 1;
+        return { ...v, status: "מומש סופית" as const, updatedAt: today() };
+      }),
+    }));
+    return updated;
+  },
   importVouchers: (rows) => set((s) => ({ vouchers: [...rows, ...s.vouchers] })),
 
 
@@ -201,14 +220,14 @@ export const useAppStore = create<AppState>((set) => ({
     })),
   removeBranch: (id) => set((s) => ({ branchList: s.branchList.filter((b) => b.id !== id) })),
 
-  clients: [
-    { clientId: "1001", clientName: "מפעלי הצפון", siteId: "11", siteName: "אתר ייצור עפולה" },
-    { clientId: "1001", clientName: "מפעלי הצפון", siteId: "12", siteName: "מחסן לוגיסטי" },
-    { clientId: "1042", clientName: "קניון הדרום", siteId: "21", siteName: "חניון ראשי" },
-    { clientId: "1108", clientName: "בנק ירושלים", siteId: "31", siteName: "סניף מרכז העיר" },
-  ],
+  clients: seedClients,
   addClient: (client) => set((s) => ({ clients: [client, ...s.clients] })),
-  importClients: (rows) => set((s) => ({ clients: [...rows, ...s.clients] })),
+  /** Merges imported rows, replacing existing client+site combinations. */
+  importClients: (rows) =>
+    set((s) => {
+      const keys = new Set(rows.map((r) => `${r.clientId}|${r.siteId}`));
+      return { clients: [...rows, ...s.clients.filter((c) => !keys.has(`${c.clientId}|${c.siteId}`))] };
+    }),
   removeClient: (clientId, siteId) =>
     set((s) => ({
       clients: s.clients.filter((c) => !(c.clientId === clientId && c.siteId === siteId)),
