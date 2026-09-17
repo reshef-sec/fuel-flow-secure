@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+import clientsSeed from "@/data/clients.json";
+
 import {
   MAIN_POOL,
   vouchers as seedVouchers,
