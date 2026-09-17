@@ -78,6 +78,8 @@ interface AppState {
   allocate: (branch: string, supervisor: string | undefined, amount: number) => void;
   assignToSupervisor: (branch: string, supervisor: string, amount: number) => void;
   markPazRedeemed: (count: number) => number;
+  /** Marks vouchers redeemed by serial numbers from the Paz feedback file. */
+  markSerialsRedeemed: (serials: string[]) => number;
   importVouchers: (rows: VoucherRecord[]) => void;
 
 
