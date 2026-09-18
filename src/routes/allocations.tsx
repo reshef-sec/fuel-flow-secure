@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, Send, Ticket, UserCheck, Wallet } from "lucide-react";
+import { Building2, Send, Ticket } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
-import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
+import { NoAccess } from "@/components/layout/NoAccess";
 import { AllocationDialog } from "@/components/dashboard/AllocationDialog";
 import { Badge, Button, Card } from "@/design-system/delek-1ea111";
 import { useAppStore } from "@/store/appStore";
@@ -26,12 +26,12 @@ export const Route = createFileRoute("/allocations")({
 function AllocationsPage() {
   const branchList = useAppStore((s) => s.branchList);
   const vouchers = useAppStore((s) => s.vouchers);
-  const users = useAppStore((s) => s.users);
   const role = useAppStore((s) => s.role);
   const balance = useAppStore((s) => s.balance);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [allocOpen, setAllocOpen] = useState(false);
   const [presetBranch, setPresetBranch] = useState<string | undefined>(undefined);
+
+  if (role !== "admin") return <NoAccess title="הקצאות לסניפים" />;
 
   function openAllocation(branch?: string) {
     setPresetBranch(branch);
@@ -50,11 +50,6 @@ function AllocationsPage() {
     };
   });
 
-  const myBranch =
-    users.find((u) => u.role === "branch")?.branch ?? branchList[0]?.name ?? "מרכז";
-  const mine = stats.find((b) => b.name === myBranch);
-  const isBranchManager = role === "branch";
-
   return (
     <InternalLayout title="הקצאות לסניפים">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -70,32 +65,6 @@ function AllocationsPage() {
         </Button>
       </div>
 
-      {isBranchManager && mine ? (
-        <Card padding="lg" className="mb-8">
-          <div className="flex flex-wrap items-center justify-between gap-5">
-            <div className="flex items-center gap-4">
-              <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-mint-100 text-teal-600">
-                <Wallet className="size-6" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-muted-foreground">
-                  היתרה הזמינה שלי · {mine.name}
-                </p>
-                <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">
-                  {mine.balance.toLocaleString("he-IL")} ₪
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {mine.availableCount} שוברים זמינים להקצאה למפקחי הסניף
-                </p>
-              </div>
-            </div>
-            <Button onClick={() => setDialogOpen(true)}>
-              <UserCheck className="size-4" />
-              הקצאה למפקח
-            </Button>
-          </div>
-        </Card>
-      ) : null}
 
       <section>
         <h2 className="font-display text-xl font-extrabold text-secondary">מלאי ויתרות סניפים</h2>
@@ -156,12 +125,6 @@ function AllocationsPage() {
         </div>
       </section>
 
-      <SupervisorAllocationDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        branch={myBranch}
-        branchBalance={mine?.balance ?? 0}
-      />
 
       <AllocationDialog
         open={allocOpen}

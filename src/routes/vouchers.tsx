@@ -4,6 +4,7 @@ import { FileDown, FileSpreadsheet, RefreshCcw, UploadCloud } from "lucide-react
 import { toast } from "sonner";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
+import { NoAccess } from "@/components/layout/NoAccess";
 import {
   Badge,
   Button,
@@ -57,6 +58,10 @@ function VouchersPage() {
   const pazInputRef = useRef<HTMLInputElement>(null);
   const importVouchers = useAppStore((s) => s.importVouchers);
   const markSerialsRedeemed = useAppStore((s) => s.markSerialsRedeemed);
+  const role = useAppStore((s) => s.role);
+
+  if (role !== "admin") return <NoAccess title="מאגר שוברים" />;
+
 
   async function handlePazFile(files: FileList | null) {
     const file = files?.[0];

@@ -13,7 +13,7 @@ import {
 } from "@/design-system/delek-1ea111";
 import { downloadCsv, heDate } from "@/components/dashboard/statusVariant";
 import { isWorkerVoucher, type VoucherRecord } from "@/components/dashboard/voucherData";
-import { siteStandard, useAppStore } from "@/store/appStore";
+import { siteStandard, useAppStore, useCurrentUser } from "@/store/appStore";
 
 const headers = [
   "סניף משייך",
@@ -35,8 +35,14 @@ export function PazReport() {
   const vouchers = useAppStore((s) => s.vouchers);
   const clients = useAppStore((s) => s.clients);
   const branchList = useAppStore((s) => s.branchList);
+  const role = useAppStore((s) => s.role);
+  const me = useCurrentUser();
 
-  const rows = useMemo(() => vouchers.filter(isWorkerVoucher), [vouchers]);
+  const rows = useMemo(() => {
+    const worker = vouchers.filter(isWorkerVoucher);
+    if (role !== "branch" || !me?.branch) return worker;
+    return worker.filter((v) => v.branch === me.branch);
+  }, [vouchers, role, me?.branch]);
 
   /** Fallback for דורש הקצאה: the branch manager of the issuing branch. */
   const requesterOf = (v: VoucherRecord) =>

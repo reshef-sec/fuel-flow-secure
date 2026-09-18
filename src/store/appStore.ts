@@ -160,9 +160,21 @@ interface AppState {
   removeReason: (index: number) => void;
 }
 
+export const ROLE_KEY = "reshef.role";
+
+/** Reads the simulated role saved in the browser, if any. */
+export function storedRole(): Role | null {
+  if (typeof window === "undefined") return null;
+  const saved = window.localStorage.getItem(ROLE_KEY);
+  return saved === "admin" || saved === "branch" || saved === "supervisor" ? saved : null;
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   role: "admin",
-  setRole: (role) => set({ role }),
+  setRole: (role) => {
+    if (typeof window !== "undefined") window.localStorage.setItem(ROLE_KEY, role);
+    set({ role });
+  },
 
   balance: 15000,
   vouchers: seedVouchers,
