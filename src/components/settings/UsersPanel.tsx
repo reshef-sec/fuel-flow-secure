@@ -122,19 +122,27 @@ export function UsersPanel() {
       setError("יש למלא תפקיד וטלפון נייד");
       return;
     }
-    if (users.some((u) => u.id === form.id)) {
+    if (users.some((u) => u.id === form.id && u.id !== editingId)) {
       setError("משתמש עם ת.ז זו קיים במערכת");
       return;
     }
     setError(null);
-    addUser({
+    const payload: UserRecord = {
       ...form,
       lastName: form.lastName.trim(),
       firstName: form.firstName.trim(),
       title: form.title.trim(),
       phone: form.phone.trim(),
-    });
+    };
+    if (editingId) {
+      updateUser(editingId, payload);
+      toast.success("פרטי המשתמש עודכנו");
+    } else {
+      addUser(payload);
+      toast.success("המשתמש נוסף בהצלחה");
+    }
     setOpen(false);
+    setEditingId(null);
     setForm({
       branch: branchNames[0] ?? "",
       id: "",
@@ -145,7 +153,6 @@ export function UsersPanel() {
       phone: "",
       canRequest: false,
     });
-    toast.success("המשתמש נוסף בהצלחה");
   }
 
   return (
