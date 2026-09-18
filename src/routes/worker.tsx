@@ -46,7 +46,8 @@ export const Route = createFileRoute("/worker")({
   component: WorkerForm,
 });
 
-function WorkerForm() {
+/** Standalone mobile-first worker form; also rendered by /worker/$token. */
+export function WorkerForm() {
   const [fullName, setFullName] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [phone, setPhone] = useState("");

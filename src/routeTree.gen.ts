@@ -16,6 +16,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as AllocationsRouteImport } from './routes/allocations'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WorkerTokenRouteImport } from './routes/worker.$token'
 import { Route as Char91__mockupChar93PreviewSplatRouteImport } from './routes/[__mockup].preview.$'
 import { Route as Char91__componentChar93PreviewSplatRouteImport } from './routes/[__component].preview.$'
 
@@ -54,6 +55,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WorkerTokenRoute = WorkerTokenRouteImport.update({
+  id: '/$token',
+  path: '/$token',
+  getParentRoute: () => WorkerRoute,
+} as any)
 const Char91__mockupChar93PreviewSplatRoute =
   Char91__mockupChar93PreviewSplatRouteImport.update({
     id: '/__mockup/preview/$',
@@ -74,7 +80,8 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
-  '/worker': typeof WorkerRoute
+  '/worker': typeof WorkerRouteWithChildren
+  '/worker/$token': typeof WorkerTokenRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
   '/__mockup/preview/$': typeof Char91__mockupChar93PreviewSplatRoute
 }
@@ -85,7 +92,8 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
-  '/worker': typeof WorkerRoute
+  '/worker': typeof WorkerRouteWithChildren
+  '/worker/$token': typeof WorkerTokenRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
   '/__mockup/preview/$': typeof Char91__mockupChar93PreviewSplatRoute
 }
@@ -97,7 +105,8 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
-  '/worker': typeof WorkerRoute
+  '/worker': typeof WorkerRouteWithChildren
+  '/worker/$token': typeof WorkerTokenRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
   '/__mockup/preview/$': typeof Char91__mockupChar93PreviewSplatRoute
 }
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/supervisor'
     | '/vouchers'
     | '/worker'
+    | '/worker/$token'
     | '/__component/preview/$'
     | '/__mockup/preview/$'
   fileRoutesByTo: FileRoutesByTo
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/supervisor'
     | '/vouchers'
     | '/worker'
+    | '/worker/$token'
     | '/__component/preview/$'
     | '/__mockup/preview/$'
   id:
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/supervisor'
     | '/vouchers'
     | '/worker'
+    | '/worker/$token'
     | '/__component/preview/$'
     | '/__mockup/preview/$'
   fileRoutesById: FileRoutesById
@@ -144,7 +156,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SupervisorRoute: typeof SupervisorRoute
   VouchersRoute: typeof VouchersRoute
-  WorkerRoute: typeof WorkerRoute
+  WorkerRoute: typeof WorkerRouteWithChildren
   Char91__componentChar93PreviewSplatRoute: typeof Char91__componentChar93PreviewSplatRoute
   Char91__mockupChar93PreviewSplatRoute: typeof Char91__mockupChar93PreviewSplatRoute
 }
@@ -200,6 +212,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/worker/$token': {
+      id: '/worker/$token'
+      path: '/$token'
+      fullPath: '/worker/$token'
+      preLoaderRoute: typeof WorkerTokenRouteImport
+      parentRoute: typeof WorkerRoute
+    }
     '/__mockup/preview/$': {
       id: '/__mockup/preview/$'
       path: '/__mockup/preview/$'
@@ -217,6 +236,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface WorkerRouteChildren {
+  WorkerTokenRoute: typeof WorkerTokenRoute
+}
+
+const WorkerRouteChildren: WorkerRouteChildren = {
+  WorkerTokenRoute: WorkerTokenRoute,
+}
+
+const WorkerRouteWithChildren =
+  WorkerRoute._addFileChildren(WorkerRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AllocationsRoute: AllocationsRoute,
@@ -224,7 +254,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SupervisorRoute: SupervisorRoute,
   VouchersRoute: VouchersRoute,
-  WorkerRoute: WorkerRoute,
+  WorkerRoute: WorkerRouteWithChildren,
   Char91__componentChar93PreviewSplatRoute:
     Char91__componentChar93PreviewSplatRoute,
   Char91__mockupChar93PreviewSplatRoute: Char91__mockupChar93PreviewSplatRoute,
