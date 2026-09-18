@@ -28,6 +28,24 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
+type Period = "month" | "ytd" | "all";
+
+const periodLabels: Record<Period, string> = {
+  month: "החודש הנוכחי",
+  ytd: "מתחילת השנה",
+  all: "כל התקופה",
+};
+
+/** First day of the selected period as an ISO date, or null for all time. */
+function periodStart(period: Period): string | null {
+  if (period === "all") return null;
+  const now = new Date();
+  const month = period === "month" ? now.getMonth() : 0;
+  const first = new Date(now.getFullYear(), month, 1);
+  return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+
 function Dashboard() {
   const allVouchers = useAppStore((s) => s.vouchers);
   const globalBalance = useAppStore((s) => s.balance);
@@ -35,6 +53,7 @@ function Dashboard() {
   const me = useCurrentUser();
   const [requestOpen, setRequestOpen] = useState(false);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
+  const [period, setPeriod] = useState<Period>("month");
 
   const isBranchManager = role === "branch";
   const isSupervisor = role === "supervisor";
@@ -55,11 +74,15 @@ function Dashboard() {
       ? vouchers.filter((v) => v.status === "טרם שומש").reduce((t, v) => t + v.amount, 0)
       : globalBalance;
 
+  // Time-bound metrics use the selected period; wallet metrics always show the live state.
+  const since = periodStart(period);
+  const timed = since ? vouchers.filter((v) => v.updatedAt >= since) : vouchers;
+
   const sum = (status: string) =>
-    vouchers.filter((v) => v.status === status).reduce((t, v) => t + v.amount, 0);
+    timed.filter((v) => v.status === status).reduce((t, v) => t + v.amount, 0);
   const claimed = sum("מומש סופית");
   const allocated = sum("הוקצה לעובד");
-  const blocked = vouchers.filter((v) => v.status === "חסום").length;
+  const blocked = timed.filter((v) => v.status === "חסום").length;
   const total = vouchers.reduce((t, v) => t + v.amount, 0);
 
   return (
