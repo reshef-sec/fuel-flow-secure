@@ -20,7 +20,7 @@ import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { useAppStore } from "@/store/appStore";
 
-const empty = { clientId: "", clientName: "", siteId: "", siteName: "" };
+const empty = { clientId: "", clientName: "", siteId: "", siteName: "", standard: "" };
 
 export function ClientsPanel() {
   const clients = useAppStore((s) => s.clients);
@@ -43,7 +43,7 @@ export function ClientsPanel() {
     const q = query.trim();
     if (!q) return clients;
     return clients.filter((c) =>
-      [c.clientId, c.clientName, c.siteId, c.siteName].some((v) => v.includes(q)),
+      [c.clientId, c.clientName, c.siteId, c.siteName, c.standard ?? ""].some((v) => v.includes(q)),
     );
   }, [clients, query]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -66,9 +66,10 @@ export function ClientsPanel() {
           clientName: String(r[1] ?? "").trim(),
           siteId: String(r[2] ?? "").trim(),
           siteName: String(r[3] ?? "").trim(),
+          standard: String(r[4] ?? "").trim(),
         }));
       if (rows.length === 0) {
-        toast.error("לא נמצאו שורות תקינות. עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר");
+        toast.error("לא נמצאו שורות תקינות. עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן");
         return;
       }
       importClients(rows);
