@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, FileSpreadsheet, Plus, Search, Trash2, UploadCloud } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileSpreadsheet, Pencil, Plus, Search, Trash2, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -25,10 +25,12 @@ const empty = { clientId: "", clientName: "", siteId: "", siteName: "" };
 export function ClientsPanel() {
   const clients = useAppStore((s) => s.clients);
   const addClient = useAppStore((s) => s.addClient);
+  const updateClient = useAppStore((s) => s.updateClient);
   const importClients = useAppStore((s) => s.importClients);
   const removeClient = useAppStore((s) => s.removeClient);
 
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<{ clientId: string; siteId: string } | null>(null);
   const [form, setForm] = useState(empty);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -83,20 +85,33 @@ export function ClientsPanel() {
       setError("יש למלא את כל השדות");
       return;
     }
-    if (clients.some((c) => c.clientId === form.clientId.trim() && c.siteId === form.siteId.trim())) {
-      setError("שילוב לקוח ואתר זה קיים כבר");
-      return;
-    }
-    setError(null);
-    addClient({
+    const payload = {
       clientId: form.clientId.trim(),
       clientName: form.clientName.trim(),
       siteId: form.siteId.trim(),
       siteName: form.siteName.trim(),
-    });
+    };
+    const clash = clients.some(
+      (c) =>
+        c.clientId === payload.clientId &&
+        c.siteId === payload.siteId &&
+        !(editing && c.clientId === editing.clientId && c.siteId === editing.siteId),
+    );
+    if (clash) {
+      setError("שילוב לקוח ואתר זה קיים כבר");
+      return;
+    }
+    setError(null);
+    if (editing) {
+      updateClient(editing.clientId, editing.siteId, payload);
+      toast.success("פרטי האתר עודכנו");
+    } else {
+      addClient(payload);
+      toast.success("הלקוח נוסף בהצלחה");
+    }
     setForm(empty);
+    setEditing(null);
     setOpen(false);
-    toast.success("הלקוח נוסף בהצלחה");
   }
 
   return (
@@ -136,7 +151,14 @@ export function ClientsPanel() {
             <FileSpreadsheet className="size-4" />
             הורד תבנית אקסל
           </Button>
-          <Button onClick={() => setOpen(true)}>
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setForm(empty);
+              setError(null);
+              setOpen(true);
+            }}
+          >
             <Plus className="size-4" />
             הוספה ידנית
           </Button>
@@ -210,16 +232,35 @@ export function ClientsPanel() {
                   <TableCell className="tabular-nums">{c.siteId}</TableCell>
                   <TableCell>{c.siteName}</TableCell>
                   <TableCell>
-                    <button
-                      aria-label={`מחק ${c.siteName}`}
-                      onClick={() => {
-                        removeClient(c.clientId, c.siteId);
-                        toast.success("האתר נמחק");
-                      }}
-                      className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-danger focus-visible:shadow-focus"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        aria-label={`ערוך ${c.siteName}`}
+                        onClick={() => {
+                          setEditing({ clientId: c.clientId, siteId: c.siteId });
+                          setForm({
+                            clientId: c.clientId,
+                            clientName: c.clientName,
+                            siteId: c.siteId,
+                            siteName: c.siteName,
+                          });
+                          setError(null);
+                          setOpen(true);
+                        }}
+                        className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-primary focus-visible:shadow-focus"
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                      <button
+                        aria-label={`מחק ${c.siteName}`}
+                        onClick={() => {
+                          removeClient(c.clientId, c.siteId);
+                          toast.success("האתר נמחק");
+                        }}
+                        className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-danger focus-visible:shadow-focus"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -254,7 +295,11 @@ export function ClientsPanel() {
         </div>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="הוספת לקוח ואתר">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editing ? "עריכת לקוח ואתר" : "הוספת לקוח ואתר"}
+      >
         <form onSubmit={submit} className="space-y-5">
           <FormField label="מס' לקוח">
             <Input
@@ -295,7 +340,7 @@ export function ClientsPanel() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               ביטול
             </Button>
-            <Button type="submit">הוספה</Button>
+            <Button type="submit">{editing ? "שמירת שינויים" : "הוספה"}</Button>
           </div>
         </form>
       </Modal>

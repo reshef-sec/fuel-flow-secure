@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { FileSpreadsheet, Plus, Search, Trash2, UserPlus } from "lucide-react";
+import { FileSpreadsheet, Pencil, Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -39,6 +39,7 @@ const roleVariant: Record<Role, "brand" | "info" | "purple"> = {
 export function UsersPanel() {
   const users = useAppStore((s) => s.users);
   const addUser = useAppStore((s) => s.addUser);
+  const updateUser = useAppStore((s) => s.updateUser);
   const removeUser = useAppStore((s) => s.removeUser);
   const branchList = useAppStore((s) => s.branchList);
   const branchNames = branchList.map((b) => b.name);
@@ -51,6 +52,7 @@ export function UsersPanel() {
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     branch: branchNames[0] ?? "",
     id: "",
@@ -122,19 +124,27 @@ export function UsersPanel() {
       setError("יש למלא תפקיד וטלפון נייד");
       return;
     }
-    if (users.some((u) => u.id === form.id)) {
+    if (users.some((u) => u.id === form.id && u.id !== editingId)) {
       setError("משתמש עם ת.ז זו קיים במערכת");
       return;
     }
     setError(null);
-    addUser({
+    const payload: UserRecord = {
       ...form,
       lastName: form.lastName.trim(),
       firstName: form.firstName.trim(),
       title: form.title.trim(),
       phone: form.phone.trim(),
-    });
+    };
+    if (editingId) {
+      updateUser(editingId, payload);
+      toast.success("פרטי המשתמש עודכנו");
+    } else {
+      addUser(payload);
+      toast.success("המשתמש נוסף בהצלחה");
+    }
     setOpen(false);
+    setEditingId(null);
     setForm({
       branch: branchNames[0] ?? "",
       id: "",
@@ -145,7 +155,6 @@ export function UsersPanel() {
       phone: "",
       canRequest: false,
     });
-    toast.success("המשתמש נוסף בהצלחה");
   }
 
   return (
@@ -196,7 +205,23 @@ export function UsersPanel() {
             <FileSpreadsheet className="size-4" />
             ייבוא מאקסל
           </Button>
-          <Button onClick={() => setOpen(true)}>
+          <Button
+            onClick={() => {
+              setEditingId(null);
+              setError(null);
+              setForm({
+                branch: branchNames[0] ?? "",
+                id: "",
+                lastName: "",
+                firstName: "",
+                role: "supervisor",
+                title: "",
+                phone: "",
+                canRequest: false,
+              });
+              setOpen(true);
+            }}
+          >
             <Plus className="size-4" />
             הוספת משתמש
           </Button>
@@ -245,16 +270,39 @@ export function UsersPanel() {
                   />
                 </TableCell>
                 <TableCell>
-                  <button
-                    onClick={() => {
-                      removeUser(u.id);
-                      toast.success("המשתמש הוסר");
-                    }}
-                    aria-label={`מחק את ${u.lastName} ${u.firstName}`}
-                    className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-danger focus-visible:shadow-focus"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setEditingId(u.id);
+                        setError(null);
+                        setForm({
+                          branch: u.branch,
+                          id: u.id,
+                          lastName: u.lastName,
+                          firstName: u.firstName,
+                          role: u.role,
+                          title: u.title,
+                          phone: u.phone,
+                          canRequest: Boolean(u.canRequest),
+                        });
+                        setOpen(true);
+                      }}
+                      aria-label={`ערוך את ${u.lastName} ${u.firstName}`}
+                      className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-primary focus-visible:shadow-focus"
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        removeUser(u.id);
+                        toast.success("המשתמש הוסר");
+                      }}
+                      aria-label={`מחק את ${u.lastName} ${u.firstName}`}
+                      className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-danger focus-visible:shadow-focus"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -269,7 +317,11 @@ export function UsersPanel() {
         </Table>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="הוספת משתמש חדש">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editingId ? "עריכת משתמש" : "הוספת משתמש חדש"}
+      >
         <form onSubmit={submit} className="space-y-5">
           <div className="flex items-center gap-3 rounded-lg bg-blue-100 p-4">
             <span className="grid size-10 shrink-0 place-items-center rounded-md bg-surface text-blue-700">
@@ -380,7 +432,7 @@ export function UsersPanel() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               ביטול
             </Button>
-            <Button type="submit">הוספת משתמש</Button>
+            <Button type="submit">{editingId ? "שמירת שינויים" : "הוספת משתמש"}</Button>
           </div>
         </form>
       </Modal>

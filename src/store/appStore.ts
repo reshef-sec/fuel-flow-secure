@@ -87,6 +87,7 @@ interface AppState {
 
   users: UserRecord[];
   addUser: (user: UserRecord) => void;
+  updateUser: (id: string, patch: Partial<UserRecord>) => void;
   removeUser: (id: string) => void;
   /** Adds only rows whose ת.ז is new. Returns added/skipped counts. */
   importUsers: (rows: UserRecord[]) => { added: number; skipped: number };
@@ -99,6 +100,7 @@ interface AppState {
 
   clients: ClientRecord[];
   addClient: (client: ClientRecord) => void;
+  updateClient: (clientId: string, siteId: string, patch: Partial<ClientRecord>) => void;
   importClients: (rows: ClientRecord[]) => void;
   removeClient: (clientId: string, siteId: string) => void;
 
@@ -215,6 +217,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     { branch: "צפון", id: "324914803", lastName: "לוי", firstName: "אביב", role: "supervisor", title: "מפקח", phone: "052-2357626" },
   ],
   addUser: (user) => set((s) => ({ users: [user, ...s.users] })),
+  updateUser: (id, patch) =>
+    set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) })),
   removeUser: (id) => set((s) => ({ users: s.users.filter((u) => u.id !== id) })),
   importUsers: (rows) => {
     const existing = new Set(get().users.map((u) => u.id));
@@ -244,6 +248,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clients: seedClients,
   addClient: (client) => set((s) => ({ clients: [client, ...s.clients] })),
+  updateClient: (clientId, siteId, patch) =>
+    set((s) => ({
+      clients: s.clients.map((c) =>
+        c.clientId === clientId && c.siteId === siteId ? { ...c, ...patch } : c,
+      ),
+    })),
   /** Merges imported rows, replacing existing client+site combinations. */
   importClients: (rows) =>
     set((s) => {
