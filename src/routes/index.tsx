@@ -28,11 +28,25 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
-  const vouchers = useAppStore((s) => s.vouchers);
-  const balance = useAppStore((s) => s.balance);
+  const allVouchers = useAppStore((s) => s.vouchers);
+  const globalBalance = useAppStore((s) => s.balance);
   const role = useAppStore((s) => s.role);
   const me = useCurrentUser();
   const [requestOpen, setRequestOpen] = useState(false);
+  const [supervisorOpen, setSupervisorOpen] = useState(false);
+
+  const isBranchManager = role === "branch";
+  const myBranch = me?.branch ?? "";
+
+  // Branch managers see only their own branch's vouchers and balance.
+  const vouchers = isBranchManager
+    ? allVouchers.filter((v) => v.branch === myBranch)
+    : allVouchers;
+
+  const branchAvailable = vouchers.filter((v) => v.status === "טרם שומש" && !v.supervisor);
+  const balance = isBranchManager
+    ? branchAvailable.reduce((t, v) => t + v.amount, 0)
+    : globalBalance;
 
   const sum = (status: string) =>
     vouchers.filter((v) => v.status === status).reduce((t, v) => t + v.amount, 0);
@@ -43,6 +57,26 @@ function Dashboard() {
 
   return (
     <InternalLayout title="דשבורד ניהול שוברים">
+      {isBranchManager ? (
+        <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-muted-foreground">
+              היתרה הזמינה שלי · סניף {myBranch || "—"}
+            </p>
+            <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">
+              {balance.toLocaleString("he-IL")} ₪
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {branchAvailable.length} שוברים זמינים להקצאה למפקחי הסניף שלי
+            </p>
+          </div>
+          <Button onClick={() => setSupervisorOpen(true)}>
+            <UserCheck className="size-4" />
+            הקצאה למפקח
+          </Button>
+        </Card>
+      ) : null}
+
       {me?.canRequest ? (
         <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -59,6 +93,7 @@ function Dashboard() {
           </Button>
         </Card>
       ) : null}
+
 
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
