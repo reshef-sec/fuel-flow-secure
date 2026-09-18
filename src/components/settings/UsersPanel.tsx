@@ -213,8 +213,8 @@ export function UsersPanel() {
               <TableHeaderCell>פרטי</TableHeaderCell>
               <TableHeaderCell>הרשאה</TableHeaderCell>
               <TableHeaderCell>תפקיד</TableHeaderCell>
-              <TableHeaderCell>נייד</TableHeaderCell>
-              <TableHeaderCell>רשאי להקים דרישה</TableHeaderCell>
+              <TableHeaderCell className="text-center">נייד</TableHeaderCell>
+              <TableHeaderCell className="text-center">רשאי להקים דרישה</TableHeaderCell>
               <TableHeaderCell>פעולות</TableHeaderCell>
             </TableRow>
           </TableHead>
@@ -231,10 +231,12 @@ export function UsersPanel() {
                   </Badge>
                 </TableCell>
                 <TableCell>{u.title}</TableCell>
-                <TableCell className="tabular-nums" dir="ltr">
-                  {u.phone}
+                <TableCell className="text-center">
+                  <span className="tabular-nums" dir="ltr">
+                    {u.phone}
+                  </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-center">
                   <Checkbox
                     checked={Boolean(u.canRequest)}
                     disabled={!isAdmin}

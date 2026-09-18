@@ -4,7 +4,7 @@ import { cn } from "../lib/utils";
 /** Scrollable wrapper + table surface for dense record lists. */
 export const Table = forwardRef<HTMLTableElement, React.TableHTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="w-full overflow-x-auto rounded-lg border border-border bg-surface">
+    <div className="w-full overflow-x-auto rounded-lg border border-slate-300 bg-surface">
       <table ref={ref} className={cn("w-full border-collapse text-sm", className)} {...props} />
     </div>
   ),
@@ -43,7 +43,10 @@ export const TableHeaderCell = forwardRef<
   <th
     ref={ref}
     scope="col"
-    className={cn("px-4 py-3 text-start font-semibold text-muted-foreground", className)}
+    className={cn(
+      "border-s border-slate-200 px-4 py-3 text-start font-semibold text-muted-foreground first:border-s-0",
+      className,
+    )}
     {...props}
   />
 ));
@@ -53,6 +56,13 @@ export const TableCell = forwardRef<
   HTMLTableCellElement,
   React.TdHTMLAttributes<HTMLTableCellElement>
 >(({ className, ...props }, ref) => (
-  <td ref={ref} className={cn("px-4 py-3 text-start text-foreground", className)} {...props} />
+  <td
+    ref={ref}
+    className={cn(
+      "border-s border-slate-200 px-4 py-3 text-start text-foreground first:border-s-0",
+      className,
+    )}
+    {...props}
+  />
 ));
 TableCell.displayName = "TableCell";
