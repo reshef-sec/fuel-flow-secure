@@ -28,7 +28,14 @@ import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
 const columnHelper = createColumnHelper<VoucherRecord>();
 
-export function VoucherTable() {
+export function VoucherTable({
+  since = null,
+  periodLabel,
+}: {
+  /** ISO date; only vouchers updated on/after it are shown. null = all time. */
+  since?: string | null;
+  periodLabel?: string;
+} = {}) {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const allVouchers = useAppStore((s) => s.vouchers);
@@ -38,10 +45,12 @@ export function VoucherTable() {
   // Branch managers see only their own branch; supervisors only vouchers assigned to them.
   const myName = me ? fullName(me) : "";
   const vouchers = useMemo(() => {
-    if (role === "branch" && me?.branch) return allVouchers.filter((v) => v.branch === me.branch);
-    if (role === "supervisor") return allVouchers.filter((v) => v.supervisor === myName);
-    return allVouchers;
-  }, [allVouchers, role, me?.branch, myName]);
+    let rows = allVouchers;
+    if (role === "branch" && me?.branch) rows = rows.filter((v) => v.branch === me.branch);
+    else if (role === "supervisor") rows = rows.filter((v) => v.supervisor === myName);
+    if (since) rows = rows.filter((v) => v.updatedAt >= since);
+    return rows;
+  }, [allVouchers, role, me?.branch, myName, since]);
 
 
   const columns = useMemo(

@@ -200,7 +200,7 @@ function Dashboard() {
 
       {role === "admin" ? <PendingRequests /> : null}
 
-      <VoucherTable />
+      <VoucherTable since={since} periodLabel={periodLabels[period]} />
 
       <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} />
 
