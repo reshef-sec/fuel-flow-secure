@@ -344,6 +344,14 @@ export function ClientsPanel() {
               aria-label="שם אתר"
             />
           </FormField>
+          <FormField label="תקן" hint="תקן הרכב / השמירה של האתר">
+            <Input
+              value={form.standard}
+              onChange={(e) => setForm({ ...form, standard: e.target.value })}
+              aria-label="תקן"
+            />
+          </FormField>
+
 
           {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
 
