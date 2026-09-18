@@ -216,6 +216,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     { branch: "צפון", id: "324914803", lastName: "לוי", firstName: "אביב", role: "supervisor", title: "מפקח", phone: "052-2357626" },
   ],
   addUser: (user) => set((s) => ({ users: [user, ...s.users] })),
+  updateUser: (id, patch) =>
+    set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) })),
   removeUser: (id) => set((s) => ({ users: s.users.filter((u) => u.id !== id) })),
   importUsers: (rows) => {
     const existing = new Set(get().users.map((u) => u.id));
