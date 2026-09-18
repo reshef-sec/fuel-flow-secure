@@ -51,6 +51,8 @@ export interface ClientRecord {
   clientName: string;
   siteId: string;
   siteName: string;
+  /** תקן — vehicle / manpower standard code of the site */
+  standard?: string;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -74,8 +76,26 @@ export interface AllocationMeta {
   approver?: string;
 }
 
-/** Real clients & sites list (מס' לקוח, שם לקוח, מספר אתר, שם אתר). */
-const seedClients: ClientRecord[] = clientsSeed as ClientRecord[];
+/** תקן values known for specific sites, keyed by "clientId|siteId". */
+const standardBySite: Record<string, string> = {
+  "38|74": "תקן 1204",
+  "38|76": "תקן 1187",
+  "38|109": "תקן 2331",
+  "38|115": "תקן 2440",
+  "38|127": "תקן 3102",
+};
+
+/** Real clients & sites list (מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן). */
+const seedClients: ClientRecord[] = (clientsSeed as ClientRecord[]).map((c) => {
+  const standard = standardBySite[`${c.clientId}|${c.siteId}`];
+  return standard ? { ...c, standard } : c;
+});
+
+/** תקן for a given client + site, or "—" when unknown. */
+export function siteStandard(clients: ClientRecord[], clientId?: string, siteId?: string) {
+  if (!clientId || !siteId) return "—";
+  return clients.find((c) => c.clientId === clientId && c.siteId === siteId)?.standard || "—";
+}
 
 const seedBranches: BranchRecord[] = [
   { id: "b1", name: "הנהלה", manager: "רון קלדרון", city: "מטה" },
