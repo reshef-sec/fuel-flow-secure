@@ -100,6 +100,7 @@ interface AppState {
 
   clients: ClientRecord[];
   addClient: (client: ClientRecord) => void;
+  updateClient: (clientId: string, siteId: string, patch: Partial<ClientRecord>) => void;
   importClients: (rows: ClientRecord[]) => void;
   removeClient: (clientId: string, siteId: string) => void;
 
