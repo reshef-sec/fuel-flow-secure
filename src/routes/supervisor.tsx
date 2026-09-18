@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, Copy, Link2, Send } from "lucide-react";
+import { Check, Copy, Link2, Send, SquareArrowOutUpRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
@@ -196,12 +196,15 @@ function SupervisorPage() {
                   {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                   העתק לינק
                 </Button>
-                <Button variant="outline" block asChild>
-                  <a href={link} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="size-4" />
-                    פתח בחלון חדש
-                  </a>
-                </Button>
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-primary bg-surface px-4 text-sm font-bold text-primary transition-colors hover:bg-blue-100"
+                >
+                  <SquareArrowOutUpRight className="size-4" />
+                  פתח בחלון חדש
+                </a>
               </div>
               <p className="text-center text-xs text-muted-foreground">
                 הלינק תקף לשימוש חד פעמי בלבד ומתעד את הלקוח, האתר וסיבת ההנפקה שנבחרו.
