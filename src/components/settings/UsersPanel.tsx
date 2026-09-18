@@ -52,6 +52,7 @@ export function UsersPanel() {
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     branch: branchNames[0] ?? "",
     id: "",
