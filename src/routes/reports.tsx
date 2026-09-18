@@ -22,7 +22,7 @@ import {
 } from "@/design-system/delek-1ea111";
 import { downloadCsv, heDate, statusVariant } from "@/components/dashboard/statusVariant";
 import { formatAssignment, type VoucherStatus } from "@/components/dashboard/voucherData";
-import { fullName, useAppStore } from "@/store/appStore";
+import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -53,11 +53,19 @@ function ReportsPage() {
   const branchList = useAppStore((s) => s.branchList);
   const users = useAppStore((s) => s.users);
   const clients = useAppStore((s) => s.clients);
+  const role = useAppStore((s) => s.role);
+  const me = useCurrentUser();
   const [filters, setFilters] = useState(empty);
 
+  // Branch managers are locked to their own branch — no "all branches" option.
+  const lockedBranch = role === "branch" ? (me?.branch ?? "") : null;
+
   const supervisors = useMemo(
-    () => users.filter((u) => u.role === "supervisor").map((u) => fullName(u)),
-    [users],
+    () =>
+      users
+        .filter((u) => u.role === "supervisor" && (!lockedBranch || u.branch === lockedBranch))
+        .map((u) => fullName(u)),
+    [users, lockedBranch],
   );
   const clientOptions = useMemo(() => {
     const fromVouchers = vouchers.map((v) => v.client).filter(Boolean) as string[];
@@ -68,6 +76,7 @@ function ReportsPage() {
   const rows = useMemo(
     () =>
       vouchers.filter((v) => {
+        if (lockedBranch && v.branch !== lockedBranch) return false;
         if (filters.from && v.updatedAt < filters.from) return false;
         if (filters.to && v.updatedAt > filters.to) return false;
         if (filters.branch && v.branch !== filters.branch) return false;
@@ -76,7 +85,7 @@ function ReportsPage() {
         if (filters.status && v.status !== filters.status) return false;
         return true;
       }),
-    [vouchers, filters],
+    [vouchers, filters, lockedBranch],
   );
 
   const total = rows.reduce((sum, v) => sum + v.amount, 0);
