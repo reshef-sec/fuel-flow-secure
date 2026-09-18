@@ -214,6 +214,7 @@ export function UsersPanel() {
               <TableHeaderCell>הרשאה</TableHeaderCell>
               <TableHeaderCell>תפקיד</TableHeaderCell>
               <TableHeaderCell>נייד</TableHeaderCell>
+              <TableHeaderCell>רשאי להקים דרישה</TableHeaderCell>
               <TableHeaderCell>פעולות</TableHeaderCell>
             </TableRow>
           </TableHead>
