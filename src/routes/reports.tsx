@@ -205,18 +205,24 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
             )}
           </FormField>
           <FormField label="מפקח">
-            <Select
-              value={filters.supervisor}
-              onChange={(e) => setFilters({ ...filters, supervisor: e.target.value })}
-              aria-label="מפקח"
-            >
-              <option value="">כל המפקחים</option>
-              {supervisors.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </Select>
+            {lockedSupervisor !== null ? (
+              <Select value={lockedSupervisor} onChange={() => {}} aria-label="מפקח" disabled>
+                <option value={lockedSupervisor}>{lockedSupervisor || "—"}</option>
+              </Select>
+            ) : (
+              <Select
+                value={filters.supervisor}
+                onChange={(e) => setFilters({ ...filters, supervisor: e.target.value })}
+                aria-label="מפקח"
+              >
+                <option value="">כל המפקחים</option>
+                {supervisors.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+            )}
           </FormField>
           <FormField label="לקוח">
             <Select
