@@ -4,13 +4,23 @@ import { toast } from "sonner";
 
 import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { fullName, useAppStore } from "@/store/appStore";
+import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
-export function AllocationDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AllocationDialog({
+  open,
+  onClose,
+  presetTarget,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** Pre-selected branch name, used by the quick-allocate action on branch cards. */
+  presetTarget?: string;
+}) {
   const balance = useAppStore((s) => s.balance);
   const allocate = useAppStore((s) => s.allocate);
   const branchList = useAppStore((s) => s.branchList);
   const users = useAppStore((s) => s.users);
+  const me = useCurrentUser();
 
   const targets: { value: string; label: string; branch: string; supervisor?: string }[] = [
     ...branchList.map((b) => ({ value: b.name, label: b.name, branch: b.name })),
@@ -30,11 +40,11 @@ export function AllocationDialog({ open, onClose }: { open: boolean; onClose: ()
 
   useEffect(() => {
     if (!open) return;
-    setTarget("");
+    setTarget(presetTarget ?? "");
     setAmount("");
     setError(null);
     setLoading(false);
-  }, [open]);
+  }, [open, presetTarget]);
 
   const numeric = Number(amount);
 
@@ -57,7 +67,9 @@ export function AllocationDialog({ open, onClose }: { open: boolean; onClose: ()
     setTimeout(() => {
       setLoading(false);
       const picked = targets.find((t) => t.value === target);
-      allocate(picked?.branch ?? target, picked?.supervisor, numeric);
+      allocate(picked?.branch ?? target, picked?.supervisor, numeric, {
+        approver: me ? fullName(me) : "אדמין מרכזי",
+      });
       onClose();
       toast.success("ההקצאה בוצעה בהצלחה והיתרה עודכנה");
     }, 1000);

@@ -14,6 +14,10 @@ export interface VoucherRecord {
   client?: string;
   status: VoucherStatus;
   updatedAt: string;
+  /** דורש ההקצאה — user who requested the allocation */
+  requester?: string;
+  /** גורם מאשר — admin who approved / executed the allocation */
+  approver?: string;
 }
 
 /** "מאגר ראשי" | "צפון" | "סניף צפון (מפקח דן)" */

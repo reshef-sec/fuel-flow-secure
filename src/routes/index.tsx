@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Wallet, Ticket, CheckCircle2, Ban } from "lucide-react";
+import { Wallet, Ticket, CheckCircle2, Ban, FilePlus2 } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { VoucherTable } from "@/components/dashboard/VoucherTable";
-import { Card, StatCard } from "@/design-system/delek-1ea111";
-import { useAppStore } from "@/store/appStore";
+import { RequestDialog } from "@/components/requests/RequestDialog";
+import { PendingRequests } from "@/components/requests/PendingRequests";
+import { Button, Card, StatCard } from "@/design-system/delek-1ea111";
+import { useAppStore, useCurrentUser } from "@/store/appStore";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,6 +30,9 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const vouchers = useAppStore((s) => s.vouchers);
   const balance = useAppStore((s) => s.balance);
+  const role = useAppStore((s) => s.role);
+  const me = useCurrentUser();
+  const [requestOpen, setRequestOpen] = useState(false);
 
   const sum = (status: string) =>
     vouchers.filter((v) => v.status === status).reduce((t, v) => t + v.amount, 0);
@@ -37,6 +43,23 @@ function Dashboard() {
 
   return (
     <InternalLayout title="דשבורד ניהול שוברים">
+      {me?.canRequest ? (
+        <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="font-display text-lg font-extrabold text-secondary">
+              דרישת שוברים לסניף {me.branch}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              יש לך הרשאה להקים דרישת שוברים לאישור אדמין מרכזי
+            </p>
+          </div>
+          <Button onClick={() => setRequestOpen(true)}>
+            <FilePlus2 className="size-4" />
+            הגשת דרישת שוברים
+          </Button>
+        </Card>
+      ) : null}
+
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="יתרה זמינה לחלוקה"
@@ -89,7 +112,11 @@ function Dashboard() {
         ))}
       </div>
 
+      {role === "admin" ? <PendingRequests /> : null}
+
       <VoucherTable />
+
+      <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} />
     </InternalLayout>
   );
 }

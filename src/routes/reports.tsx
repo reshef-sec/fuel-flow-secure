@@ -72,13 +72,25 @@ function ReportsPage() {
   );
 
   const total = rows.reduce((sum, v) => sum + v.amount, 0);
-  const headers = ['מס"ד', "סיריאלי", "סכום", "שויך ל", "לקוח", "סטטוס", "תאריך עדכון"];
+  const headers = [
+    'מס"ד',
+    "סיריאלי",
+    "סכום",
+    "שויך ל",
+    "לקוח",
+    "דורש ההקצאה",
+    "גורם מאשר",
+    "סטטוס",
+    "תאריך עדכון",
+  ];
   const cells = rows.map((v) => [
     v.serial,
     v.realCode,
     v.amount,
     formatAssignment(v),
     v.client ?? "—",
+    v.requester ?? "—",
+    v.approver ?? "—",
     v.status,
     v.updatedAt,
   ]);
@@ -232,6 +244,8 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
                 <TableHeaderCell>סכום</TableHeaderCell>
                 <TableHeaderCell>שויך ל</TableHeaderCell>
                 <TableHeaderCell>לקוח</TableHeaderCell>
+                <TableHeaderCell>דורש ההקצאה</TableHeaderCell>
+                <TableHeaderCell>גורם מאשר</TableHeaderCell>
                 <TableHeaderCell>סטטוס</TableHeaderCell>
                 <TableHeaderCell>תאריך עדכון</TableHeaderCell>
               </TableRow>
@@ -239,7 +253,7 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                     לא נמצאו רשומות מתאימות לסינון
                   </TableCell>
                 </TableRow>
@@ -255,6 +269,8 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
                     </TableCell>
                     <TableCell>{formatAssignment(v)}</TableCell>
                     <TableCell>{v.client ?? "—"}</TableCell>
+                    <TableCell>{v.requester ?? "—"}</TableCell>
+                    <TableCell>{v.approver ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant={statusVariant[v.status]} size="md">
                         {v.status}

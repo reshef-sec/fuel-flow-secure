@@ -55,6 +55,25 @@ export interface ClientRecord {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+export interface VoucherRequest {
+  id: string;
+  requester: string;
+  requesterId: string;
+  branch: string;
+  amount: number;
+  reason: string;
+  createdAt: string;
+  status: "ממתין לאישור" | "אושר" | "נדחה";
+  approvedAmount?: number;
+  approver?: string;
+}
+
+/** Metadata attached to created vouchers for audit tracking. */
+export interface AllocationMeta {
+  requester?: string;
+  approver?: string;
+}
+
 /** Real clients & sites list (מס' לקוח, שם לקוח, מספר אתר, שם אתר). */
 const seedClients: ClientRecord[] = clientsSeed as ClientRecord[];
 
@@ -77,7 +96,18 @@ interface AppState {
 
   balance: number;
   vouchers: VoucherRecord[];
-  allocate: (branch: string, supervisor: string | undefined, amount: number) => void;
+  allocate: (
+    branch: string,
+    supervisor: string | undefined,
+    amount: number,
+    meta?: AllocationMeta,
+  ) => void;
+
+  requests: VoucherRequest[];
+  addRequest: (req: Omit<VoucherRequest, "id" | "createdAt" | "status">) => void;
+  /** Approves a request (full or custom amount) and allocates to the requester branch. */
+  approveRequest: (id: string, amount: number, approver: string) => void;
+  rejectRequest: (id: string, approver: string) => void;
   assignToSupervisor: (branch: string, supervisor: string, amount: number) => void;
   markPazRedeemed: (count: number) => number;
   /** Marks vouchers redeemed by serial numbers from the Paz feedback file. */
@@ -116,7 +146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   balance: 15000,
   vouchers: seedVouchers,
-  allocate: (branch, supervisor, amount) =>
+  allocate: (branch, supervisor, amount, meta) =>
     set((s) => {
       const count = Math.floor(amount / 100);
       const created: VoucherRecord[] = Array.from({ length: count }, (_, i) => ({
@@ -127,6 +157,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...(supervisor ? { supervisor } : {}),
         status: supervisor ? ("הוקצה לעובד" as const) : ("טרם שומש" as const),
         updatedAt: today(),
+        ...(meta?.requester ? { requester: meta.requester } : {}),
+        ...(meta?.approver ? { approver: meta.approver } : {}),
       }));
       return {
         balance: Math.max(0, s.balance - amount),
@@ -172,6 +204,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     return updated;
   },
   importVouchers: (rows) => set((s) => ({ vouchers: [...rows, ...s.vouchers] })),
+
+  requests: [],
+  addRequest: (req) =>
+    set((s) => ({
+      requests: [
+        {
+          ...req,
+          id: `req-${Date.now()}-${Math.floor(Math.random() * 999)}`,
+          createdAt: today(),
+          status: "ממתין לאישור" as const,
+        },
+        ...s.requests,
+      ],
+    })),
+  approveRequest: (id, amount, approver) => {
+    const req = get().requests.find((r) => r.id === id);
+    if (!req) return;
+    get().allocate(req.branch, undefined, amount, { requester: req.requester, approver });
+    set((s) => ({
+      requests: s.requests.map((r) =>
+        r.id === id ? { ...r, status: "אושר" as const, approvedAmount: amount, approver } : r,
+      ),
+    }));
+  },
+  rejectRequest: (id, approver) =>
+    set((s) => ({
+      requests: s.requests.map((r) =>
+        r.id === id ? { ...r, status: "נדחה" as const, approver } : r,
+      ),
+    })),
 
 
   users: [
@@ -272,5 +334,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((s) => ({ reasons: s.reasons.map((r, i) => (i === index ? reason : r)) })),
   removeReason: (index) => set((s) => ({ reasons: s.reasons.filter((_, i) => i !== index) })),
 }));
+
+/** The user represented by the role simulator; prefers one allowed to request. */
+export function pickCurrentUser(users: UserRecord[], role: Role) {
+  return users.find((u) => u.role === role && u.canRequest) ?? users.find((u) => u.role === role);
+}
+
+export function useCurrentUser() {
+  const users = useAppStore((s) => s.users);
+  const role = useAppStore((s) => s.role);
+  return pickCurrentUser(users, role);
+}
 
 export { MAIN_POOL };

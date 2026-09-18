@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, Ticket, UserCheck, Wallet } from "lucide-react";
+import { Building2, Send, Ticket, UserCheck, Wallet } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
+import { AllocationDialog } from "@/components/dashboard/AllocationDialog";
 import { Badge, Button, Card } from "@/design-system/delek-1ea111";
 import { useAppStore } from "@/store/appStore";
 
@@ -27,7 +28,15 @@ function AllocationsPage() {
   const vouchers = useAppStore((s) => s.vouchers);
   const users = useAppStore((s) => s.users);
   const role = useAppStore((s) => s.role);
+  const balance = useAppStore((s) => s.balance);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [allocOpen, setAllocOpen] = useState(false);
+  const [presetBranch, setPresetBranch] = useState<string | undefined>(undefined);
+
+  function openAllocation(branch?: string) {
+    setPresetBranch(branch);
+    setAllocOpen(true);
+  }
 
   const stats = branchList.map((b) => {
     const rows = vouchers.filter((v) => v.branch === b.name);
@@ -48,6 +57,19 @@ function AllocationsPage() {
 
   return (
     <InternalLayout title="הקצאות לסניפים">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          יתרה זמינה לחלוקה:{" "}
+          <span className="font-bold tabular-nums text-secondary">
+            {balance.toLocaleString("he-IL")} ₪
+          </span>
+        </p>
+        <Button onClick={() => openAllocation(undefined)}>
+          <Send className="size-4" />
+          ביצוע הקצאה יזומה
+        </Button>
+      </div>
+
       {isBranchManager && mine ? (
         <Card padding="lg" className="mb-8">
           <div className="flex flex-wrap items-center justify-between gap-5">
@@ -121,6 +143,13 @@ function AllocationsPage() {
                     {b.allocated} הוקצו לעובדים
                   </Badge>
                 </div>
+
+                <div className="mt-4 flex justify-end">
+                  <Button size="sm" variant="outline" onClick={() => openAllocation(b.name)}>
+                    <Send className="size-4" />
+                    הקצה
+                  </Button>
+                </div>
               </Card>
             ))
           )}
@@ -132,6 +161,12 @@ function AllocationsPage() {
         onClose={() => setDialogOpen(false)}
         branch={myBranch}
         branchBalance={mine?.balance ?? 0}
+      />
+
+      <AllocationDialog
+        open={allocOpen}
+        onClose={() => setAllocOpen(false)}
+        presetTarget={presetBranch}
       />
     </InternalLayout>
   );
