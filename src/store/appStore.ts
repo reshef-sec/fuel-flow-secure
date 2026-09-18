@@ -96,7 +96,18 @@ interface AppState {
 
   balance: number;
   vouchers: VoucherRecord[];
-  allocate: (branch: string, supervisor: string | undefined, amount: number) => void;
+  allocate: (
+    branch: string,
+    supervisor: string | undefined,
+    amount: number,
+    meta?: AllocationMeta,
+  ) => void;
+
+  requests: VoucherRequest[];
+  addRequest: (req: Omit<VoucherRequest, "id" | "createdAt" | "status">) => void;
+  /** Approves a request (full or custom amount) and allocates to the requester branch. */
+  approveRequest: (id: string, amount: number, approver: string) => void;
+  rejectRequest: (id: string, approver: string) => void;
   assignToSupervisor: (branch: string, supervisor: string, amount: number) => void;
   markPazRedeemed: (count: number) => number;
   /** Marks vouchers redeemed by serial numbers from the Paz feedback file. */
@@ -135,7 +146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   balance: 15000,
   vouchers: seedVouchers,
-  allocate: (branch, supervisor, amount) =>
+  allocate: (branch, supervisor, amount, meta) =>
     set((s) => {
       const count = Math.floor(amount / 100);
       const created: VoucherRecord[] = Array.from({ length: count }, (_, i) => ({
@@ -146,6 +157,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...(supervisor ? { supervisor } : {}),
         status: supervisor ? ("הוקצה לעובד" as const) : ("טרם שומש" as const),
         updatedAt: today(),
+        ...(meta?.requester ? { requester: meta.requester } : {}),
+        ...(meta?.approver ? { approver: meta.approver } : {}),
       }));
       return {
         balance: Math.max(0, s.balance - amount),
