@@ -358,6 +358,20 @@ export function UsersPanel() {
             />
           </FormField>
 
+          <div className="rounded-lg border border-border p-3">
+            <Checkbox
+              checked={form.canRequest}
+              disabled={!isAdmin}
+              onChange={(e) => setForm({ ...form, canRequest: e.target.checked })}
+              label="רשאי להקים דרישה"
+            />
+            {!isAdmin ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                רק אדמין מרכזי רשאי לעדכן הרשאה זו
+              </p>
+            ) : null}
+          </div>
+
           {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
 
           <div className="flex flex-wrap justify-end gap-2 pt-1">
