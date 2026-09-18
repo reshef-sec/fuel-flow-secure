@@ -295,7 +295,11 @@ export function ClientsPanel() {
         </div>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="הוספת לקוח ואתר">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editing ? "עריכת לקוח ואתר" : "הוספת לקוח ואתר"}
+      >
         <form onSubmit={submit} className="space-y-5">
           <FormField label="מס' לקוח">
             <Input
