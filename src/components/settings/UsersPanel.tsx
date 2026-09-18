@@ -205,7 +205,23 @@ export function UsersPanel() {
             <FileSpreadsheet className="size-4" />
             ייבוא מאקסל
           </Button>
-          <Button onClick={() => setOpen(true)}>
+          <Button
+            onClick={() => {
+              setEditingId(null);
+              setError(null);
+              setForm({
+                branch: branchNames[0] ?? "",
+                id: "",
+                lastName: "",
+                firstName: "",
+                role: "supervisor",
+                title: "",
+                phone: "",
+                canRequest: false,
+              });
+              setOpen(true);
+            }}
+          >
             <Plus className="size-4" />
             הוספת משתמש
           </Button>
