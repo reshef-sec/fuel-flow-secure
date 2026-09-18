@@ -134,7 +134,15 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
 
   return (
     <InternalLayout title="דוחות">
-      <Card padding="lg">
+      <Tabs items={reportTabs} value={tab} onChange={setTab} />
+
+      {tab === "paz" ? (
+        <div className="mt-6">
+          <PazReport />
+        </div>
+      ) : (
+        <>
+      <Card padding="lg" className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 font-display text-lg font-extrabold text-secondary">
             <Filter className="size-5 text-primary" />
@@ -294,6 +302,8 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
           </Table>
         </div>
       </section>
+        </>
+      )}
     </InternalLayout>
   );
 }
