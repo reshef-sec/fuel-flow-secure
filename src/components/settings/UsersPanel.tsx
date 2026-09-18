@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
-import { Plus, Search, Trash2, UserPlus } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { FileSpreadsheet, Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   Badge,
   Button,
+  Checkbox,
   FormField,
   Input,
   Select,
@@ -16,7 +17,18 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { roleLabels, useAppStore, type Role } from "@/store/appStore";
+import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
+import { roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
+
+const roleFromLabel = (value: string): Role => {
+  const v = value.trim();
+  if (v === "אדמין" || v === "admin" || v.includes("אדמין")) return "admin";
+  if (v === "מנהל סניף" || v === "branch" || v.includes("סניף")) return "branch";
+  return "supervisor";
+};
+
+const truthy = (value: string) =>
+  ["כן", "true", "1", "v", "yes", "✓"].includes(value.trim().toLowerCase());
 
 const roleVariant: Record<Role, "brand" | "info" | "purple"> = {
   admin: "brand",
