@@ -39,6 +39,7 @@ const roleVariant: Record<Role, "brand" | "info" | "purple"> = {
 export function UsersPanel() {
   const users = useAppStore((s) => s.users);
   const addUser = useAppStore((s) => s.addUser);
+  const updateUser = useAppStore((s) => s.updateUser);
   const removeUser = useAppStore((s) => s.removeUser);
   const branchList = useAppStore((s) => s.branchList);
   const branchNames = branchList.map((b) => b.name);
