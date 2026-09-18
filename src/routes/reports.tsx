@@ -59,6 +59,8 @@ function ReportsPage() {
 
   // Branch managers are locked to their own branch — no "all branches" option.
   const lockedBranch = role === "branch" ? (me?.branch ?? "") : null;
+  // Supervisors are locked to vouchers assigned to them personally.
+  const lockedSupervisor = role === "supervisor" ? (me ? fullName(me) : "") : null;
 
   const supervisors = useMemo(
     () =>
@@ -77,6 +79,7 @@ function ReportsPage() {
     () =>
       vouchers.filter((v) => {
         if (lockedBranch && v.branch !== lockedBranch) return false;
+        if (lockedSupervisor !== null && v.supervisor !== lockedSupervisor) return false;
         if (filters.from && v.updatedAt < filters.from) return false;
         if (filters.to && v.updatedAt > filters.to) return false;
         if (filters.branch && v.branch !== filters.branch) return false;
@@ -85,7 +88,7 @@ function ReportsPage() {
         if (filters.status && v.status !== filters.status) return false;
         return true;
       }),
-    [vouchers, filters, lockedBranch],
+    [vouchers, filters, lockedBranch, lockedSupervisor],
   );
 
   const total = rows.reduce((sum, v) => sum + v.amount, 0);
