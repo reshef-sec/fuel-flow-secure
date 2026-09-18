@@ -20,7 +20,7 @@ import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { useAppStore } from "@/store/appStore";
 
-const empty = { clientId: "", clientName: "", siteId: "", siteName: "" };
+const empty = { clientId: "", clientName: "", siteId: "", siteName: "", standard: "" };
 
 export function ClientsPanel() {
   const clients = useAppStore((s) => s.clients);
@@ -43,7 +43,7 @@ export function ClientsPanel() {
     const q = query.trim();
     if (!q) return clients;
     return clients.filter((c) =>
-      [c.clientId, c.clientName, c.siteId, c.siteName].some((v) => v.includes(q)),
+      [c.clientId, c.clientName, c.siteId, c.siteName, c.standard ?? ""].some((v) => v.includes(q)),
     );
   }, [clients, query]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -66,9 +66,10 @@ export function ClientsPanel() {
           clientName: String(r[1] ?? "").trim(),
           siteId: String(r[2] ?? "").trim(),
           siteName: String(r[3] ?? "").trim(),
+          standard: String(r[4] ?? "").trim(),
         }));
       if (rows.length === 0) {
-        toast.error("לא נמצאו שורות תקינות. עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר");
+        toast.error("לא נמצאו שורות תקינות. עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן");
         return;
       }
       importClients(rows);
@@ -81,8 +82,14 @@ export function ClientsPanel() {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.clientId.trim() || !form.clientName.trim() || !form.siteId.trim() || !form.siteName.trim()) {
-      setError("יש למלא את כל השדות");
+    if (
+      !form.clientId.trim() ||
+      !form.clientName.trim() ||
+      !form.siteId.trim() ||
+      !form.siteName.trim() ||
+      !form.standard.trim()
+    ) {
+      setError("יש למלא את כל השדות, כולל תקן");
       return;
     }
     const payload = {
@@ -90,6 +97,7 @@ export function ClientsPanel() {
       clientName: form.clientName.trim(),
       siteId: form.siteId.trim(),
       siteName: form.siteName.trim(),
+      standard: form.standard.trim(),
     };
     const clash = clients.some(
       (c) =>
@@ -142,8 +150,8 @@ export function ClientsPanel() {
             onClick={() => {
               downloadCsv(
                 "clients-template.csv",
-                ["מס' לקוח", "שם לקוח", "מספר אתר", "שם אתר"],
-                [["1001", "שם לקוח לדוגמה", "11", "שם אתר לדוגמה"]],
+                ["מס' לקוח", "שם לקוח", "מספר אתר", "שם אתר", "תקן"],
+                [["1001", "שם לקוח לדוגמה", "11", "שם אתר לדוגמה", "תקן 1001"]],
               );
               toast.success("תבנית הלקוחות הורדה");
             }}
@@ -189,7 +197,7 @@ export function ClientsPanel() {
             ייבוא לקוחות ואתרים מקובץ אקסל
           </p>
           <p className="text-sm text-muted-foreground">
-            עמודות נדרשות: מס' לקוח, שם לקוח, מספר אתר, שם אתר
+            עמודות נדרשות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן
           </p>
           <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
             <FileSpreadsheet className="size-4" />
@@ -214,13 +222,14 @@ export function ClientsPanel() {
               <TableHeaderCell>שם לקוח</TableHeaderCell>
               <TableHeaderCell>מספר אתר</TableHeaderCell>
               <TableHeaderCell>שם אתר</TableHeaderCell>
+              <TableHeaderCell className="text-center">תקן</TableHeaderCell>
               <TableHeaderCell>פעולות</TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {visible.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   לא נמצאו לקוחות או אתרים מתאימים
                 </TableCell>
               </TableRow>
@@ -231,6 +240,7 @@ export function ClientsPanel() {
                   <TableCell>{c.clientName}</TableCell>
                   <TableCell className="tabular-nums">{c.siteId}</TableCell>
                   <TableCell>{c.siteName}</TableCell>
+                  <TableCell className="text-center tabular-nums">{c.standard || "—"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <button
@@ -242,6 +252,7 @@ export function ClientsPanel() {
                             clientName: c.clientName,
                             siteId: c.siteId,
                             siteName: c.siteName,
+                            standard: c.standard ?? "",
                           });
                           setError(null);
                           setOpen(true);
@@ -333,6 +344,14 @@ export function ClientsPanel() {
               aria-label="שם אתר"
             />
           </FormField>
+          <FormField label="תקן" hint="תקן הרכב / השמירה של האתר">
+            <Input
+              value={form.standard}
+              onChange={(e) => setForm({ ...form, standard: e.target.value })}
+              aria-label="תקן"
+            />
+          </FormField>
+
 
           {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
 

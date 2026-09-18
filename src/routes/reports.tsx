@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { FileDown, Filter, Printer, RotateCcw } from "lucide-react";
+import { FileDown, Filter, Fuel, Printer, RotateCcw, Table2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
+import { Tabs } from "@/components/ui/Tabs";
+import { PazReport } from "@/components/reports/PazReport";
 import {
   Badge,
   Button,
@@ -40,7 +42,13 @@ export const Route = createFileRoute("/reports")({
 const statuses: VoucherStatus[] = ["טרם שומש", "הוקצה לעובד", "מומש סופית", "חסום"];
 const empty = { from: "", to: "", branch: "", supervisor: "", client: "", status: "" };
 
+const reportTabs = [
+  { id: "master", label: "דוח מאסטר", icon: Table2 },
+  { id: "paz", label: "דוח קש פז", icon: Fuel },
+] as const;
+
 function ReportsPage() {
+  const [tab, setTab] = useState<string>("master");
   const vouchers = useAppStore((s) => s.vouchers);
   const branchList = useAppStore((s) => s.branchList);
   const users = useAppStore((s) => s.users);
@@ -126,7 +134,15 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
 
   return (
     <InternalLayout title="דוחות">
-      <Card padding="lg">
+      <Tabs items={reportTabs} value={tab} onChange={setTab} />
+
+      {tab === "paz" ? (
+        <div className="mt-6">
+          <PazReport />
+        </div>
+      ) : (
+        <>
+      <Card padding="lg" className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 font-display text-lg font-extrabold text-secondary">
             <Filter className="size-5 text-primary" />
@@ -286,6 +302,8 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
           </Table>
         </div>
       </section>
+        </>
+      )}
     </InternalLayout>
   );
 }

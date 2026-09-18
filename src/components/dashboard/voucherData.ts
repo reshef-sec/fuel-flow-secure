@@ -18,7 +18,27 @@ export interface VoucherRecord {
   requester?: string;
   /** גורם מאשר — admin who approved / executed the allocation */
   approver?: string;
+
+  /* ---- End-worker issuance details (billing report) ---- */
+  /** מס' לקוח */
+  clientId?: string;
+  /** מספר אתר */
+  siteId?: string;
+  /** שם אתר */
+  siteName?: string;
+  /** סיבת הפקה */
+  reason?: string;
+  /** שם עובד */
+  workerName?: string;
+  /** ת.ז עובד */
+  workerId?: string;
+  /** תאריך מסירה לעובד */
+  deliveredAt?: string;
 }
+
+/** True for vouchers handed to an end worker (billing-relevant). */
+export const isWorkerVoucher = (v: VoucherRecord) =>
+  Boolean(v.workerId || v.workerName) || v.status === "הוקצה לעובד";
 
 /** "מאגר ראשי" | "צפון" | "סניף צפון (מפקח דן)" */
 export function formatAssignment(v: { branch: string; supervisor?: string }) {
@@ -44,4 +64,41 @@ export const vouchers: VoucherRecord[] = [
   { serial: "483920", realCode: "RB-2218-6639", amount: 500, branch: "דרום", client: "לקוח - אתר 2", status: "מומש סופית", updatedAt: "2026-08-17" },
   { serial: "572011", realCode: "RB-6674-1125", amount: 100, branch: "שפלה", supervisor: "שני רפי", status: "טרם שומש", updatedAt: "2026-08-16" },
   { serial: "639874", realCode: "RB-4451-9938", amount: 200, branch: MAIN_POOL, status: "טרם שומש", updatedAt: "2026-08-15" },
+
+  /* ---- Vouchers handed to end workers (feed the "דוח קש פז" billing report) ---- */
+  {
+    serial: "700114", realCode: "RB-7001-1140", amount: 100, branch: "צפון", supervisor: "שני רפי",
+    status: "הוקצה לעובד", updatedAt: "2026-09-15", deliveredAt: "2026-09-15",
+    client: "מזרחי טפחות שרותי אבטחה", clientId: "38", siteId: "74", siteName: 'לב העיר פ"ת 550-אבטחה',
+    reason: "סיור ניידות", workerName: "לוי אדיר", workerId: "034044487",
+    requester: "לוי אדיר", approver: "קלדרון רון",
+  },
+  {
+    serial: "700221", realCode: "RB-7002-2215", amount: 200, branch: "ירושלים", supervisor: "חטיבי ניר",
+    status: "הוקצה לעובד", updatedAt: "2026-09-14", deliveredAt: "2026-09-14",
+    client: "מזרחי טפחות שרותי אבטחה", clientId: "38", siteId: "76", siteName: "חזון איש-אבטחה",
+    reason: "חידוש מלאי שוטף", workerName: "אזרואל מאיר", workerId: "043369339",
+    requester: "חטיבי ניר", approver: "בני תמי",
+  },
+  {
+    serial: "700338", realCode: "RB-7003-3382", amount: 100, branch: "דרום", supervisor: "כחלוני עוז",
+    status: "מומש סופית", updatedAt: "2026-09-12", deliveredAt: "2026-09-10",
+    client: "מזרחי טפחות שרותי אבטחה", clientId: "38", siteId: "109", siteName: "סמילנסקי נתניה-אבטחה מזדמנת",
+    reason: "אירוע חריג", workerName: "רבינוביץ אבי", workerId: "208268425",
+    requester: "אלמקייס חיים", approver: "קלדרון רון",
+  },
+  {
+    serial: "700447", realCode: "RB-7004-4471", amount: 300, branch: "מרכז", supervisor: "נגר רביב",
+    status: "הוקצה לעובד", updatedAt: "2026-09-09", deliveredAt: "2026-09-09",
+    client: "מזרחי טפחות שרותי אבטחה", clientId: "38", siteId: "115", siteName: "פארק המדע רחובות-אבטחה",
+    reason: "הקצאה חד פעמית", workerName: "נגר רביב", workerId: "028547099",
+    requester: "קשי עופר", approver: "נמדר שגאל",
+  },
+  {
+    serial: "700556", realCode: "RB-7005-5568", amount: 100, branch: "שפלה", supervisor: "שני רפי",
+    status: "הוקצה לעובד", updatedAt: "2026-09-08", deliveredAt: "2026-09-08",
+    client: "מזרחי טפחות שרותי אבטחה", clientId: "38", siteId: "127", siteName: "אופקים 437-אבטחה",
+    reason: "סיור ניידות", workerName: "שני רפי", workerId: "033237454",
+    approver: "לוגסי איתן",
+  },
 ];
