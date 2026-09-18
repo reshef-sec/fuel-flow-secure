@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Building2, Ticket, UserCheck, Wallet } from "lucide-react";
+import { Building2, Send, Ticket, UserCheck, Wallet } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
+import { AllocationDialog } from "@/components/dashboard/AllocationDialog";
 import { Badge, Button, Card } from "@/design-system/delek-1ea111";
 import { useAppStore } from "@/store/appStore";
 
@@ -28,6 +29,13 @@ function AllocationsPage() {
   const users = useAppStore((s) => s.users);
   const role = useAppStore((s) => s.role);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [allocOpen, setAllocOpen] = useState(false);
+  const [presetBranch, setPresetBranch] = useState<string | undefined>(undefined);
+
+  function openAllocation(branch?: string) {
+    setPresetBranch(branch);
+    setAllocOpen(true);
+  }
 
   const stats = branchList.map((b) => {
     const rows = vouchers.filter((v) => v.branch === b.name);
