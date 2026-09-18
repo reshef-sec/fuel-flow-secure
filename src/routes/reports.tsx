@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { FileDown, Filter, Printer, RotateCcw } from "lucide-react";
+import { FileDown, Filter, Fuel, Printer, RotateCcw, Table2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
+import { Tabs } from "@/components/ui/Tabs";
+import { PazReport } from "@/components/reports/PazReport";
 import {
   Badge,
   Button,
@@ -40,7 +42,13 @@ export const Route = createFileRoute("/reports")({
 const statuses: VoucherStatus[] = ["טרם שומש", "הוקצה לעובד", "מומש סופית", "חסום"];
 const empty = { from: "", to: "", branch: "", supervisor: "", client: "", status: "" };
 
+const reportTabs = [
+  { id: "master", label: "דוח מאסטר", icon: Table2 },
+  { id: "paz", label: "דוח קש פז", icon: Fuel },
+] as const;
+
 function ReportsPage() {
+  const [tab, setTab] = useState<string>("master");
   const vouchers = useAppStore((s) => s.vouchers);
   const branchList = useAppStore((s) => s.branchList);
   const users = useAppStore((s) => s.users);
