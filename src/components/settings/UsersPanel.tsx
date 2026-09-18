@@ -231,10 +231,12 @@ export function UsersPanel() {
                   </Badge>
                 </TableCell>
                 <TableCell>{u.title}</TableCell>
-                <TableCell className="tabular-nums" dir="ltr">
-                  {u.phone}
+                <TableCell className="text-center">
+                  <span className="tabular-nums" dir="ltr">
+                    {u.phone}
+                  </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-center">
                   <Checkbox
                     checked={Boolean(u.canRequest)}
                     disabled={!isAdmin}
