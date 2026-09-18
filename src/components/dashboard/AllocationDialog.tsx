@@ -40,11 +40,11 @@ export function AllocationDialog({
 
   useEffect(() => {
     if (!open) return;
-    setTarget("");
+    setTarget(presetTarget ?? "");
     setAmount("");
     setError(null);
     setLoading(false);
-  }, [open]);
+  }, [open, presetTarget]);
 
   const numeric = Number(amount);
 
@@ -67,7 +67,9 @@ export function AllocationDialog({
     setTimeout(() => {
       setLoading(false);
       const picked = targets.find((t) => t.value === target);
-      allocate(picked?.branch ?? target, picked?.supervisor, numeric);
+      allocate(picked?.branch ?? target, picked?.supervisor, numeric, {
+        approver: me ? fullName(me) : "אדמין מרכזי",
+      });
       onClose();
       toast.success("ההקצאה בוצעה בהצלחה והיתרה עודכנה");
     }, 1000);
