@@ -24,15 +24,23 @@ import {
 import { AllocationDialog } from "./AllocationDialog";
 import { formatAssignment, type VoucherRecord } from "./voucherData";
 import { downloadCsv, heDate, statusVariant } from "./statusVariant";
-import { useAppStore } from "@/store/appStore";
+import { useAppStore, useCurrentUser } from "@/store/appStore";
 
 const columnHelper = createColumnHelper<VoucherRecord>();
 
 export function VoucherTable() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const vouchers = useAppStore((s) => s.vouchers);
+  const allVouchers = useAppStore((s) => s.vouchers);
   const role = useAppStore((s) => s.role);
+  const me = useCurrentUser();
+
+  // Branch managers see only vouchers of their own branch (allocated to their employees).
+  const vouchers = useMemo(() => {
+    if (role !== "branch" || !me?.branch) return allVouchers;
+    return allVouchers.filter((v) => v.branch === me.branch);
+  }, [allVouchers, role, me?.branch]);
+
 
   const columns = useMemo(
     () => [
@@ -128,7 +136,7 @@ export function VoucherTable() {
             <FileDown className="size-4" />
             ייצוא לאקסל
           </Button>
-          {role !== "supervisor" ? (
+          {role === "admin" ? (
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="size-4" />
               הקצאת שוברים
