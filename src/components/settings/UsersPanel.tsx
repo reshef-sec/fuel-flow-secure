@@ -42,6 +42,11 @@ export function UsersPanel() {
   const removeUser = useAppStore((s) => s.removeUser);
   const branchList = useAppStore((s) => s.branchList);
   const branchNames = branchList.map((b) => b.name);
+  const importUsers = useAppStore((s) => s.importUsers);
+  const setUserCanRequest = useAppStore((s) => s.setUserCanRequest);
+  const role = useAppStore((s) => s.role);
+  const isAdmin = role === "admin";
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
@@ -54,8 +59,43 @@ export function UsersPanel() {
     role: "supervisor" as Role,
     title: "",
     phone: "",
+    canRequest: false,
   });
   const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    if (!isSheetFile(file.name)) {
+      toast.error("יש להעלות קובץ אקסל (xlsx/xls) או CSV");
+      return;
+    }
+    try {
+      const raw = stripHeader(await parseSheetFile(file), "ת.ז");
+      const parsed: UserRecord[] = [];
+      for (const r of raw) {
+        const [branch = "", id = "", lastName = "", firstName = "", roleCell = "", title = "", phone = "", canReq = ""] = r;
+        const cleanId = id.replace(/\D/g, "");
+        if (cleanId.length !== 9 || !lastName.trim()) continue;
+        parsed.push({
+          branch: branch.trim(),
+          id: cleanId,
+          lastName: lastName.trim(),
+          firstName: firstName.trim(),
+          role: roleFromLabel(roleCell),
+          title: title.trim(),
+          phone: phone.trim(),
+          canRequest: truthy(canReq),
+        });
+      }
+      if (!parsed.length) {
+        toast.error("לא נמצאו שורות תקינות בקובץ");
+        return;
+      }
+      const { added, skipped } = importUsers(parsed);
+      toast.success(`נוספו ${added} משתמשים, ${skipped} דולגו (ת.ז קיימת)`);
+    } catch {
+      toast.error("שגיאה בקריאת הקובץ");
+    }
+  }
 
   const rows = useMemo(() => {
     const q = query.trim();
