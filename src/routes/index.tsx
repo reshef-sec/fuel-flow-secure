@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Wallet, Ticket, CheckCircle2, Ban, FilePlus2 } from "lucide-react";
+import { Wallet, Ticket, CheckCircle2, Ban, FilePlus2, UserCheck } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { VoucherTable } from "@/components/dashboard/VoucherTable";
 import { RequestDialog } from "@/components/requests/RequestDialog";
 import { PendingRequests } from "@/components/requests/PendingRequests";
+import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
 import { Button, Card, StatCard } from "@/design-system/delek-1ea111";
 import { useAppStore, useCurrentUser } from "@/store/appStore";
 
