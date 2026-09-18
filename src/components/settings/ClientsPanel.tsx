@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, FileSpreadsheet, Plus, Search, Trash2, UploadCloud } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileSpreadsheet, Pencil, Plus, Search, Trash2, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import {
