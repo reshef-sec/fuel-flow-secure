@@ -150,8 +150,8 @@ export function ClientsPanel() {
             onClick={() => {
               downloadCsv(
                 "clients-template.csv",
-                ["מס' לקוח", "שם לקוח", "מספר אתר", "שם אתר"],
-                [["1001", "שם לקוח לדוגמה", "11", "שם אתר לדוגמה"]],
+                ["מס' לקוח", "שם לקוח", "מספר אתר", "שם אתר", "תקן"],
+                [["1001", "שם לקוח לדוגמה", "11", "שם אתר לדוגמה", "תקן 1001"]],
               );
               toast.success("תבנית הלקוחות הורדה");
             }}
@@ -197,7 +197,7 @@ export function ClientsPanel() {
             ייבוא לקוחות ואתרים מקובץ אקסל
           </p>
           <p className="text-sm text-muted-foreground">
-            עמודות נדרשות: מס' לקוח, שם לקוח, מספר אתר, שם אתר
+            עמודות נדרשות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן
           </p>
           <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
             <FileSpreadsheet className="size-4" />
@@ -222,13 +222,14 @@ export function ClientsPanel() {
               <TableHeaderCell>שם לקוח</TableHeaderCell>
               <TableHeaderCell>מספר אתר</TableHeaderCell>
               <TableHeaderCell>שם אתר</TableHeaderCell>
+              <TableHeaderCell className="text-center">תקן</TableHeaderCell>
               <TableHeaderCell>פעולות</TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {visible.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   לא נמצאו לקוחות או אתרים מתאימים
                 </TableCell>
               </TableRow>
@@ -239,6 +240,7 @@ export function ClientsPanel() {
                   <TableCell>{c.clientName}</TableCell>
                   <TableCell className="tabular-nums">{c.siteId}</TableCell>
                   <TableCell>{c.siteName}</TableCell>
+                  <TableCell className="text-center tabular-nums">{c.standard || "—"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <button
@@ -250,6 +252,7 @@ export function ClientsPanel() {
                             clientName: c.clientName,
                             siteId: c.siteId,
                             siteName: c.siteName,
+                            standard: c.standard ?? "",
                           });
                           setError(null);
                           setOpen(true);
