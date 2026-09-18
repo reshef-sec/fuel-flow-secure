@@ -58,7 +58,7 @@ function ReportsPage() {
   const [filters, setFilters] = useState(empty);
 
   // Branch managers are locked to their own branch — no "all branches" option.
-  const lockedBranch = role === "branch" ? (me?.branch ?? "") : null;
+  const lockedBranch = role === "admin" ? null : (me?.branch ?? "");
   // Supervisors are locked to vouchers assigned to them personally.
   const lockedSupervisor = role === "supervisor" ? (me ? fullName(me) : "") : null;
 
