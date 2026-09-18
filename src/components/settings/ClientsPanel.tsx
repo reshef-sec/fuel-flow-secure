@@ -82,8 +82,14 @@ export function ClientsPanel() {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.clientId.trim() || !form.clientName.trim() || !form.siteId.trim() || !form.siteName.trim()) {
-      setError("יש למלא את כל השדות");
+    if (
+      !form.clientId.trim() ||
+      !form.clientName.trim() ||
+      !form.siteId.trim() ||
+      !form.siteName.trim() ||
+      !form.standard.trim()
+    ) {
+      setError("יש למלא את כל השדות, כולל תקן");
       return;
     }
     const payload = {
@@ -91,6 +97,7 @@ export function ClientsPanel() {
       clientName: form.clientName.trim(),
       siteId: form.siteId.trim(),
       siteName: form.siteName.trim(),
+      standard: form.standard.trim(),
     };
     const clash = clients.some(
       (c) =>
