@@ -7,7 +7,7 @@ import { VoucherTable } from "@/components/dashboard/VoucherTable";
 import { RequestDialog } from "@/components/requests/RequestDialog";
 import { PendingRequests } from "@/components/requests/PendingRequests";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
-import { Button, Card, StatCard } from "@/design-system/delek-1ea111";
+import { Button, Card, Select, StatCard } from "@/design-system/delek-1ea111";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
 export const Route = createFileRoute("/")({
@@ -87,6 +87,27 @@ function Dashboard() {
 
   return (
     <InternalLayout title="דשבורד ניהול שוברים">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-display text-lg font-extrabold text-secondary">תמונת מצב</p>
+          <p className="text-xs text-muted-foreground">
+            היתרה ומלאי השוברים מוצגים תמיד במצב עדכני · המימושים והחסומים לפי התקופה שנבחרה
+          </p>
+        </div>
+        <Select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value as Period)}
+          aria-label="טווח זמן"
+          className="h-10 w-auto text-sm font-semibold"
+        >
+          {(Object.keys(periodLabels) as Period[]).map((p) => (
+            <option key={p} value={p}>
+              {periodLabels[p]}
+            </option>
+          ))}
+        </Select>
+      </div>
+
       {isBranchManager ? (
         <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
