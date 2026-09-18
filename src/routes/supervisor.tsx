@@ -14,6 +14,7 @@ import {
   Input,
   Select,
 } from "@/design-system/delek-1ea111";
+import { NoAccess } from "@/components/layout/NoAccess";
 import { useAppStore } from "@/store/appStore";
 
 export const Route = createFileRoute("/supervisor")({
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/supervisor")({
 function SupervisorPage() {
   const clients = useAppStore((s) => s.clients);
   const reasons = useAppStore((s) => s.reasons);
+  const role = useAppStore((s) => s.role);
 
   const clientOptions = useMemo(() => {
     const map = new Map<string, string>();
