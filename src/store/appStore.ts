@@ -248,6 +248,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   clients: seedClients,
   addClient: (client) => set((s) => ({ clients: [client, ...s.clients] })),
+  updateClient: (clientId, siteId, patch) =>
+    set((s) => ({
+      clients: s.clients.map((c) =>
+        c.clientId === clientId && c.siteId === siteId ? { ...c, ...patch } : c,
+      ),
+    })),
   /** Merges imported rows, replacing existing client+site combinations. */
   importClients: (rows) =>
     set((s) => {
