@@ -72,13 +72,25 @@ function ReportsPage() {
   );
 
   const total = rows.reduce((sum, v) => sum + v.amount, 0);
-  const headers = ['מס"ד', "סיריאלי", "סכום", "שויך ל", "לקוח", "סטטוס", "תאריך עדכון"];
+  const headers = [
+    'מס"ד',
+    "סיריאלי",
+    "סכום",
+    "שויך ל",
+    "לקוח",
+    "דורש ההקצאה",
+    "גורם מאשר",
+    "סטטוס",
+    "תאריך עדכון",
+  ];
   const cells = rows.map((v) => [
     v.serial,
     v.realCode,
     v.amount,
     formatAssignment(v),
     v.client ?? "—",
+    v.requester ?? "—",
+    v.approver ?? "—",
     v.status,
     v.updatedAt,
   ]);
@@ -232,6 +244,8 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
                 <TableHeaderCell>סכום</TableHeaderCell>
                 <TableHeaderCell>שויך ל</TableHeaderCell>
                 <TableHeaderCell>לקוח</TableHeaderCell>
+                <TableHeaderCell>דורש ההקצאה</TableHeaderCell>
+                <TableHeaderCell>גורם מאשר</TableHeaderCell>
                 <TableHeaderCell>סטטוס</TableHeaderCell>
                 <TableHeaderCell>תאריך עדכון</TableHeaderCell>
               </TableRow>
