@@ -205,6 +205,36 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   importVouchers: (rows) => set((s) => ({ vouchers: [...rows, ...s.vouchers] })),
 
+  requests: [],
+  addRequest: (req) =>
+    set((s) => ({
+      requests: [
+        {
+          ...req,
+          id: `req-${Date.now()}-${Math.floor(Math.random() * 999)}`,
+          createdAt: today(),
+          status: "ממתין לאישור" as const,
+        },
+        ...s.requests,
+      ],
+    })),
+  approveRequest: (id, amount, approver) => {
+    const req = get().requests.find((r) => r.id === id);
+    if (!req) return;
+    get().allocate(req.branch, undefined, amount, { requester: req.requester, approver });
+    set((s) => ({
+      requests: s.requests.map((r) =>
+        r.id === id ? { ...r, status: "אושר" as const, approvedAmount: amount, approver } : r,
+      ),
+    }));
+  },
+  rejectRequest: (id, approver) =>
+    set((s) => ({
+      requests: s.requests.map((r) =>
+        r.id === id ? { ...r, status: "נדחה" as const, approver } : r,
+      ),
+    })),
+
 
   users: [
     { branch: "הנהלה", id: "032957615", lastName: "בני", firstName: "תמי", role: "admin", title: "בקרת חוזים ושכר", phone: "0506350222" },
