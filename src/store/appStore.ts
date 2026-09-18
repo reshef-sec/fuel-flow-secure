@@ -31,6 +31,8 @@ export interface UserRecord {
   phone: string;
   /** סניף */
   branch: string;
+  /** רשאי להקים דרישה */
+  canRequest?: boolean;
 }
 
 /** "משפחה פרטי" for selects and voucher assignment labels. */
