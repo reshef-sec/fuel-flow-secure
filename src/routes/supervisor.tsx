@@ -93,6 +93,8 @@ function SupervisorPage() {
     }
   }
 
+  if (role === "supervisor") return <NoAccess title="הפקת שובר לעובד" />;
+
   return (
     <InternalLayout title="הפקת שובר לעובד">
       <div className="grid gap-6 lg:grid-cols-2">
