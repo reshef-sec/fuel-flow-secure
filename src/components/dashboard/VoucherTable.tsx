@@ -24,7 +24,7 @@ import {
 import { AllocationDialog } from "./AllocationDialog";
 import { formatAssignment, type VoucherRecord } from "./voucherData";
 import { downloadCsv, heDate, statusVariant } from "./statusVariant";
-import { useAppStore, useCurrentUser } from "@/store/appStore";
+import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
 const columnHelper = createColumnHelper<VoucherRecord>();
 
@@ -35,11 +35,13 @@ export function VoucherTable() {
   const role = useAppStore((s) => s.role);
   const me = useCurrentUser();
 
-  // Branch managers see only vouchers of their own branch (allocated to their employees).
+  // Branch managers see only their own branch; supervisors only vouchers assigned to them.
+  const myName = me ? fullName(me) : "";
   const vouchers = useMemo(() => {
-    if (role !== "branch" || !me?.branch) return allVouchers;
-    return allVouchers.filter((v) => v.branch === me.branch);
-  }, [allVouchers, role, me?.branch]);
+    if (role === "branch" && me?.branch) return allVouchers.filter((v) => v.branch === me.branch);
+    if (role === "supervisor") return allVouchers.filter((v) => v.supervisor === myName);
+    return allVouchers;
+  }, [allVouchers, role, me?.branch, myName]);
 
 
   const columns = useMemo(

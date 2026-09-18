@@ -58,7 +58,9 @@ function ReportsPage() {
   const [filters, setFilters] = useState(empty);
 
   // Branch managers are locked to their own branch — no "all branches" option.
-  const lockedBranch = role === "branch" ? (me?.branch ?? "") : null;
+  const lockedBranch = role === "admin" ? null : (me?.branch ?? "");
+  // Supervisors are locked to vouchers assigned to them personally.
+  const lockedSupervisor = role === "supervisor" ? (me ? fullName(me) : "") : null;
 
   const supervisors = useMemo(
     () =>
@@ -77,6 +79,7 @@ function ReportsPage() {
     () =>
       vouchers.filter((v) => {
         if (lockedBranch && v.branch !== lockedBranch) return false;
+        if (lockedSupervisor !== null && v.supervisor !== lockedSupervisor) return false;
         if (filters.from && v.updatedAt < filters.from) return false;
         if (filters.to && v.updatedAt > filters.to) return false;
         if (filters.branch && v.branch !== filters.branch) return false;
@@ -85,7 +88,7 @@ function ReportsPage() {
         if (filters.status && v.status !== filters.status) return false;
         return true;
       }),
-    [vouchers, filters, lockedBranch],
+    [vouchers, filters, lockedBranch, lockedSupervisor],
   );
 
   const total = rows.reduce((sum, v) => sum + v.amount, 0);
@@ -202,18 +205,24 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
             )}
           </FormField>
           <FormField label="מפקח">
-            <Select
-              value={filters.supervisor}
-              onChange={(e) => setFilters({ ...filters, supervisor: e.target.value })}
-              aria-label="מפקח"
-            >
-              <option value="">כל המפקחים</option>
-              {supervisors.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </Select>
+            {lockedSupervisor !== null ? (
+              <Select value={lockedSupervisor} onChange={() => {}} aria-label="מפקח" disabled>
+                <option value={lockedSupervisor}>{lockedSupervisor || "—"}</option>
+              </Select>
+            ) : (
+              <Select
+                value={filters.supervisor}
+                onChange={(e) => setFilters({ ...filters, supervisor: e.target.value })}
+                aria-label="מפקח"
+              >
+                <option value="">כל המפקחים</option>
+                {supervisors.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+            )}
           </FormField>
           <FormField label="לקוח">
             <Select
