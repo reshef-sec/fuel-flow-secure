@@ -294,7 +294,11 @@ export function UsersPanel() {
         </Table>
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="הוספת משתמש חדש">
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editingId ? "עריכת משתמש" : "הוספת משתמש חדש"}
+      >
         <form onSubmit={submit} className="space-y-5">
           <div className="flex items-center gap-3 rounded-lg bg-blue-100 p-4">
             <span className="grid size-10 shrink-0 place-items-center rounded-md bg-surface text-blue-700">
