@@ -128,12 +128,6 @@ function AllocationsPage() {
         </div>
       </section>
 
-      <SupervisorAllocationDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-        branch={myBranch}
-        branchBalance={mine?.balance ?? 0}
-      />
 
       <AllocationDialog
         open={allocOpen}
