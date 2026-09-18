@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Building2, Send, Ticket, UserCheck, Wallet } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
+import { NoAccess } from "@/components/layout/NoAccess";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
 import { AllocationDialog } from "@/components/dashboard/AllocationDialog";
 import { Badge, Button, Card } from "@/design-system/delek-1ea111";
@@ -32,6 +33,8 @@ function AllocationsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [allocOpen, setAllocOpen] = useState(false);
   const [presetBranch, setPresetBranch] = useState<string | undefined>(undefined);
+
+  if (role !== "admin") return <NoAccess title="הקצאות לסניפים" />;
 
   function openAllocation(branch?: string) {
     setPresetBranch(branch);

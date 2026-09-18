@@ -181,19 +181,25 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
             />
           </FormField>
           <FormField label="סניף">
-            <Select
-              value={filters.branch}
-              onChange={(e) => setFilters({ ...filters, branch: e.target.value })}
-              aria-label="סניף"
-            >
-              <option value="">כל הסניפים</option>
-              <option value="מאגר ראשי">מאגר ראשי</option>
-              {branchList.map((b) => (
-                <option key={b.id} value={b.name}>
-                  {b.name}
-                </option>
-              ))}
-            </Select>
+            {lockedBranch !== null ? (
+              <Select value={lockedBranch} onChange={() => {}} aria-label="סניף" disabled>
+                <option value={lockedBranch}>{lockedBranch || "—"}</option>
+              </Select>
+            ) : (
+              <Select
+                value={filters.branch}
+                onChange={(e) => setFilters({ ...filters, branch: e.target.value })}
+                aria-label="סניף"
+              >
+                <option value="">כל הסניפים</option>
+                <option value="מאגר ראשי">מאגר ראשי</option>
+                {branchList.map((b) => (
+                  <option key={b.id} value={b.name}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
+            )}
           </FormField>
           <FormField label="מפקח">
             <Select
