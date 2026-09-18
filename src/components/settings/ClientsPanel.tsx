@@ -232,16 +232,35 @@ export function ClientsPanel() {
                   <TableCell className="tabular-nums">{c.siteId}</TableCell>
                   <TableCell>{c.siteName}</TableCell>
                   <TableCell>
-                    <button
-                      aria-label={`מחק ${c.siteName}`}
-                      onClick={() => {
-                        removeClient(c.clientId, c.siteId);
-                        toast.success("האתר נמחק");
-                      }}
-                      className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-danger focus-visible:shadow-focus"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        aria-label={`ערוך ${c.siteName}`}
+                        onClick={() => {
+                          setEditing({ clientId: c.clientId, siteId: c.siteId });
+                          setForm({
+                            clientId: c.clientId,
+                            clientName: c.clientName,
+                            siteId: c.siteId,
+                            siteName: c.siteName,
+                          });
+                          setError(null);
+                          setOpen(true);
+                        }}
+                        className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-primary focus-visible:shadow-focus"
+                      >
+                        <Pencil className="size-4" />
+                      </button>
+                      <button
+                        aria-label={`מחק ${c.siteName}`}
+                        onClick={() => {
+                          removeClient(c.clientId, c.siteId);
+                          toast.success("האתר נמחק");
+                        }}
+                        className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-danger focus-visible:shadow-focus"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
