@@ -18,7 +18,27 @@ export interface VoucherRecord {
   requester?: string;
   /** גורם מאשר — admin who approved / executed the allocation */
   approver?: string;
+
+  /* ---- End-worker issuance details (billing report) ---- */
+  /** מס' לקוח */
+  clientId?: string;
+  /** מספר אתר */
+  siteId?: string;
+  /** שם אתר */
+  siteName?: string;
+  /** סיבת הפקה */
+  reason?: string;
+  /** שם עובד */
+  workerName?: string;
+  /** ת.ז עובד */
+  workerId?: string;
+  /** תאריך מסירה לעובד */
+  deliveredAt?: string;
 }
+
+/** True for vouchers handed to an end worker (billing-relevant). */
+export const isWorkerVoucher = (v: VoucherRecord) =>
+  Boolean(v.workerId || v.workerName) || v.status === "הוקצה לעובד";
 
 /** "מאגר ראשי" | "צפון" | "סניף צפון (מפקח דן)" */
 export function formatAssignment(v: { branch: string; supervisor?: string }) {
