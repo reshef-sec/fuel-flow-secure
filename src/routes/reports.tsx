@@ -253,7 +253,7 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                     לא נמצאו רשומות מתאימות לסינון
                   </TableCell>
                 </TableRow>
@@ -269,6 +269,8 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
                     </TableCell>
                     <TableCell>{formatAssignment(v)}</TableCell>
                     <TableCell>{v.client ?? "—"}</TableCell>
+                    <TableCell>{v.requester ?? "—"}</TableCell>
+                    <TableCell>{v.approver ?? "—"}</TableCell>
                     <TableCell>
                       <Badge variant={statusVariant[v.status]} size="md">
                         {v.status}
