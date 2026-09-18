@@ -160,17 +160,17 @@ interface AppState {
   removeReason: (index: number) => void;
 }
 
-const ROLE_KEY = "reshef.role";
+export const ROLE_KEY = "reshef.role";
 
-/** Keeps the simulated role stable across page loads so RBAC applies on direct URLs. */
-function storedRole(): Role {
-  if (typeof window === "undefined") return "admin";
+/** Reads the simulated role saved in the browser, if any. */
+export function storedRole(): Role | null {
+  if (typeof window === "undefined") return null;
   const saved = window.localStorage.getItem(ROLE_KEY);
-  return saved === "admin" || saved === "branch" || saved === "supervisor" ? saved : "admin";
+  return saved === "admin" || saved === "branch" || saved === "supervisor" ? saved : null;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
-  role: storedRole(),
+  role: "admin",
   setRole: (role) => {
     if (typeof window !== "undefined") window.localStorage.setItem(ROLE_KEY, role);
     set({ role });
