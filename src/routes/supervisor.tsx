@@ -73,7 +73,8 @@ function SupervisorPage() {
     setTimeout(() => {
       setLoading(false);
       const token = Math.floor(10000 + Math.random() * 89999);
-      setLink(`https://reshef-vouchers.co.il/worker/${token}`);
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      setLink(`${origin}/worker/${token}`);
       setCopied(false);
       toast.success("הלינק לעובד הופק בהצלחה");
     }, 1000);
@@ -190,10 +191,18 @@ function SupervisorPage() {
                   {link}
                 </p>
               </div>
-              <Button variant="accent" block onClick={copyLink}>
-                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                העתק לינק לוואטסאפ
-              </Button>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button variant="accent" block onClick={copyLink}>
+                  {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                  העתק לינק
+                </Button>
+                <Button variant="outline" block asChild>
+                  <a href={link} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="size-4" />
+                    פתח בחלון חדש
+                  </a>
+                </Button>
+              </div>
               <p className="text-center text-xs text-muted-foreground">
                 הלינק תקף לשימוש חד פעמי בלבד ומתעד את הלקוח, האתר וסיבת ההנפקה שנבחרו.
               </p>
