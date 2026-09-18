@@ -30,6 +30,7 @@ export function ClientsPanel() {
   const removeClient = useAppStore((s) => s.removeClient);
 
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<{ clientId: string; siteId: string } | null>(null);
   const [form, setForm] = useState(empty);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
