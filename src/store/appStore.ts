@@ -88,6 +88,9 @@ interface AppState {
   users: UserRecord[];
   addUser: (user: UserRecord) => void;
   removeUser: (id: string) => void;
+  /** Adds only rows whose ת.ז is new. Returns added/skipped counts. */
+  importUsers: (rows: UserRecord[]) => { added: number; skipped: number };
+  setUserCanRequest: (id: string, value: boolean) => void;
 
   branchList: BranchRecord[];
   addBranch: (branch: BranchRecord) => void;
