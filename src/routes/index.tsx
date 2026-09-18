@@ -8,7 +8,7 @@ import { RequestDialog } from "@/components/requests/RequestDialog";
 import { PendingRequests } from "@/components/requests/PendingRequests";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
 import { Button, Card, StatCard } from "@/design-system/delek-1ea111";
-import { useAppStore, useCurrentUser } from "@/store/appStore";
+import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -37,17 +37,23 @@ function Dashboard() {
   const [supervisorOpen, setSupervisorOpen] = useState(false);
 
   const isBranchManager = role === "branch";
+  const isSupervisor = role === "supervisor";
   const myBranch = me?.branch ?? "";
+  const myName = me ? fullName(me) : "";
 
-  // Branch managers see only their own branch's vouchers and balance.
+  // Branch managers see their own branch; supervisors only what is assigned to them.
   const vouchers = isBranchManager
     ? allVouchers.filter((v) => v.branch === myBranch)
-    : allVouchers;
+    : isSupervisor
+      ? allVouchers.filter((v) => v.supervisor === myName)
+      : allVouchers;
 
   const branchAvailable = vouchers.filter((v) => v.status === "טרם שומש" && !v.supervisor);
   const balance = isBranchManager
     ? branchAvailable.reduce((t, v) => t + v.amount, 0)
-    : globalBalance;
+    : isSupervisor
+      ? vouchers.filter((v) => v.status === "טרם שומש").reduce((t, v) => t + v.amount, 0)
+      : globalBalance;
 
   const sum = (status: string) =>
     vouchers.filter((v) => v.status === status).reduce((t, v) => t + v.amount, 0);
