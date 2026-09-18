@@ -340,7 +340,7 @@ export function ClientsPanel() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               ביטול
             </Button>
-            <Button type="submit">הוספה</Button>
+            <Button type="submit">{editing ? "שמירת שינויים" : "הוספה"}</Button>
           </div>
         </form>
       </Modal>
