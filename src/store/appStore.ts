@@ -108,7 +108,7 @@ interface AppState {
   removeReason: (index: number) => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   role: "admin",
   setRole: (role) => set({ role }),
 
