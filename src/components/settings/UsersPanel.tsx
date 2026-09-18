@@ -181,6 +181,21 @@ export function UsersPanel() {
               </option>
             ))}
           </Select>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void handleFile(file);
+            }}
+          />
+          <Button variant="outline" onClick={() => fileRef.current?.click()}>
+            <FileSpreadsheet className="size-4" />
+            ייבוא מאקסל
+          </Button>
           <Button onClick={() => setOpen(true)}>
             <Plus className="size-4" />
             הוספת משתמש
