@@ -153,6 +153,15 @@ function Dashboard() {
       <VoucherTable />
 
       <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} />
+
+      {isBranchManager ? (
+        <SupervisorAllocationDialog
+          open={supervisorOpen}
+          onClose={() => setSupervisorOpen(false)}
+          branch={myBranch}
+          branchBalance={balance}
+        />
+      ) : null}
     </InternalLayout>
   );
 }
