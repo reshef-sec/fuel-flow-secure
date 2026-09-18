@@ -143,6 +143,7 @@ export function UsersPanel() {
       role: "supervisor",
       title: "",
       phone: "",
+      canRequest: false,
     });
     toast.success("המשתמש נוסף בהצלחה");
   }
