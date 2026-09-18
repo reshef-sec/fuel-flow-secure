@@ -43,7 +43,10 @@ export const TableHeaderCell = forwardRef<
   <th
     ref={ref}
     scope="col"
-    className={cn("px-4 py-3 text-start font-semibold text-muted-foreground", className)}
+    className={cn(
+      "border-s border-slate-200 px-4 py-3 text-start font-semibold text-muted-foreground first:border-s-0",
+      className,
+    )}
     {...props}
   />
 ));
