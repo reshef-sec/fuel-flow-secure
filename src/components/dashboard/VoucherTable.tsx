@@ -129,9 +129,14 @@ export function VoucherTable({
   return (
     <section className="mt-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-extrabold text-secondary">
-          פעילות שוברים אחרונה
-        </h2>
+        <div>
+          <h2 className="font-display text-xl font-extrabold text-secondary">
+            פעילות שוברים אחרונה
+          </h2>
+          {periodLabel ? (
+            <p className="text-xs text-muted-foreground">{periodLabel}</p>
+          ) : null}
+        </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           <div className="relative w-full sm:w-72">
             <Search className="pointer-events-none absolute inset-y-0 end-3 my-auto size-4 text-slate-400" />
