@@ -235,6 +235,14 @@ export function UsersPanel() {
                   {u.phone}
                 </TableCell>
                 <TableCell>
+                  <Checkbox
+                    checked={Boolean(u.canRequest)}
+                    disabled={!isAdmin}
+                    onChange={(e) => setUserCanRequest(u.id, e.target.checked)}
+                    aria-label={`רשאי להקים דרישה - ${u.lastName} ${u.firstName}`}
+                  />
+                </TableCell>
+                <TableCell>
                   <button
                     onClick={() => {
                       removeUser(u.id);
