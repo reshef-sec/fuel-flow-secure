@@ -56,6 +56,19 @@ function AllocationsPage() {
 
   return (
     <InternalLayout title="הקצאות לסניפים">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          יתרה זמינה לחלוקה:{" "}
+          <span className="font-bold tabular-nums text-secondary">
+            {balance.toLocaleString("he-IL")} ₪
+          </span>
+        </p>
+        <Button onClick={() => openAllocation(undefined)}>
+          <Send className="size-4" />
+          ביצוע הקצאה יזומה
+        </Button>
+      </div>
+
       {isBranchManager && mine ? (
         <Card padding="lg" className="mb-8">
           <div className="flex flex-wrap items-center justify-between gap-5">
@@ -129,6 +142,13 @@ function AllocationsPage() {
                     {b.allocated} הוקצו לעובדים
                   </Badge>
                 </div>
+
+                <div className="mt-4 flex justify-end">
+                  <Button size="sm" variant="outline" onClick={() => openAllocation(b.name)}>
+                    <Send className="size-4" />
+                    הקצה
+                  </Button>
+                </div>
               </Card>
             ))
           )}
@@ -140,6 +160,12 @@ function AllocationsPage() {
         onClose={() => setDialogOpen(false)}
         branch={myBranch}
         branchBalance={mine?.balance ?? 0}
+      />
+
+      <AllocationDialog
+        open={allocOpen}
+        onClose={() => setAllocOpen(false)}
+        presetTarget={presetBranch}
       />
     </InternalLayout>
   );
