@@ -7,7 +7,7 @@ import { VoucherTable } from "@/components/dashboard/VoucherTable";
 import { RequestDialog } from "@/components/requests/RequestDialog";
 import { PendingRequests } from "@/components/requests/PendingRequests";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
-import { Button, Card, StatCard } from "@/design-system/delek-1ea111";
+import { Button, Card, Select, StatCard } from "@/design-system/delek-1ea111";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
 export const Route = createFileRoute("/")({
@@ -28,6 +28,24 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
+type Period = "month" | "ytd" | "all";
+
+const periodLabels: Record<Period, string> = {
+  month: "החודש הנוכחי",
+  ytd: "מתחילת השנה",
+  all: "כל התקופה",
+};
+
+/** First day of the selected period as an ISO date, or null for all time. */
+function periodStart(period: Period): string | null {
+  if (period === "all") return null;
+  const now = new Date();
+  const month = period === "month" ? now.getMonth() : 0;
+  const first = new Date(now.getFullYear(), month, 1);
+  return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+
 function Dashboard() {
   const allVouchers = useAppStore((s) => s.vouchers);
   const globalBalance = useAppStore((s) => s.balance);
@@ -35,6 +53,7 @@ function Dashboard() {
   const me = useCurrentUser();
   const [requestOpen, setRequestOpen] = useState(false);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
+  const [period, setPeriod] = useState<Period>("month");
 
   const isBranchManager = role === "branch";
   const isSupervisor = role === "supervisor";
@@ -55,15 +74,40 @@ function Dashboard() {
       ? vouchers.filter((v) => v.status === "טרם שומש").reduce((t, v) => t + v.amount, 0)
       : globalBalance;
 
+  // Time-bound metrics use the selected period; wallet metrics always show the live state.
+  const since = periodStart(period);
+  const timed = since ? vouchers.filter((v) => v.updatedAt >= since) : vouchers;
+
   const sum = (status: string) =>
-    vouchers.filter((v) => v.status === status).reduce((t, v) => t + v.amount, 0);
+    timed.filter((v) => v.status === status).reduce((t, v) => t + v.amount, 0);
   const claimed = sum("מומש סופית");
   const allocated = sum("הוקצה לעובד");
-  const blocked = vouchers.filter((v) => v.status === "חסום").length;
+  const blocked = timed.filter((v) => v.status === "חסום").length;
   const total = vouchers.reduce((t, v) => t + v.amount, 0);
 
   return (
     <InternalLayout title="דשבורד ניהול שוברים">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-display text-lg font-extrabold text-secondary">תמונת מצב</p>
+          <p className="text-xs text-muted-foreground">
+            היתרה ומלאי השוברים מוצגים תמיד במצב עדכני · המימושים והחסומים לפי התקופה שנבחרה
+          </p>
+        </div>
+        <Select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value as Period)}
+          aria-label="טווח זמן"
+          className="h-10 w-auto text-sm font-semibold"
+        >
+          {(Object.keys(periodLabels) as Period[]).map((p) => (
+            <option key={p} value={p}>
+              {periodLabels[p]}
+            </option>
+          ))}
+        </Select>
+      </div>
+
       {isBranchManager ? (
         <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -119,15 +163,15 @@ function Dashboard() {
         <StatCard
           label="שוברים שמומשו"
           value={`${claimed.toLocaleString("he-IL")} ₪`}
-          caption="מתחילת השנה"
+          caption={periodLabels[period]}
           percent={total ? Math.round((claimed / total) * 100) : 0}
           tone="secondary"
         />
         <StatCard
           label="שוברים חסומים"
           value={blocked}
-          caption="ממתינים לבדיקה"
-          percent={vouchers.length ? Math.round((blocked / vouchers.length) * 100) : 0}
+          caption={`ממתינים לבדיקה · ${periodLabels[period]}`}
+          percent={timed.length ? Math.round((blocked / timed.length) * 100) : 0}
         />
       </div>
 
@@ -135,8 +179,8 @@ function Dashboard() {
         {[
           { label: "תקציב", icon: Wallet, value: `${balance.toLocaleString("he-IL")} ₪` },
           { label: "מלאי", icon: Ticket, value: `${vouchers.length} שוברים` },
-          { label: "מימושים", icon: CheckCircle2, value: `${claimed.toLocaleString("he-IL")} ₪` },
-          { label: "הוקצה לעובדים", icon: Ban, value: `${allocated.toLocaleString("he-IL")} ₪` },
+          { label: `מימושים · ${periodLabels[period]}`, icon: CheckCircle2, value: `${claimed.toLocaleString("he-IL")} ₪` },
+          { label: `הוקצה לעובדים · ${periodLabels[period]}`, icon: Ban, value: `${allocated.toLocaleString("he-IL")} ₪` },
         ].map(({ label, icon: Icon, value }) => (
           <Card key={label} padding="md" variant="outline" className="flex items-center gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-100 text-blue-700">
@@ -156,7 +200,7 @@ function Dashboard() {
 
       {role === "admin" ? <PendingRequests /> : null}
 
-      <VoucherTable />
+      <VoucherTable since={since} periodLabel={periodLabels[period]} />
 
       <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} />
 

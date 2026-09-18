@@ -28,7 +28,14 @@ import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
 const columnHelper = createColumnHelper<VoucherRecord>();
 
-export function VoucherTable() {
+export function VoucherTable({
+  since = null,
+  periodLabel,
+}: {
+  /** ISO date; only vouchers updated on/after it are shown. null = all time. */
+  since?: string | null;
+  periodLabel?: string;
+} = {}) {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const allVouchers = useAppStore((s) => s.vouchers);
@@ -38,10 +45,12 @@ export function VoucherTable() {
   // Branch managers see only their own branch; supervisors only vouchers assigned to them.
   const myName = me ? fullName(me) : "";
   const vouchers = useMemo(() => {
-    if (role === "branch" && me?.branch) return allVouchers.filter((v) => v.branch === me.branch);
-    if (role === "supervisor") return allVouchers.filter((v) => v.supervisor === myName);
-    return allVouchers;
-  }, [allVouchers, role, me?.branch, myName]);
+    let rows = allVouchers;
+    if (role === "branch" && me?.branch) rows = rows.filter((v) => v.branch === me.branch);
+    else if (role === "supervisor") rows = rows.filter((v) => v.supervisor === myName);
+    if (since) rows = rows.filter((v) => v.updatedAt >= since);
+    return rows;
+  }, [allVouchers, role, me?.branch, myName, since]);
 
 
   const columns = useMemo(
@@ -120,9 +129,14 @@ export function VoucherTable() {
   return (
     <section className="mt-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-extrabold text-secondary">
-          פעילות שוברים אחרונה
-        </h2>
+        <div>
+          <h2 className="font-display text-xl font-extrabold text-secondary">
+            פעילות שוברים אחרונה
+          </h2>
+          {periodLabel ? (
+            <p className="text-xs text-muted-foreground">{periodLabel}</p>
+          ) : null}
+        </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           <div className="relative w-full sm:w-72">
             <Search className="pointer-events-none absolute inset-y-0 end-3 my-auto size-4 text-slate-400" />
