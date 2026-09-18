@@ -85,20 +85,33 @@ export function ClientsPanel() {
       setError("יש למלא את כל השדות");
       return;
     }
-    if (clients.some((c) => c.clientId === form.clientId.trim() && c.siteId === form.siteId.trim())) {
-      setError("שילוב לקוח ואתר זה קיים כבר");
-      return;
-    }
-    setError(null);
-    addClient({
+    const payload = {
       clientId: form.clientId.trim(),
       clientName: form.clientName.trim(),
       siteId: form.siteId.trim(),
       siteName: form.siteName.trim(),
-    });
+    };
+    const clash = clients.some(
+      (c) =>
+        c.clientId === payload.clientId &&
+        c.siteId === payload.siteId &&
+        !(editing && c.clientId === editing.clientId && c.siteId === editing.siteId),
+    );
+    if (clash) {
+      setError("שילוב לקוח ואתר זה קיים כבר");
+      return;
+    }
+    setError(null);
+    if (editing) {
+      updateClient(editing.clientId, editing.siteId, payload);
+      toast.success("פרטי האתר עודכנו");
+    } else {
+      addClient(payload);
+      toast.success("הלקוח נוסף בהצלחה");
+    }
     setForm(empty);
+    setEditing(null);
     setOpen(false);
-    toast.success("הלקוח נוסף בהצלחה");
   }
 
   return (
