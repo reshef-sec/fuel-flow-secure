@@ -163,15 +163,15 @@ function Dashboard() {
         <StatCard
           label="שוברים שמומשו"
           value={`${claimed.toLocaleString("he-IL")} ₪`}
-          caption="מתחילת השנה"
+          caption={periodLabels[period]}
           percent={total ? Math.round((claimed / total) * 100) : 0}
           tone="secondary"
         />
         <StatCard
           label="שוברים חסומים"
           value={blocked}
-          caption="ממתינים לבדיקה"
-          percent={vouchers.length ? Math.round((blocked / vouchers.length) * 100) : 0}
+          caption={`ממתינים לבדיקה · ${periodLabels[period]}`}
+          percent={timed.length ? Math.round((blocked / timed.length) * 100) : 0}
         />
       </div>
 
@@ -179,8 +179,8 @@ function Dashboard() {
         {[
           { label: "תקציב", icon: Wallet, value: `${balance.toLocaleString("he-IL")} ₪` },
           { label: "מלאי", icon: Ticket, value: `${vouchers.length} שוברים` },
-          { label: "מימושים", icon: CheckCircle2, value: `${claimed.toLocaleString("he-IL")} ₪` },
-          { label: "הוקצה לעובדים", icon: Ban, value: `${allocated.toLocaleString("he-IL")} ₪` },
+          { label: `מימושים · ${periodLabels[period]}`, icon: CheckCircle2, value: `${claimed.toLocaleString("he-IL")} ₪` },
+          { label: `הוקצה לעובדים · ${periodLabels[period]}`, icon: Ban, value: `${allocated.toLocaleString("he-IL")} ₪` },
         ].map(({ label, icon: Icon, value }) => (
           <Card key={label} padding="md" variant="outline" className="flex items-center gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-100 text-blue-700">
