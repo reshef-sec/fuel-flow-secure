@@ -213,8 +213,8 @@ export function UsersPanel() {
               <TableHeaderCell>פרטי</TableHeaderCell>
               <TableHeaderCell>הרשאה</TableHeaderCell>
               <TableHeaderCell>תפקיד</TableHeaderCell>
-              <TableHeaderCell>נייד</TableHeaderCell>
-              <TableHeaderCell>רשאי להקים דרישה</TableHeaderCell>
+              <TableHeaderCell className="text-center">נייד</TableHeaderCell>
+              <TableHeaderCell className="text-center">רשאי להקים דרישה</TableHeaderCell>
               <TableHeaderCell>פעולות</TableHeaderCell>
             </TableRow>
           </TableHead>
