@@ -25,6 +25,7 @@ const empty = { clientId: "", clientName: "", siteId: "", siteName: "" };
 export function ClientsPanel() {
   const clients = useAppStore((s) => s.clients);
   const addClient = useAppStore((s) => s.addClient);
+  const updateClient = useAppStore((s) => s.updateClient);
   const importClients = useAppStore((s) => s.importClients);
   const removeClient = useAppStore((s) => s.removeClient);
 
