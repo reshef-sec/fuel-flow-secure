@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { FileSpreadsheet, Plus, Search, Trash2, UserPlus } from "lucide-react";
+import { FileSpreadsheet, Pencil, Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
