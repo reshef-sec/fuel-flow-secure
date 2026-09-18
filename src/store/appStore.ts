@@ -55,6 +55,25 @@ export interface ClientRecord {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+export interface VoucherRequest {
+  id: string;
+  requester: string;
+  requesterId: string;
+  branch: string;
+  amount: number;
+  reason: string;
+  createdAt: string;
+  status: "ממתין לאישור" | "אושר" | "נדחה";
+  approvedAmount?: number;
+  approver?: string;
+}
+
+/** Metadata attached to created vouchers for audit tracking. */
+export interface AllocationMeta {
+  requester?: string;
+  approver?: string;
+}
+
 /** Real clients & sites list (מס' לקוח, שם לקוח, מספר אתר, שם אתר). */
 const seedClients: ClientRecord[] = clientsSeed as ClientRecord[];
 
