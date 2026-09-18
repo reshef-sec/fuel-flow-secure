@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -18,7 +18,7 @@ import {
 
 import { Logo, Select } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
-import { roleLabels, useAppStore, type Role } from "@/store/appStore";
+import { roleLabels, storedRole, useAppStore, type Role } from "@/store/appStore";
 
 const navItems = [
   { to: "/", label: "דשבורד", icon: LayoutDashboard, roles: ["admin", "branch", "supervisor"] },
@@ -36,6 +36,12 @@ export function InternalLayout({ title, children }: { title: string; children: R
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const role = useAppStore((s) => s.role);
   const setRole = useAppStore((s) => s.setRole);
+
+  // Restore the simulated role after hydration so permissions survive a reload.
+  useEffect(() => {
+    const saved = storedRole();
+    if (saved && saved !== useAppStore.getState().role) setRole(saved);
+  }, [setRole]);
 
   const items = navItems.filter((item) => (item.roles as readonly string[]).includes(role));
 
