@@ -31,6 +31,8 @@ export interface UserRecord {
   phone: string;
   /** סניף */
   branch: string;
+  /** רשאי להקים דרישה */
+  canRequest?: boolean;
 }
 
 /** "משפחה פרטי" for selects and voucher assignment labels. */
@@ -86,6 +88,9 @@ interface AppState {
   users: UserRecord[];
   addUser: (user: UserRecord) => void;
   removeUser: (id: string) => void;
+  /** Adds only rows whose ת.ז is new. Returns added/skipped counts. */
+  importUsers: (rows: UserRecord[]) => { added: number; skipped: number };
+  setUserCanRequest: (id: string, value: boolean) => void;
 
   branchList: BranchRecord[];
   addBranch: (branch: BranchRecord) => void;
@@ -103,7 +108,7 @@ interface AppState {
   removeReason: (index: number) => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   role: "admin",
   setRole: (role) => set({ role }),
 
@@ -211,6 +216,23 @@ export const useAppStore = create<AppState>((set) => ({
   ],
   addUser: (user) => set((s) => ({ users: [user, ...s.users] })),
   removeUser: (id) => set((s) => ({ users: s.users.filter((u) => u.id !== id) })),
+  importUsers: (rows) => {
+    const existing = new Set(get().users.map((u) => u.id));
+    const fresh: UserRecord[] = [];
+    let skipped = 0;
+    for (const row of rows) {
+      if (existing.has(row.id)) {
+        skipped += 1;
+        continue;
+      }
+      existing.add(row.id);
+      fresh.push(row);
+    }
+    if (fresh.length) set((s) => ({ users: [...fresh, ...s.users] }));
+    return { added: fresh.length, skipped };
+  },
+  setUserCanRequest: (id, value) =>
+    set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, canRequest: value } : u)) })),
 
   branchList: seedBranches,
   addBranch: (branch) => set((s) => ({ branchList: [...s.branchList, branch] })),

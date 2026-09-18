@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
-import { Plus, Search, Trash2, UserPlus } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { FileSpreadsheet, Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
   Badge,
   Button,
+  Checkbox,
   FormField,
   Input,
   Select,
@@ -16,7 +17,18 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { roleLabels, useAppStore, type Role } from "@/store/appStore";
+import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
+import { roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
+
+const roleFromLabel = (value: string): Role => {
+  const v = value.trim();
+  if (v === "אדמין" || v === "admin" || v.includes("אדמין")) return "admin";
+  if (v === "מנהל סניף" || v === "branch" || v.includes("סניף")) return "branch";
+  return "supervisor";
+};
+
+const truthy = (value: string) =>
+  ["כן", "true", "1", "v", "yes", "✓"].includes(value.trim().toLowerCase());
 
 const roleVariant: Record<Role, "brand" | "info" | "purple"> = {
   admin: "brand",
@@ -30,6 +42,11 @@ export function UsersPanel() {
   const removeUser = useAppStore((s) => s.removeUser);
   const branchList = useAppStore((s) => s.branchList);
   const branchNames = branchList.map((b) => b.name);
+  const importUsers = useAppStore((s) => s.importUsers);
+  const setUserCanRequest = useAppStore((s) => s.setUserCanRequest);
+  const role = useAppStore((s) => s.role);
+  const isAdmin = role === "admin";
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
@@ -42,8 +59,43 @@ export function UsersPanel() {
     role: "supervisor" as Role,
     title: "",
     phone: "",
+    canRequest: false,
   });
   const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    if (!isSheetFile(file.name)) {
+      toast.error("יש להעלות קובץ אקסל (xlsx/xls) או CSV");
+      return;
+    }
+    try {
+      const raw = stripHeader(await parseSheetFile(file), "ת.ז");
+      const parsed: UserRecord[] = [];
+      for (const r of raw) {
+        const [branch = "", id = "", lastName = "", firstName = "", roleCell = "", title = "", phone = "", canReq = ""] = r;
+        const cleanId = id.replace(/\D/g, "");
+        if (cleanId.length !== 9 || !lastName.trim()) continue;
+        parsed.push({
+          branch: branch.trim(),
+          id: cleanId,
+          lastName: lastName.trim(),
+          firstName: firstName.trim(),
+          role: roleFromLabel(roleCell),
+          title: title.trim(),
+          phone: phone.trim(),
+          canRequest: truthy(canReq),
+        });
+      }
+      if (!parsed.length) {
+        toast.error("לא נמצאו שורות תקינות בקובץ");
+        return;
+      }
+      const { added, skipped } = importUsers(parsed);
+      toast.success(`נוספו ${added} משתמשים, ${skipped} דולגו (ת.ז קיימת)`);
+    } catch {
+      toast.error("שגיאה בקריאת הקובץ");
+    }
+  }
 
   const rows = useMemo(() => {
     const q = query.trim();
@@ -91,6 +143,7 @@ export function UsersPanel() {
       role: "supervisor",
       title: "",
       phone: "",
+      canRequest: false,
     });
     toast.success("המשתמש נוסף בהצלחה");
   }
@@ -128,6 +181,21 @@ export function UsersPanel() {
               </option>
             ))}
           </Select>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void handleFile(file);
+            }}
+          />
+          <Button variant="outline" onClick={() => fileRef.current?.click()}>
+            <FileSpreadsheet className="size-4" />
+            ייבוא מאקסל
+          </Button>
           <Button onClick={() => setOpen(true)}>
             <Plus className="size-4" />
             הוספת משתמש
@@ -146,6 +214,7 @@ export function UsersPanel() {
               <TableHeaderCell>הרשאה</TableHeaderCell>
               <TableHeaderCell>תפקיד</TableHeaderCell>
               <TableHeaderCell>נייד</TableHeaderCell>
+              <TableHeaderCell>רשאי להקים דרישה</TableHeaderCell>
               <TableHeaderCell>פעולות</TableHeaderCell>
             </TableRow>
           </TableHead>
@@ -166,6 +235,14 @@ export function UsersPanel() {
                   {u.phone}
                 </TableCell>
                 <TableCell>
+                  <Checkbox
+                    checked={Boolean(u.canRequest)}
+                    disabled={!isAdmin}
+                    onChange={(e) => setUserCanRequest(u.id, e.target.checked)}
+                    aria-label={`רשאי להקים דרישה - ${u.lastName} ${u.firstName}`}
+                  />
+                </TableCell>
+                <TableCell>
                   <button
                     onClick={() => {
                       removeUser(u.id);
@@ -181,7 +258,7 @@ export function UsersPanel() {
             ))}
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                   לא נמצאו משתמשים מתאימים
                 </TableCell>
               </TableRow>
@@ -280,6 +357,20 @@ export function UsersPanel() {
               className="tabular-nums"
             />
           </FormField>
+
+          <div className="rounded-lg border border-border p-3">
+            <Checkbox
+              checked={form.canRequest}
+              disabled={!isAdmin}
+              onChange={(e) => setForm({ ...form, canRequest: e.target.checked })}
+              label="רשאי להקים דרישה"
+            />
+            {!isAdmin ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                רק אדמין מרכזי רשאי לעדכן הרשאה זו
+              </p>
+            ) : null}
+          </div>
 
           {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
 
