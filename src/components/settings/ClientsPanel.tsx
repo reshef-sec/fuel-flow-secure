@@ -151,7 +151,14 @@ export function ClientsPanel() {
             <FileSpreadsheet className="size-4" />
             הורד תבנית אקסל
           </Button>
-          <Button onClick={() => setOpen(true)}>
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setForm(empty);
+              setError(null);
+              setOpen(true);
+            }}
+          >
             <Plus className="size-4" />
             הוספה ידנית
           </Button>
