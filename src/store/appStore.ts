@@ -335,4 +335,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeReason: (index) => set((s) => ({ reasons: s.reasons.filter((_, i) => i !== index) })),
 }));
 
+/** The user represented by the role simulator; prefers one allowed to request. */
+export function pickCurrentUser(users: UserRecord[], role: Role) {
+  return users.find((u) => u.role === role && u.canRequest) ?? users.find((u) => u.role === role);
+}
+
+export function useCurrentUser() {
+  const users = useAppStore((s) => s.users);
+  const role = useAppStore((s) => s.role);
+  return pickCurrentUser(users, role);
+}
+
 export { MAIN_POOL };
