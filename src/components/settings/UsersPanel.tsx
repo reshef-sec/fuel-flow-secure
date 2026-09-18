@@ -270,16 +270,39 @@ export function UsersPanel() {
                   />
                 </TableCell>
                 <TableCell>
-                  <button
-                    onClick={() => {
-                      removeUser(u.id);
-                      toast.success("המשתמש הוסר");
-                    }}
-                    aria-label={`מחק את ${u.lastName} ${u.firstName}`}
-                    className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-danger focus-visible:shadow-focus"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setEditingId(u.id);
+                        setError(null);
+                        setForm({
+                          branch: u.branch,
+                          id: u.id,
+                          lastName: u.lastName,
+                          firstName: u.firstName,
+                          role: u.role,
+                          title: u.title,
+                          phone: u.phone,
+                          canRequest: Boolean(u.canRequest),
+                        });
+                        setOpen(true);
+                      }}
+                      aria-label={`ערוך את ${u.lastName} ${u.firstName}`}
+                      className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-primary focus-visible:shadow-focus"
+                    >
+                      <Pencil className="size-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        removeUser(u.id);
+                        toast.success("המשתמש הוסר");
+                      }}
+                      aria-label={`מחק את ${u.lastName} ${u.firstName}`}
+                      className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-danger focus-visible:shadow-focus"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
