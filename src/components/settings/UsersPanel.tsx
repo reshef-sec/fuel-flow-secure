@@ -409,7 +409,7 @@ export function UsersPanel() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               ביטול
             </Button>
-            <Button type="submit">הוספת משתמש</Button>
+            <Button type="submit">{editingId ? "שמירת שינויים" : "הוספת משתמש"}</Button>
           </div>
         </form>
       </Modal>
