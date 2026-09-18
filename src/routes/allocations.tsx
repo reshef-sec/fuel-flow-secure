@@ -28,6 +28,7 @@ function AllocationsPage() {
   const vouchers = useAppStore((s) => s.vouchers);
   const users = useAppStore((s) => s.users);
   const role = useAppStore((s) => s.role);
+  const balance = useAppStore((s) => s.balance);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [allocOpen, setAllocOpen] = useState(false);
   const [presetBranch, setPresetBranch] = useState<string | undefined>(undefined);
