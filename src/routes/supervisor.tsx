@@ -159,7 +159,7 @@ function SupervisorPage() {
                   className="pe-9"
                 />
                 {matches.length > 0 ? (
-                  <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+                  <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-raised">
                     {matches.map((v) => (
                       <li key={v.licensePlate}>
                         <button
