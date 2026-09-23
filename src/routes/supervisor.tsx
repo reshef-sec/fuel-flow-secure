@@ -1,6 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, Copy, Link2, Send, SquareArrowOutUpRight } from "lucide-react";
+import {
+  BadgeCheck,
+  Building2,
+  Car,
+  Check,
+  Copy,
+  Link2,
+  MapPin,
+  Search,
+  Send,
+  SquareArrowOutUpRight,
+  User,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
@@ -15,7 +27,12 @@ import {
   Select,
 } from "@/design-system/delek-1ea111";
 import { NoAccess } from "@/components/layout/NoAccess";
-import { useAppStore } from "@/store/appStore";
+import {
+  fullName,
+  useAppStore,
+  useCurrentUser,
+  type VehicleRecord,
+} from "@/store/appStore";
 
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
@@ -23,10 +40,10 @@ export const Route = createFileRoute("/supervisor")({
       { title: "הפקת שובר לעובד | רשף ביטחון" },
       {
         name: "description",
-        content: "הפקת לינק שובר דלק אישי לעובד: סכום, לקוח, אתר וסיבת הנפקה.",
+        content: "הפקת לינק שובר דלק אישי לעובד לפי רישוי רכב או שם נהג, סכום וסיבת הנפקה.",
       },
       { property: "og:title", content: "הפקת שובר לעובד | רשף ביטחון" },
-      { property: "og:description", content: "הפקת שובר לעובד ושליחת לינק בוואטסאפ." },
+      { property: "og:description", content: "חיפוש רכב חכם והפקת לינק שובר לעובד בוואטסאפ." },
     ],
   }),
   component: SupervisorPage,
@@ -34,36 +51,42 @@ export const Route = createFileRoute("/supervisor")({
 
 function SupervisorPage() {
   const clients = useAppStore((s) => s.clients);
+  const vehicles = useAppStore((s) => s.vehicles);
   const reasons = useAppStore((s) => s.reasons);
   const role = useAppStore((s) => s.role);
+  const issueWorkerVoucher = useAppStore((s) => s.issueWorkerVoucher);
+  const me = useCurrentUser();
 
-  const clientOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    clients.forEach((c) => map.set(c.clientId, c.clientName));
-    return [...map].map(([clientId, clientName]) => ({ clientId, clientName }));
-  }, [clients]);
-
+  const [search, setSearch] = useState("");
+  const [vehicle, setVehicle] = useState<VehicleRecord | null>(null);
   const [amount, setAmount] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [siteId, setSiteId] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const sites = clients.filter((c) => c.clientId === clientId);
+  const matches = useMemo(() => {
+    const q = search.trim();
+    if (!q || vehicle) return [];
+    return vehicles
+      .filter((v) => v.licensePlate.includes(q) || v.driverName.includes(q))
+      .slice(0, 6);
+  }, [search, vehicle, vehicles]);
 
-  useEffect(() => {
-    setSiteId("");
-  }, [clientId]);
+  /** Joined client + site for the selected vehicle. */
+  const site = vehicle
+    ? clients.find(
+        (c) => c.clientId === vehicle.linkedClientCode && c.siteId === vehicle.linkedSiteCode,
+      )
+    : undefined;
 
   const numeric = Number(amount);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!numeric || !clientId || !siteId || !reason) {
-      setError("יש למלא סכום, לקוח, אתר וסיבת הנפקה");
+    if (!vehicle || !numeric || !reason) {
+      setError("יש לבחור רכב, למלא סכום ולבחור סיבת הנפקה");
       return;
     }
     if (numeric % 100 !== 0) {
@@ -74,6 +97,16 @@ function SupervisorPage() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
+      issueWorkerVoucher({
+        amount: numeric,
+        reason,
+        branch: me?.branch ?? "הנהלה",
+        ...(me ? { supervisor: fullName(me) } : {}),
+        vehicle,
+        clientName: site?.clientName ?? "",
+        siteName: site?.siteName ?? "",
+        ...(me ? { requester: fullName(me) } : {}),
+      });
       const token = Math.floor(10000 + Math.random() * 89999);
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       setLink(`${origin}/worker/${token}`);
@@ -107,10 +140,66 @@ function SupervisorPage() {
             </Badge>
           </CardHeader>
           <p className="text-sm text-muted-foreground">
-            השובר אינו מוקצה מיד. נוצר לינק אישי לעובד, והשובר מונפק רק לאחר מילוי הפרטים והחתימה.
+            מחפשים רכב לפי רישוי או שם נהג — הלקוח, האתר והתקן נשלפים אוטומטית מהמאגר.
           </p>
 
           <form onSubmit={submit} className="mt-5 space-y-5">
+            <FormField label="חיפוש רכב" hint="רישוי רכב או שם נהג">
+              <div className="relative">
+                <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  aria-label="חיפוש רכב לפי רישוי או שם נהג"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setVehicle(null);
+                  }}
+                  placeholder="12-345-67 או שם הנהג"
+                  className="pe-9"
+                />
+                {matches.length > 0 ? (
+                  <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+                    {matches.map((v) => (
+                      <li key={v.licensePlate}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVehicle(v);
+                            setSearch(`${v.licensePlate} · ${v.driverName}`);
+                          }}
+                          className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-start text-sm transition-colors hover:bg-blue-100"
+                        >
+                          <span className="font-bold text-secondary">{v.driverName}</span>
+                          <span dir="ltr" className="tabular-nums text-muted-foreground">
+                            {v.licensePlate}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </FormField>
+
+            {vehicle ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <InfoCard icon={Car} label="רישוי רכב" value={vehicle.licensePlate} ltr />
+                <InfoCard icon={User} label="שם נהג" value={vehicle.driverName} />
+                <InfoCard icon={BadgeCheck} label="שם תקן" value={vehicle.standardName} />
+                <InfoCard
+                  icon={Building2}
+                  label="לקוח"
+                  value={`${site?.clientName ?? "—"} (${vehicle.linkedClientCode})`}
+                />
+                <InfoCard
+                  icon={MapPin}
+                  label="אתר / פרויקט"
+                  value={`${site?.siteName ?? "—"} (${vehicle.linkedSiteCode})`}
+                  wide
+                />
+              </div>
+            ) : null}
+
             <FormField label="סכום השובר (₪)" hint="בכפולות של 100 ₪ בלבד">
               <Input
                 aria-label="סכום השובר"
@@ -123,37 +212,6 @@ function SupervisorPage() {
                 placeholder="300"
                 className="tabular-nums"
               />
-            </FormField>
-
-            <FormField label="לקוח">
-              <Select
-                aria-label="בחר לקוח"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-              >
-                <option value="">בחר לקוח…</option>
-                {clientOptions.map((c) => (
-                  <option key={c.clientId} value={c.clientId}>
-                    {c.clientName} ({c.clientId})
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-
-            <FormField label="אתר">
-              <Select
-                aria-label="בחר אתר"
-                value={siteId}
-                onChange={(e) => setSiteId(e.target.value)}
-                disabled={!clientId}
-              >
-                <option value="">{clientId ? "בחר אתר…" : "יש לבחור לקוח קודם"}</option>
-                {sites.map((s) => (
-                  <option key={s.siteId} value={s.siteId}>
-                    {s.siteName} ({s.siteId})
-                  </option>
-                ))}
-              </Select>
             </FormField>
 
             <FormField label="סיבת הנפקה">
@@ -211,7 +269,7 @@ function SupervisorPage() {
                 </a>
               </div>
               <p className="text-center text-xs text-muted-foreground">
-                הלינק תקף לשימוש חד פעמי בלבד ומתעד את הלקוח, האתר וסיבת ההנפקה שנבחרו.
+                הלינק תקף לשימוש חד פעמי בלבד ומתעד את הרכב, הנהג, התקן, הלקוח והאתר שנבחרו.
               </p>
             </div>
           ) : (
@@ -223,12 +281,43 @@ function SupervisorPage() {
                 עדיין לא הופק לינק
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                מלא את הטופס ולחץ על "הפקת שובר לעובד" כדי לקבל לינק לשליחה.
+                בחר רכב, מלא סכום וסיבה ולחץ על "הפקת שובר לעובד" כדי לקבל לינק לשליחה.
               </p>
             </div>
           )}
         </Card>
       </div>
     </InternalLayout>
+  );
+}
+
+function InfoCard({
+  icon: Icon,
+  label,
+  value,
+  ltr,
+  wide,
+}: {
+  icon: typeof Car;
+  label: string;
+  value: string;
+  ltr?: boolean;
+  wide?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border border-border bg-surface-muted p-3 ${wide ? "sm:col-span-2" : ""}`}
+    >
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+        <Icon className="size-3.5" />
+        {label}
+      </p>
+      <p
+        {...(ltr ? { dir: "ltr" as const } : {})}
+        className="mt-1 font-display text-sm font-extrabold text-secondary"
+      >
+        {value}
+      </p>
+    </div>
   );
 }
