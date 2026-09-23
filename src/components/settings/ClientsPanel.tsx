@@ -72,9 +72,9 @@ export function ClientsPanel() {
         toast.error("לא נמצאו שורות תקינות. עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן");
         return;
       }
-      importClients(rows);
+      const { added, updated } = importClients(rows);
       setPage(0);
-      toast.success(`הקובץ "${file.name}" נטען · ${rows.length.toLocaleString("he-IL")} אתרים`);
+      toast.success(`נוספו ${added.toLocaleString("he-IL")} אתרים, עודכנו ${updated.toLocaleString("he-IL")}`);
     } catch {
       toast.error("קריאת הקובץ נכשלה. יש לוודא שהקובץ תקין");
     }
