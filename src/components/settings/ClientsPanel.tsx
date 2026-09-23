@@ -222,14 +222,13 @@ export function ClientsPanel() {
               <TableHeaderCell>שם לקוח</TableHeaderCell>
               <TableHeaderCell>מספר אתר</TableHeaderCell>
               <TableHeaderCell>שם אתר</TableHeaderCell>
-              <TableHeaderCell className="text-center">תקן</TableHeaderCell>
               <TableHeaderCell>פעולות</TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {visible.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
                   לא נמצאו לקוחות או אתרים מתאימים
                 </TableCell>
               </TableRow>
@@ -240,7 +239,6 @@ export function ClientsPanel() {
                   <TableCell>{c.clientName}</TableCell>
                   <TableCell className="tabular-nums">{c.siteId}</TableCell>
                   <TableCell>{c.siteName}</TableCell>
-                  <TableCell className="text-center tabular-nums">{c.standard || "—"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <button
