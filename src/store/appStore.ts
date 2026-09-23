@@ -55,7 +55,44 @@ export interface ClientRecord {
   standard?: string;
 }
 
+/** רכב ותקן — linked to a client + site by codes. */
+export interface VehicleRecord {
+  /** רישוי רכב — primary key */
+  licensePlate: string;
+  /** שם נהג */
+  driverName: string;
+  /** שם תקן */
+  standardName: string;
+  /** מס' לקוח מקושר */
+  linkedClientCode: string;
+  /** מספר אתר מקושר */
+  linkedSiteCode: string;
+}
+
+const seedVehicles: VehicleRecord[] = [
+  { licensePlate: "12-345-67", driverName: "לוי אדיר", standardName: "תקן 1204", linkedClientCode: "38", linkedSiteCode: "74" },
+  { licensePlate: "23-456-78", driverName: "אזרואל מאיר", standardName: "תקן 1187", linkedClientCode: "38", linkedSiteCode: "76" },
+  { licensePlate: "34-567-89", driverName: "רבינוביץ אבי", standardName: "תקן 2331", linkedClientCode: "38", linkedSiteCode: "109" },
+  { licensePlate: "45-678-90", driverName: "נגר רביב", standardName: "תקן 2440", linkedClientCode: "38", linkedSiteCode: "115" },
+  { licensePlate: "56-789-01", driverName: "שני רפי", standardName: "תקן 3102", linkedClientCode: "38", linkedSiteCode: "127" },
+  { licensePlate: "67-890-12", driverName: "כחלוני עוז", standardName: "תקן 2331", linkedClientCode: "38", linkedSiteCode: "109" },
+  { licensePlate: "78-901-23", driverName: "חטיבי ניר", standardName: "תקן 1187", linkedClientCode: "38", linkedSiteCode: "76" },
+];
+
 const today = () => new Date().toISOString().slice(0, 10);
+
+/** Details resolved from the vehicle → client/site join when issuing a worker voucher. */
+export interface WorkerIssuePayload {
+  amount: number;
+  reason: string;
+  branch: string;
+  supervisor?: string;
+  vehicle: VehicleRecord;
+  clientName: string;
+  siteName: string;
+  requester?: string;
+  approver?: string;
+}
 
 export interface VoucherRequest {
   id: string;
