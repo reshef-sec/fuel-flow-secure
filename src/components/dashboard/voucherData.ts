@@ -34,6 +34,14 @@ export interface VoucherRecord {
   workerId?: string;
   /** תאריך מסירה לעובד */
   deliveredAt?: string;
+
+  /* ---- Vehicle link (relational) ---- */
+  /** רישוי רכב */
+  licensePlate?: string;
+  /** שם נהג */
+  driverName?: string;
+  /** שם תקן */
+  standardName?: string;
 }
 
 /** True for vouchers handed to an end worker (billing-relevant). */

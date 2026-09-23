@@ -55,7 +55,44 @@ export interface ClientRecord {
   standard?: string;
 }
 
+/** רכב ותקן — linked to a client + site by codes. */
+export interface VehicleRecord {
+  /** רישוי רכב — primary key */
+  licensePlate: string;
+  /** שם נהג */
+  driverName: string;
+  /** שם תקן */
+  standardName: string;
+  /** מס' לקוח מקושר */
+  linkedClientCode: string;
+  /** מספר אתר מקושר */
+  linkedSiteCode: string;
+}
+
+const seedVehicles: VehicleRecord[] = [
+  { licensePlate: "12-345-67", driverName: "לוי אדיר", standardName: "תקן 1204", linkedClientCode: "38", linkedSiteCode: "74" },
+  { licensePlate: "23-456-78", driverName: "אזרואל מאיר", standardName: "תקן 1187", linkedClientCode: "38", linkedSiteCode: "76" },
+  { licensePlate: "34-567-89", driverName: "רבינוביץ אבי", standardName: "תקן 2331", linkedClientCode: "38", linkedSiteCode: "109" },
+  { licensePlate: "45-678-90", driverName: "נגר רביב", standardName: "תקן 2440", linkedClientCode: "38", linkedSiteCode: "115" },
+  { licensePlate: "56-789-01", driverName: "שני רפי", standardName: "תקן 3102", linkedClientCode: "38", linkedSiteCode: "127" },
+  { licensePlate: "67-890-12", driverName: "כחלוני עוז", standardName: "תקן 2331", linkedClientCode: "38", linkedSiteCode: "109" },
+  { licensePlate: "78-901-23", driverName: "חטיבי ניר", standardName: "תקן 1187", linkedClientCode: "38", linkedSiteCode: "76" },
+];
+
 const today = () => new Date().toISOString().slice(0, 10);
+
+/** Details resolved from the vehicle → client/site join when issuing a worker voucher. */
+export interface WorkerIssuePayload {
+  amount: number;
+  reason: string;
+  branch: string;
+  supervisor?: string;
+  vehicle: VehicleRecord;
+  clientName: string;
+  siteName: string;
+  requester?: string;
+  approver?: string;
+}
 
 export interface VoucherRequest {
   id: string;
@@ -151,8 +188,19 @@ interface AppState {
   clients: ClientRecord[];
   addClient: (client: ClientRecord) => void;
   updateClient: (clientId: string, siteId: string, patch: Partial<ClientRecord>) => void;
-  importClients: (rows: ClientRecord[]) => void;
+  /** Upsert by clientId + siteId. Returns added/updated counts. */
+  importClients: (rows: ClientRecord[]) => { added: number; updated: number };
   removeClient: (clientId: string, siteId: string) => void;
+
+  vehicles: VehicleRecord[];
+  addVehicle: (vehicle: VehicleRecord) => void;
+  updateVehicle: (licensePlate: string, patch: Partial<VehicleRecord>) => void;
+  /** Upsert by licensePlate. Returns added/updated counts. */
+  importVehicles: (rows: VehicleRecord[]) => { added: number; updated: number };
+  removeVehicle: (licensePlate: string) => void;
+
+  /** Issues a voucher handed to an end worker, storing the resolved vehicle/client data. */
+  issueWorkerVoucher: (payload: WorkerIssuePayload) => VoucherRecord;
 
   reasons: string[];
   addReason: (reason: string) => void;
@@ -349,16 +397,80 @@ export const useAppStore = create<AppState>((set, get) => ({
         c.clientId === clientId && c.siteId === siteId ? { ...c, ...patch } : c,
       ),
     })),
-  /** Merges imported rows, replacing existing client+site combinations. */
-  importClients: (rows) =>
-    set((s) => {
-      const keys = new Set(rows.map((r) => `${r.clientId}|${r.siteId}`));
-      return { clients: [...rows, ...s.clients.filter((c) => !keys.has(`${c.clientId}|${c.siteId}`))] };
-    }),
+  /** Upserts imported rows by clientId + siteId (no duplicates). */
+  importClients: (rows) => {
+    const existing = new Map(get().clients.map((c) => [`${c.clientId}|${c.siteId}`, c]));
+    let updated = 0;
+    let added = 0;
+    for (const row of rows) {
+      const key = `${row.clientId}|${row.siteId}`;
+      if (existing.has(key)) {
+        existing.set(key, { ...existing.get(key)!, ...row });
+        updated += 1;
+      } else {
+        existing.set(key, row);
+        added += 1;
+      }
+    }
+    set({ clients: [...existing.values()] });
+    return { added, updated };
+  },
   removeClient: (clientId, siteId) =>
     set((s) => ({
       clients: s.clients.filter((c) => !(c.clientId === clientId && c.siteId === siteId)),
     })),
+
+  vehicles: seedVehicles,
+  addVehicle: (vehicle) => set((s) => ({ vehicles: [vehicle, ...s.vehicles] })),
+  updateVehicle: (licensePlate, patch) =>
+    set((s) => ({
+      vehicles: s.vehicles.map((v) => (v.licensePlate === licensePlate ? { ...v, ...patch } : v)),
+    })),
+  importVehicles: (rows) => {
+    const existing = new Map(get().vehicles.map((v) => [v.licensePlate, v]));
+    let updated = 0;
+    let added = 0;
+    for (const row of rows) {
+      if (existing.has(row.licensePlate)) {
+        existing.set(row.licensePlate, { ...existing.get(row.licensePlate)!, ...row });
+        updated += 1;
+      } else {
+        existing.set(row.licensePlate, row);
+        added += 1;
+      }
+    }
+    set({ vehicles: [...existing.values()] });
+    return { added, updated };
+  },
+  removeVehicle: (licensePlate) =>
+    set((s) => ({ vehicles: s.vehicles.filter((v) => v.licensePlate !== licensePlate) })),
+
+  issueWorkerVoucher: (p) => {
+    const voucher: VoucherRecord = {
+      serial: String(Math.floor(700000 + Math.random() * 299999)),
+      realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
+      amount: p.amount,
+      branch: p.branch,
+      ...(p.supervisor ? { supervisor: p.supervisor } : {}),
+      status: "הוקצה לעובד",
+      updatedAt: today(),
+      deliveredAt: today(),
+      client: p.clientName,
+      clientId: p.vehicle.linkedClientCode,
+      siteId: p.vehicle.linkedSiteCode,
+      siteName: p.siteName,
+      reason: p.reason,
+      workerName: p.vehicle.driverName,
+      licensePlate: p.vehicle.licensePlate,
+      driverName: p.vehicle.driverName,
+      standardName: p.vehicle.standardName,
+      ...(p.requester ? { requester: p.requester } : {}),
+      ...(p.approver ? { approver: p.approver } : {}),
+    };
+    set((s) => ({ vouchers: [voucher, ...s.vouchers] }));
+    return voucher;
+  },
+
 
   reasons: ["חידוש מלאי שוטף", "הקצאה חד פעמית", "סיור ניידות", "אירוע חריג"],
   addReason: (reason) => set((s) => ({ reasons: [...s.reasons, reason] })),
