@@ -188,8 +188,19 @@ interface AppState {
   clients: ClientRecord[];
   addClient: (client: ClientRecord) => void;
   updateClient: (clientId: string, siteId: string, patch: Partial<ClientRecord>) => void;
-  importClients: (rows: ClientRecord[]) => void;
+  /** Upsert by clientId + siteId. Returns added/updated counts. */
+  importClients: (rows: ClientRecord[]) => { added: number; updated: number };
   removeClient: (clientId: string, siteId: string) => void;
+
+  vehicles: VehicleRecord[];
+  addVehicle: (vehicle: VehicleRecord) => void;
+  updateVehicle: (licensePlate: string, patch: Partial<VehicleRecord>) => void;
+  /** Upsert by licensePlate. Returns added/updated counts. */
+  importVehicles: (rows: VehicleRecord[]) => { added: number; updated: number };
+  removeVehicle: (licensePlate: string) => void;
+
+  /** Issues a voucher handed to an end worker, storing the resolved vehicle/client data. */
+  issueWorkerVoucher: (payload: WorkerIssuePayload) => VoucherRecord;
 
   reasons: string[];
   addReason: (reason: string) => void;
