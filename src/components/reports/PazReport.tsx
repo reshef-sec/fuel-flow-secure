@@ -13,27 +13,28 @@ import {
 } from "@/design-system/delek-1ea111";
 import { downloadCsv, heDate } from "@/components/dashboard/statusVariant";
 import { isWorkerVoucher, type VoucherRecord } from "@/components/dashboard/voucherData";
-import { fullName, siteStandard, useAppStore, useCurrentUser } from "@/store/appStore";
+import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
 const headers = [
   "סניף משייך",
   "ערך כרטיס",
   'מס"ד',
-  "לקוח",
-  "אתר",
-  "תקן",
+  "קוד ושם לקוח",
+  "אתר/פרויקט",
+  "שם תקן",
+  "רישוי רכב",
+  "שם נהג",
   "תאריך מסירה",
   "סיבת הפקה",
-  "שם עובד",
-  "ת.ז עובד",
   "דורש הקצאה",
-  "מאשר ההקצאה",
+  "מאשר הקצאה",
 ];
 
-/** Billing report — only vouchers handed to an end worker. */
+/** Billing report — only vouchers handed to an end worker, joined with vehicles & clients. */
 export function PazReport() {
   const vouchers = useAppStore((s) => s.vouchers);
   const clients = useAppStore((s) => s.clients);
+  const vehicles = useAppStore((s) => s.vehicles);
   const branchList = useAppStore((s) => s.branchList);
   const role = useAppStore((s) => s.role);
   const me = useCurrentUser();
@@ -46,28 +47,55 @@ export function PazReport() {
     return worker;
   }, [vouchers, role, me?.branch, myName]);
 
-  /** Fallback for דורש הקצאה: the branch manager of the issuing branch. */
-  const requesterOf = (v: VoucherRecord) =>
-    v.requester ?? branchList.find((b) => b.name === v.branch)?.manager ?? "—";
+  /** Vehicle linked to the voucher — by plate, else by the worker/driver name. */
+  const vehicleOf = (v: VoucherRecord) =>
+    vehicles.find((x) => x.licensePlate === v.licensePlate) ??
+    vehicles.find((x) => x.driverName === (v.driverName ?? v.workerName));
 
-  const clientCell = (v: VoucherRecord) =>
-    v.clientId ? `${v.client ?? ""} (${v.clientId})`.trim() : (v.client ?? "—");
-  const siteCell = (v: VoucherRecord) =>
-    v.siteId ? `${v.siteName ?? ""} (${v.siteId})`.trim() : (v.siteName ?? "—");
+  /** Flattens one voucher into the 12 report columns, joining vehicles + clients. */
+  function flatten(v: VoucherRecord) {
+    const vehicle = vehicleOf(v);
+    const clientCode = vehicle?.linkedClientCode ?? v.clientId ?? "";
+    const siteCode = vehicle?.linkedSiteCode ?? v.siteId ?? "";
+    const site = clients.find((c) => c.clientId === clientCode && c.siteId === siteCode);
+    const clientCell = clientCode
+      ? `${clientCode} · ${site?.clientName ?? v.client ?? "—"}`
+      : (v.client ?? "—");
+    const siteCell = siteCode
+      ? `${site?.siteName ?? v.siteName ?? "—"} (${siteCode})`
+      : (v.siteName ?? "—");
+    const requester =
+      v.requester ?? branchList.find((b) => b.name === v.branch)?.manager ?? "—";
+    return {
+      branch: v.branch,
+      amount: v.amount,
+      serial: v.serial,
+      clientCell,
+      siteCell,
+      standardName: vehicle?.standardName ?? site?.standard ?? "—",
+      licensePlate: vehicle?.licensePlate ?? v.licensePlate ?? "—",
+      driverName: vehicle?.driverName ?? v.driverName ?? v.workerName ?? "—",
+      deliveredAt: v.deliveredAt ?? v.updatedAt,
+      reason: v.reason ?? "—",
+      requester,
+      approver: v.approver ?? "—",
+    };
+  }
 
-  const cells = rows.map((v) => [
-    v.branch,
-    v.amount,
-    v.serial,
-    clientCell(v),
-    siteCell(v),
-    siteStandard(clients, v.clientId, v.siteId),
-    v.deliveredAt ?? v.updatedAt,
-    v.reason ?? "—",
-    v.workerName ?? "—",
-    v.workerId ?? "—",
-    requesterOf(v),
-    v.approver ?? "—",
+  const flat = rows.map(flatten);
+  const cells = flat.map((r) => [
+    r.branch,
+    r.amount,
+    r.serial,
+    r.clientCell,
+    r.siteCell,
+    r.standardName,
+    r.licensePlate,
+    r.driverName,
+    r.deliveredAt,
+    r.reason,
+    r.requester,
+    r.approver,
   ]);
 
   const total = rows.reduce((sum, v) => sum + v.amount, 0);
@@ -103,7 +131,7 @@ export function PazReport() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {rows.length === 0 ? (
+            {flat.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={headers.length}
@@ -113,26 +141,26 @@ export function PazReport() {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((v) => (
-                <TableRow key={v.serial}>
-                  <TableCell className="font-semibold">{v.branch}</TableCell>
+              flat.map((r) => (
+                <TableRow key={r.serial}>
+                  <TableCell className="font-semibold">{r.branch}</TableCell>
                   <TableCell className="tabular-nums">
-                    {v.amount.toLocaleString("he-IL")} ₪
+                    {r.amount.toLocaleString("he-IL")} ₪
                   </TableCell>
-                  <TableCell className="tabular-nums">{v.serial}</TableCell>
-                  <TableCell>{clientCell(v)}</TableCell>
-                  <TableCell>{siteCell(v)}</TableCell>
-                  <TableCell className="text-center tabular-nums">
-                    {siteStandard(clients, v.clientId, v.siteId)}
+                  <TableCell className="tabular-nums">{r.serial}</TableCell>
+                  <TableCell>{r.clientCell}</TableCell>
+                  <TableCell>{r.siteCell}</TableCell>
+                  <TableCell className="text-center">{r.standardName}</TableCell>
+                  <TableCell className="tabular-nums" dir="ltr">
+                    {r.licensePlate}
                   </TableCell>
+                  <TableCell>{r.driverName}</TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
-                    {heDate.format(new Date(v.deliveredAt ?? v.updatedAt))}
+                    {heDate.format(new Date(r.deliveredAt))}
                   </TableCell>
-                  <TableCell>{v.reason ?? "—"}</TableCell>
-                  <TableCell>{v.workerName ?? "—"}</TableCell>
-                  <TableCell className="tabular-nums">{v.workerId ?? "—"}</TableCell>
-                  <TableCell>{requesterOf(v)}</TableCell>
-                  <TableCell>{v.approver ?? "—"}</TableCell>
+                  <TableCell>{r.reason}</TableCell>
+                  <TableCell>{r.requester}</TableCell>
+                  <TableCell>{r.approver}</TableCell>
                 </TableRow>
               ))
             )}
