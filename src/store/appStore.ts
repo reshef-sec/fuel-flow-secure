@@ -397,16 +397,80 @@ export const useAppStore = create<AppState>((set, get) => ({
         c.clientId === clientId && c.siteId === siteId ? { ...c, ...patch } : c,
       ),
     })),
-  /** Merges imported rows, replacing existing client+site combinations. */
-  importClients: (rows) =>
-    set((s) => {
-      const keys = new Set(rows.map((r) => `${r.clientId}|${r.siteId}`));
-      return { clients: [...rows, ...s.clients.filter((c) => !keys.has(`${c.clientId}|${c.siteId}`))] };
-    }),
+  /** Upserts imported rows by clientId + siteId (no duplicates). */
+  importClients: (rows) => {
+    const existing = new Map(get().clients.map((c) => [`${c.clientId}|${c.siteId}`, c]));
+    let updated = 0;
+    let added = 0;
+    for (const row of rows) {
+      const key = `${row.clientId}|${row.siteId}`;
+      if (existing.has(key)) {
+        existing.set(key, { ...existing.get(key)!, ...row });
+        updated += 1;
+      } else {
+        existing.set(key, row);
+        added += 1;
+      }
+    }
+    set({ clients: [...existing.values()] });
+    return { added, updated };
+  },
   removeClient: (clientId, siteId) =>
     set((s) => ({
       clients: s.clients.filter((c) => !(c.clientId === clientId && c.siteId === siteId)),
     })),
+
+  vehicles: seedVehicles,
+  addVehicle: (vehicle) => set((s) => ({ vehicles: [vehicle, ...s.vehicles] })),
+  updateVehicle: (licensePlate, patch) =>
+    set((s) => ({
+      vehicles: s.vehicles.map((v) => (v.licensePlate === licensePlate ? { ...v, ...patch } : v)),
+    })),
+  importVehicles: (rows) => {
+    const existing = new Map(get().vehicles.map((v) => [v.licensePlate, v]));
+    let updated = 0;
+    let added = 0;
+    for (const row of rows) {
+      if (existing.has(row.licensePlate)) {
+        existing.set(row.licensePlate, { ...existing.get(row.licensePlate)!, ...row });
+        updated += 1;
+      } else {
+        existing.set(row.licensePlate, row);
+        added += 1;
+      }
+    }
+    set({ vehicles: [...existing.values()] });
+    return { added, updated };
+  },
+  removeVehicle: (licensePlate) =>
+    set((s) => ({ vehicles: s.vehicles.filter((v) => v.licensePlate !== licensePlate) })),
+
+  issueWorkerVoucher: (p) => {
+    const voucher: VoucherRecord = {
+      serial: String(Math.floor(700000 + Math.random() * 299999)),
+      realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
+      amount: p.amount,
+      branch: p.branch,
+      ...(p.supervisor ? { supervisor: p.supervisor } : {}),
+      status: "הוקצה לעובד",
+      updatedAt: today(),
+      deliveredAt: today(),
+      client: p.clientName,
+      clientId: p.vehicle.linkedClientCode,
+      siteId: p.vehicle.linkedSiteCode,
+      siteName: p.siteName,
+      reason: p.reason,
+      workerName: p.vehicle.driverName,
+      licensePlate: p.vehicle.licensePlate,
+      driverName: p.vehicle.driverName,
+      standardName: p.vehicle.standardName,
+      ...(p.requester ? { requester: p.requester } : {}),
+      ...(p.approver ? { approver: p.approver } : {}),
+    };
+    set((s) => ({ vouchers: [voucher, ...s.vouchers] }));
+    return voucher;
+  },
+
 
   reasons: ["חידוש מלאי שוטף", "הקצאה חד פעמית", "סיור ניידות", "אירוע חריג"],
   addReason: (reason) => set((s) => ({ reasons: [...s.reasons, reason] })),
