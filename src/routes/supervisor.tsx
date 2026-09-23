@@ -26,6 +26,7 @@ import {
   Input,
   Select,
 } from "@/design-system/delek-1ea111";
+import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { NoAccess } from "@/components/layout/NoAccess";
 import {
   fullName,
@@ -306,7 +307,10 @@ function InfoCard({
 }) {
   return (
     <div
-      className={`rounded-xl border border-border bg-surface-muted p-3 ${wide ? "sm:col-span-2" : ""}`}
+      className={cn(
+        "rounded-xl border border-border bg-surface-muted p-3",
+        wide && "sm:col-span-2",
+      )}
     >
       <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
         <Icon className="size-3.5" />
