@@ -1,11 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import clientsSeed from "@/data/clients.json";
-
 import {
   MAIN_POOL,
-  vouchers as seedVouchers,
   type VoucherRecord,
 } from "@/components/dashboard/voucherData";
 
@@ -93,16 +90,6 @@ export interface WorkerLink {
   signedAt?: string;
 }
 
-const seedB2b: B2BClientRecord[] = [
-  { branch: "צפון", accountName: 'לב העיר פ"ת 550-אבטחה', clientCode: "38", clientName: "מזרחי טפחות שרותי אבטחה", standard: "תקן 1204" },
-  { branch: "ירושלים", accountName: "חזון איש-אבטחה", clientCode: "38", clientName: "מזרחי טפחות שרותי אבטחה", standard: "תקן 1187" },
-  { branch: "דרום", accountName: "סמילנסקי נתניה-אבטחה מזדמנת", clientCode: "38", clientName: "מזרחי טפחות שרותי אבטחה", standard: "תקן 2331" },
-  { branch: "מרכז", accountName: "פארק המדע רחובות-אבטחה", clientCode: "38", clientName: "מזרחי טפחות שרותי אבטחה", standard: "תקן 2440" },
-  { branch: "שפלה", accountName: "אופקים 437-אבטחה", clientCode: "38", clientName: "מזרחי טפחות שרותי אבטחה", standard: "תקן 3102" },
-  { branch: "ירושלים", accountName: "בנייני האומה-אבטחה", clientCode: "212", clientName: "מרכז הכנסים ירושלים", standard: "תקן 5010" },
-  { branch: "צפון", accountName: "קניון עפולה-סיור", clientCode: "415", clientName: "קניוני הצפון בע\"מ", standard: "תקן 6120" },
-];
-
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** Details of a worker voucher issued from the supervisor screen. */
@@ -141,39 +128,11 @@ export interface AllocationMeta {
   approver?: string;
 }
 
-/** תקן values known for specific sites, keyed by "clientId|siteId". */
-const standardBySite: Record<string, string> = {
-  "38|74": "תקן 1204",
-  "38|76": "תקן 1187",
-  "38|109": "תקן 2331",
-  "38|115": "תקן 2440",
-  "38|127": "תקן 3102",
-};
-
-/** Real clients & sites list (מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן). */
-const seedClients: ClientRecord[] = (clientsSeed as ClientRecord[]).map((c) => {
-  const standard = standardBySite[`${c.clientId}|${c.siteId}`];
-  return standard ? { ...c, standard } : c;
-});
-
 /** תקן for a given client + site, or "—" when unknown. */
 export function siteStandard(clients: ClientRecord[], clientId?: string, siteId?: string) {
   if (!clientId || !siteId) return "—";
   return clients.find((c) => c.clientId === clientId && c.siteId === siteId)?.standard || "—";
 }
-
-const seedBranches: BranchRecord[] = [
-  { id: "b1", name: "הנהלה", manager: "רון קלדרון", city: "מטה" },
-  { id: "b2", name: "צפון", manager: "גיא שכטר", city: "עפולה" },
-  { id: "b3", name: "מרכז", manager: "עופר קשי", city: "תל אביב" },
-  { id: "b4", name: "ירושלים", manager: "עידן כהן", city: "ירושלים" },
-  { id: "b5", name: "דרום", manager: "חיים אלמקייס", city: "באר שבע" },
-  { id: "b6", name: "שפלה", manager: "אבי ממן", city: "רחובות" },
-  { id: "b7", name: "מוקד", manager: "ליאור משה", city: "לוד" },
-];
-
-/** Static list kept for forms that only need branch names. */
-export const branches = seedBranches.map((b) => b.name);
 
 interface AppState {
   role: Role;
@@ -258,18 +217,8 @@ export const useAppStore = create<AppState>()(
     set({ role });
   },
 
-  balance: 15000,
-  vouchers: seedVouchers.map((v) =>
-    v.serial.startsWith("700") && v.clientId
-      ? {
-          ...v,
-          route: "b2b" as const,
-          clientCode: v.clientId,
-          accountName: v.siteName,
-          standard: standardBySite[`${v.clientId}|${v.siteId}`],
-        }
-      : v,
-  ),
+  balance: 0,
+  vouchers: [],
   allocate: (branch, supervisor, amount, meta) =>
     set((s) => {
       const count = Math.floor(amount / 100);
@@ -360,49 +309,7 @@ export const useAppStore = create<AppState>()(
     })),
 
 
-  users: [
-    { branch: "הנהלה", id: "032957615", lastName: "בני", firstName: "תמי", role: "admin", title: "בקרת חוזים ושכר", phone: "0506350222" },
-    { branch: "הנהלה", id: "301140471", lastName: "קלדרון", firstName: "רון", role: "admin", title: "מנהל מחלקת רכש ולוגיסטיקה", phone: "0508574322" },
-    { branch: "הנהלה", id: "316269109", lastName: "נמדר", firstName: "שגאל", role: "admin", title: "מחלקת רכש ולוגיסטיקה", phone: "0502099132" },
-    { branch: "הנהלה", id: "059698035", lastName: "לוגסי", firstName: "איתן", role: "admin", title: "מנהל תפעול מחלקת רכב", phone: "0543277902" },
-    { branch: "דרום", id: "023009426", lastName: "אלמקייס", firstName: "חיים", role: "branch", title: "מנהל סניף", phone: "0537709916", canRequest: true },
-    { branch: "דרום", id: "208268425", lastName: "רבינוביץ", firstName: "אבי", role: "branch", title: "ס.מנהל סניף", phone: "0544628413" },
-    { branch: "הנהלה", id: "203203419", lastName: "בוטה", firstName: "חגי", role: "branch", title: "קצין תעבורה", phone: "0528745060" },
-    { branch: "ירושלים", id: "201611548", lastName: "זיאת", firstName: "שלומי", role: "branch", title: "סגן מנהל סניף", phone: "0544721440", canRequest: true },
-    { branch: "ירושלים", id: "300349784", lastName: "כהן", firstName: "עידן", role: "branch", title: "מנהל סניף", phone: "0587626041", canRequest: true },
-    { branch: "מוקד", id: "201386620", lastName: "משה", firstName: "ליאור", role: "branch", title: "בקרת אגף", phone: "0504772224" },
-    { branch: "מרכז", id: "066064601", lastName: "קשי", firstName: "עופר", role: "branch", title: "מנהל סניף", phone: "0537398436", canRequest: true },
-    { branch: "צפון", id: "034044487", lastName: "לוי", firstName: "אדיר", role: "branch", title: "סגן מנהל סניף", phone: "050-8574332", canRequest: true },
-    { branch: "צפון", id: "034161000", lastName: "שכטר", firstName: "גיא", role: "branch", title: "מנהל סניף", phone: "050-2099125" },
-    { branch: "שפלה", id: "031736465", lastName: "ממן", firstName: "אבי", role: "branch", title: "סגן מנהל מרחב שפלה-מרכז", phone: "0534443031" },
-    { branch: "דרום", id: "214244873", lastName: "כחלוני", firstName: "עוז", role: "supervisor", title: "רכז רכבים", phone: "053-4250994", canRequest: true },
-    { branch: "ירושלים", id: "021979869", lastName: "כתב", firstName: "חופית", role: "supervisor", title: 'קב"ט עוטף-מ"י', phone: "0549196365" },
-    { branch: "ירושלים", id: "031946742", lastName: "אלאל", firstName: "חגי", role: "supervisor", title: "מפקח גזר", phone: "0509304030" },
-    { branch: "ירושלים", id: "043369339", lastName: "אזרואל", firstName: "מאיר", role: "supervisor", title: "מפקח ירושלים", phone: "0544543629" },
-    { branch: "ירושלים", id: "060170990", lastName: "פריד", firstName: "גלי", role: "supervisor", title: "מנהל מפעל ראוי", phone: "0506532340" },
-    { branch: "ירושלים", id: "203077375", lastName: "חמו", firstName: "אור", role: "supervisor", title: 'מפקח מוס"ח מעלה אדומים', phone: "0542528330" },
-    { branch: "ירושלים", id: "205639032", lastName: "שער", firstName: "אושר", role: "supervisor", title: "מפקח מ.א גזר", phone: "0546752808" },
-    { branch: "ירושלים", id: "211772520", lastName: "סופר", firstName: "איתי", role: "supervisor", title: "כוח אדם עוטף ירושלים", phone: "0545919100" },
-    { branch: "ירושלים", id: "212541163", lastName: "חטיבי", firstName: "ניר", role: "supervisor", title: "מפקח לילה + רכז רכבים", phone: "0547305104", canRequest: true },
-    { branch: "ירושלים", id: "300116993", lastName: "אלקיקין", firstName: "תמיר", role: "supervisor", title: 'אחמ"ש - בניני האומה', phone: "0526344801" },
-    { branch: "ירושלים", id: "300642220", lastName: "גל", firstName: "כפיר", role: "supervisor", title: 'מפקח מוס"ח ירושלים', phone: "0524883719" },
-    { branch: "ירושלים", id: "300779220", lastName: "שמחה", firstName: "שוולטר", role: "supervisor", title: "מנהל יחידת תחבצ", phone: "0506286933" },
-    { branch: "ירושלים", id: "305536906", lastName: "בר חן", firstName: "רבקה", role: "supervisor", title: "מפקח ירושלים", phone: "0502235200" },
-    { branch: "ירושלים", id: "314766403", lastName: "אברהמי", firstName: "ליאור", role: "supervisor", title: "כוח אדם עוטף ירושלים", phone: "0534265220" },
-    { branch: "ירושלים", id: "327127965", lastName: "רבינוביץ", firstName: "אלון", role: "supervisor", title: "מפקח ירושלים", phone: "0538289299" },
-    { branch: "ירושלים", id: "332719418", lastName: "בנימינוב", firstName: "נאום", role: "supervisor", title: "מפקח מודיעין", phone: "0502099149" },
-    { branch: "מרכז", id: "028547099", lastName: "נגר", firstName: "רביב", role: "supervisor", title: "מפקח מרכז", phone: "0509744445" },
-    { branch: "צפון", id: "028842714", lastName: "עמר", firstName: "איציק", role: "supervisor", title: "מפקח ב.ל", phone: "054-6929032" },
-    { branch: "צפון", id: "029675782", lastName: "כריסטובל", firstName: "ויטלי", role: "supervisor", title: "מזכירה", phone: "050-7540499" },
-    { branch: "צפון", id: "033237454", lastName: "שני", firstName: "רפי", role: "supervisor", title: "מפקח", phone: "053-2407084", canRequest: true },
-    { branch: "צפון", id: "305051377", lastName: "שוורץ", firstName: "יוסף", role: "supervisor", title: "מפקח", phone: "053-4923308" },
-    { branch: "צפון", id: "305476053", lastName: "יצחק", firstName: "רמי", role: "supervisor", title: "מפקח", phone: "054-7341227" },
-    { branch: "צפון", id: "039294970", lastName: "גאנם", firstName: "מאהר", role: "supervisor", title: "מפקח", phone: "050-5903350" },
-    { branch: "צפון", id: "039703178", lastName: "לוי", firstName: "אליץ", role: "supervisor", title: "מפקח ב.ל", phone: "054-6897628" },
-    { branch: "צפון", id: "302115191", lastName: "ברזל", firstName: "אוהד", role: "supervisor", title: "מפקח", phone: "052-6404004" },
-    { branch: "צפון", id: "308468487", lastName: "אחיטוב", firstName: "מוריה", role: "supervisor", title: "מפקחת", phone: "050-5114646" },
-    { branch: "צפון", id: "324914803", lastName: "לוי", firstName: "אביב", role: "supervisor", title: "מפקח", phone: "052-2357626" },
-  ],
+  users: [],
   addUser: (user) => set((s) => ({ users: [user, ...s.users] })),
   updateUser: (id, patch) =>
     set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) })),
@@ -425,7 +332,7 @@ export const useAppStore = create<AppState>()(
   setUserCanRequest: (id, value) =>
     set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, canRequest: value } : u)) })),
 
-  branchList: seedBranches,
+  branchList: [],
   addBranch: (branch) => set((s) => ({ branchList: [...s.branchList, branch] })),
   updateBranch: (id, patch) =>
     set((s) => ({
@@ -433,7 +340,7 @@ export const useAppStore = create<AppState>()(
     })),
   removeBranch: (id) => set((s) => ({ branchList: s.branchList.filter((b) => b.id !== id) })),
 
-  nonB2bClients: seedClients,
+  nonB2bClients: [],
   addClient: (client) => set((s) => ({ nonB2bClients: [client, ...s.nonB2bClients] })),
   updateClient: (clientId, siteId, patch) =>
     set((s) => ({
@@ -464,7 +371,7 @@ export const useAppStore = create<AppState>()(
       nonB2bClients: s.nonB2bClients.filter((c) => !(c.clientId === clientId && c.siteId === siteId)),
     })),
 
-  b2bClients: seedB2b,
+  b2bClients: [],
   addB2b: (row) => set((s) => ({ b2bClients: [row, ...s.b2bClients] })),
   updateB2b: (code, account, patch) =>
     set((s) => ({
@@ -544,12 +451,7 @@ export const useAppStore = create<AppState>()(
   },
 
 
-  reasons: [
-    { name: "חידוש מלאי שוטף", category: "Regular" },
-    { name: "הקצאה חד פעמית", category: "Regular" },
-    { name: "סיור ניידות", category: "B2B" },
-    { name: "אירוע חריג", category: "B2B" },
-  ],
+  reasons: [],
   addReason: (reason) => set((s) => ({ reasons: [...s.reasons, reason] })),
   updateReason: (index, reason) =>
     set((s) => ({ reasons: s.reasons.map((r, i) => (i === index ? reason : r)) })),
@@ -557,7 +459,9 @@ export const useAppStore = create<AppState>()(
 }),
   {
     name: "reshef.store.v2",
+    version: 3,
     skipHydration: true,
+    merge: (persisted, current) => ({ ...current, ...(persisted as Partial<AppState>) }),
     partialize: (s) => ({
       vouchers: s.vouchers,
       links: s.links,
