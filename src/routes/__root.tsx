@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useAppStore } from "@/store/appStore";
+import { AuthProvider } from "@/lib/auth-context";
 
 import { Toaster } from "sonner";
 
@@ -82,7 +83,9 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       {storeReady ? (
-        <Outlet />
+        <AuthProvider>
+          <Outlet />
+        </AuthProvider>
       ) : (
         <main className="grid min-h-screen place-items-center bg-background" aria-busy="true">
           <p className="text-sm font-semibold text-muted-foreground">טוען נתונים…</p>
