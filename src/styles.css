@@ -9,11 +9,6 @@
   --font-display: "Assistant", "Heebo", system-ui, sans-serif;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
 
 @keyframes fadeIn {
   from {

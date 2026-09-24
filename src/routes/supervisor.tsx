@@ -3,15 +3,14 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   BadgeCheck,
   Building2,
-  Car,
   Check,
   Copy,
+  Hash,
   Link2,
   MapPin,
   Search,
   Send,
   SquareArrowOutUpRight,
-  User,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,34 +31,39 @@ import {
   fullName,
   useAppStore,
   useCurrentUser,
-  type VehicleRecord,
+  type B2BClientRecord,
+  type ClientRecord,
 } from "@/store/appStore";
 
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
     meta: [
-      { title: "הפקת שובר לעובד | רשף ביטחון" },
+      { title: "הפקת שוברי דלק | רשף ביטחון" },
       {
         name: "description",
-        content: "הפקת לינק שובר דלק אישי לעובד לפי רישוי רכב או שם נהג, סכום וסיבת הנפקה.",
+        content: "הפקת לינק שוברי דלק לעובד — בחיוב לקוח (B2B) או ללא חיוב לקוח.",
       },
-      { property: "og:title", content: "הפקת שובר לעובד | רשף ביטחון" },
-      { property: "og:description", content: "חיפוש רכב חכם והפקת לינק שובר לעובד בוואטסאפ." },
+      { property: "og:title", content: "הפקת שוברי דלק | רשף ביטחון" },
+      { property: "og:description", content: "הפקת לינק שוברי דלק לעובד בחיוב או ללא חיוב לקוח." },
     ],
   }),
   component: SupervisorPage,
 });
 
+type Mode = "b2b" | "regular";
+
 function SupervisorPage() {
-  const clients = useAppStore((s) => s.clients);
-  const vehicles = useAppStore((s) => s.vehicles);
+  const b2bClients = useAppStore((s) => s.b2bClients);
+  const nonB2b = useAppStore((s) => s.nonB2bClients);
   const reasons = useAppStore((s) => s.reasons);
   const role = useAppStore((s) => s.role);
   const issueWorkerVoucher = useAppStore((s) => s.issueWorkerVoucher);
   const me = useCurrentUser();
 
+  const [mode, setMode] = useState<Mode>("b2b");
   const [search, setSearch] = useState("");
-  const [vehicle, setVehicle] = useState<VehicleRecord | null>(null);
+  const [b2b, setB2b] = useState<B2BClientRecord | null>(null);
+  const [regular, setRegular] = useState<ClientRecord | null>(null);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -67,27 +71,36 @@ function SupervisorPage() {
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Security filter: non-admins only see B2B clients of their own branch.
+  const allowedB2b = useMemo(
+    () => (role === "admin" ? b2bClients : b2bClients.filter((c) => c.branch === me?.branch)),
+    [b2bClients, role, me?.branch],
+  );
+  const modeReasons = reasons.filter((r) => r.category === (mode === "b2b" ? "B2B" : "Regular"));
+  const selected = mode === "b2b" ? b2b : regular;
+
   const matches = useMemo(() => {
     const q = search.trim();
-    if (!q || vehicle) return [];
-    return vehicles
-      .filter((v) => v.licensePlate.includes(q) || v.driverName.includes(q))
-      .slice(0, 6);
-  }, [search, vehicle, vehicles]);
+    if (!q || selected) return [];
+    if (mode === "b2b") return allowedB2b.filter((c) => c.clientName.includes(q) || c.accountName.includes(q)).slice(0, 8);
+    return nonB2b.filter((c) => c.clientName.includes(q) || c.siteName.includes(q)).slice(0, 8);
+  }, [search, selected, mode, allowedB2b, nonB2b]);
 
-  /** Joined client + site for the selected vehicle. */
-  const site = vehicle
-    ? clients.find(
-        (c) => c.clientId === vehicle.linkedClientCode && c.siteId === vehicle.linkedSiteCode,
-      )
-    : undefined;
+  function switchMode(next: Mode) {
+    setMode(next);
+    setSearch("");
+    setB2b(null);
+    setRegular(null);
+    setReason("");
+    setError(null);
+  }
 
   const numeric = Number(amount);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!vehicle || !numeric || !reason) {
-      setError("יש לבחור רכב, למלא סכום ולבחור סיבת הנפקה");
+    if (!selected || !numeric || !reason) {
+      setError("יש לבחור לקוח, למלא סכום ולבחור סיבת הנפקה");
       return;
     }
     if (numeric % 100 !== 0) {
@@ -98,22 +111,34 @@ function SupervisorPage() {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      issueWorkerVoucher({
+      const base = {
         amount: numeric,
         reason,
         branch: me?.branch ?? "הנהלה",
-        ...(me ? { supervisor: fullName(me) } : {}),
-        vehicle,
-        clientName: site?.clientName ?? "",
-        siteName: site?.siteName ?? "",
-        ...(me ? { requester: fullName(me) } : {}),
-      });
-      const token = Math.floor(10000 + Math.random() * 89999);
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      setLink(`${origin}/worker/${token}`);
+        ...(me ? { supervisor: fullName(me), requester: fullName(me) } : {}),
+      };
+      const created =
+        mode === "b2b" && b2b
+          ? issueWorkerVoucher({
+              ...base,
+              route: "b2b",
+              clientName: b2b.clientName,
+              clientCode: b2b.clientCode,
+              accountName: b2b.accountName,
+              standard: b2b.standard,
+            })
+          : issueWorkerVoucher({
+              ...base,
+              route: "regular",
+              clientName: regular!.clientName,
+              clientCode: regular!.clientId,
+              siteId: regular!.siteId,
+              siteName: regular!.siteName,
+            });
+      setLink(`${window.location.origin}/voucher/${created.id}`);
       setCopied(false);
-      toast.success("הלינק לעובד הופק בהצלחה");
-    }, 1000);
+      toast.success(`הופקו ${created.serials.length} קודים והלינק מוכן`);
+    }, 800);
   }
 
   async function copyLink() {
@@ -127,83 +152,111 @@ function SupervisorPage() {
     }
   }
 
-  if (role === "supervisor") return <NoAccess title="הפקת שובר לעובד" />;
+  if (role === "supervisor") return <NoAccess title="הפקת שוברי דלק" />;
 
   return (
-    <InternalLayout title="הפקת שובר לעובד">
+    <InternalLayout title="הפקת שוברי דלק">
       <div className="grid gap-6 lg:grid-cols-2">
         <Card padding="lg">
           <CardHeader>
-            <CardTitle>הפקת שובר לעובד</CardTitle>
+            <CardTitle>הפקת שוברי דלק</CardTitle>
             <Badge variant="info" size="md">
               <Link2 className="size-3.5" />
               לינק חד פעמי
             </Badge>
           </CardHeader>
-          <p className="text-sm text-muted-foreground">
-            מחפשים רכב לפי רישוי או שם נהג — הלקוח, האתר והתקן נשלפים אוטומטית מהמאגר.
-          </p>
 
-          <form onSubmit={submit} className="mt-5 space-y-5">
-            <FormField label="חיפוש רכב" hint="רישוי רכב או שם נהג">
+          <form onSubmit={submit} className="mt-2 space-y-5">
+            <div role="radiogroup" aria-label="סוג הנפקה" className="grid grid-cols-2 gap-2 rounded-xl bg-surface-muted p-1">
+              {(
+                [
+                  ["b2b", "בחיוב לקוח"],
+                  ["regular", "ללא חיוב לקוח"],
+                ] as const
+              ).map(([value, label]) => (
+                <label
+                  key={value}
+                  className={cn(
+                    "flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold transition-colors",
+                    mode === value ? "bg-surface text-primary shadow-card" : "text-muted-foreground",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="mode"
+                    value={value}
+                    checked={mode === value}
+                    onChange={() => switchMode(value)}
+                    className="accent-primary"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+
+            <FormField
+              label={mode === "b2b" ? "חיפוש לקוח B2B" : "בחירת לקוח (ללא חיוב)"}
+              hint={mode === "b2b" ? "מוצגים רק לקוחות הסניף שלך" : "חיפוש לפי שם לקוח או אתר"}
+            >
               <div className="relative">
                 <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  aria-label="חיפוש רכב לפי רישוי או שם נהג"
+                  aria-label="חיפוש לקוח"
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
-                    setVehicle(null);
+                    setB2b(null);
+                    setRegular(null);
                   }}
-                  placeholder="12-345-67 או שם הנהג"
+                  placeholder="הקלד שם לקוח…"
                   className="pe-9"
                 />
                 {matches.length > 0 ? (
-                  <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-border bg-surface shadow-raised">
-                    {matches.map((v) => (
-                      <li key={v.licensePlate}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setVehicle(v);
-                            setSearch(`${v.licensePlate} · ${v.driverName}`);
-                          }}
-                          className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-start text-sm transition-colors hover:bg-blue-100"
-                        >
-                          <span className="font-bold text-secondary">{v.driverName}</span>
-                          <span dir="ltr" className="tabular-nums text-muted-foreground">
-                            {v.licensePlate}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
+                  <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-raised">
+                    {matches.map((c) => {
+                      const isB2b = "accountName" in c;
+                      const title = c.clientName;
+                      const sub = isB2b ? c.accountName : (c as ClientRecord).siteName;
+                      return (
+                        <li key={isB2b ? `${c.clientCode}|${c.accountName}` : `${(c as ClientRecord).clientId}|${(c as ClientRecord).siteId}`}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isB2b) setB2b(c);
+                              else setRegular(c as ClientRecord);
+                              setSearch(`${title} · ${sub}`);
+                            }}
+                            className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-start text-sm hover:bg-blue-100"
+                          >
+                            <span className="font-bold text-secondary">{title}</span>
+                            <span className="truncate text-muted-foreground">{sub}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : null}
               </div>
             </FormField>
 
-            {vehicle ? (
+            {b2b && mode === "b2b" ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                <InfoCard icon={Car} label="רישוי רכב" value={vehicle.licensePlate} ltr />
-                <InfoCard icon={User} label="שם נהג" value={vehicle.driverName} />
-                <InfoCard icon={BadgeCheck} label="שם תקן" value={vehicle.standardName} />
-                <InfoCard
-                  icon={Building2}
-                  label="לקוח"
-                  value={`${site?.clientName ?? "—"} (${vehicle.linkedClientCode})`}
-                />
-                <InfoCard
-                  icon={MapPin}
-                  label="אתר / פרויקט"
-                  value={`${site?.siteName ?? "—"} (${vehicle.linkedSiteCode})`}
-                  wide
-                />
+                <InfoCard icon={Building2} label="שם לקוח" value={b2b.clientName} />
+                <InfoCard icon={Hash} label="קוד לקוח" value={b2b.clientCode} />
+                <InfoCard icon={MapPin} label="שם חשבון" value={b2b.accountName} />
+                <InfoCard icon={BadgeCheck} label="תקן" value={b2b.standard} />
+              </div>
+            ) : null}
+            {regular && mode === "regular" ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <InfoCard icon={Building2} label="לקוח" value={`${regular.clientName} (${regular.clientId})`} />
+                <InfoCard icon={MapPin} label="אתר" value={`${regular.siteName} (${regular.siteId})`} />
               </div>
             ) : null}
 
-            <FormField label="סכום השובר (₪)" hint="בכפולות של 100 ₪ בלבד">
+            <FormField label="סכום (₪)" hint="בכפולות של 100 ₪ — כל 100 ₪ הם קוד נפרד">
               <Input
-                aria-label="סכום השובר"
+                aria-label="סכום"
                 type="number"
                 min={100}
                 step={100}
@@ -216,15 +269,11 @@ function SupervisorPage() {
             </FormField>
 
             <FormField label="סיבת הנפקה">
-              <Select
-                aria-label="בחר סיבת הנפקה"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-              >
+              <Select aria-label="בחר סיבת הנפקה" value={reason} onChange={(e) => setReason(e.target.value)}>
                 <option value="">בחר סיבה…</option>
-                {reasons.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
+                {modeReasons.map((r) => (
+                  <option key={r.name} value={r.name}>
+                    {r.name}
                   </option>
                 ))}
               </Select>
@@ -234,7 +283,7 @@ function SupervisorPage() {
 
             <Button type="submit" loading={loading} block>
               <Send className="size-4" />
-              הפקת שובר לעובד
+              הפקת לינק לעובד
             </Button>
           </form>
         </Card>
@@ -247,10 +296,7 @@ function SupervisorPage() {
             <div className="space-y-4">
               <div className="rounded-xl border-2 border-dashed border-primary bg-blue-100/60 p-5 text-center">
                 <p className="text-xs font-semibold text-muted-foreground">לינק אישי לעובד</p>
-                <p
-                  dir="ltr"
-                  className="mt-2 break-all font-display text-lg font-extrabold text-secondary"
-                >
+                <p dir="ltr" className="mt-2 break-all font-display text-lg font-extrabold text-secondary">
                   {link}
                 </p>
               </div>
@@ -269,21 +315,14 @@ function SupervisorPage() {
                   פתח בחלון חדש
                 </a>
               </div>
-              <p className="text-center text-xs text-muted-foreground">
-                הלינק תקף לשימוש חד פעמי בלבד ומתעד את הרכב, הנהג, התקן, הלקוח והאתר שנבחרו.
-              </p>
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-surface-muted p-10 text-center">
               <span className="mx-auto grid size-14 place-items-center rounded-xl bg-blue-100 text-blue-700">
                 <Link2 className="size-7" />
               </span>
-              <p className="mt-3 font-display text-base font-extrabold text-secondary">
-                עדיין לא הופק לינק
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                בחר רכב, מלא סכום וסיבה ולחץ על "הפקת שובר לעובד" כדי לקבל לינק לשליחה.
-              </p>
+              <p className="mt-3 font-display text-base font-extrabold text-secondary">עדיין לא הופק לינק</p>
+              <p className="mt-1 text-sm text-muted-foreground">בחר סוג הנפקה, לקוח, סכום וסיבה כדי לקבל לינק.</p>
             </div>
           )}
         </Card>
@@ -292,36 +331,14 @@ function SupervisorPage() {
   );
 }
 
-function InfoCard({
-  icon: Icon,
-  label,
-  value,
-  ltr,
-  wide,
-}: {
-  icon: typeof Car;
-  label: string;
-  value: string;
-  ltr?: boolean;
-  wide?: boolean;
-}) {
+function InfoCard({ icon: Icon, label, value }: { icon: typeof Hash; label: string; value: string }) {
   return (
-    <div
-      className={cn(
-        "rounded-xl border border-border bg-surface-muted p-3",
-        wide && "sm:col-span-2",
-      )}
-    >
+    <div className="rounded-xl border border-border bg-surface-muted p-3">
       <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
         <Icon className="size-3.5" />
         {label}
       </p>
-      <p
-        {...(ltr ? { dir: "ltr" as const } : {})}
-        className="mt-1 font-display text-sm font-extrabold text-secondary"
-      >
-        {value}
-      </p>
+      <p className="mt-1 font-display text-sm font-extrabold text-secondary">{value}</p>
     </div>
   );
 }

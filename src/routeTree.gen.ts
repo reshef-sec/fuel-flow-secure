@@ -17,6 +17,7 @@ import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as AllocationsRouteImport } from './routes/allocations'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkerTokenRouteImport } from './routes/worker.$token'
+import { Route as VoucherIdRouteImport } from './routes/voucher.$id'
 import { Route as Char91__mockupChar93PreviewSplatRouteImport } from './routes/[__mockup].preview.$'
 import { Route as Char91__componentChar93PreviewSplatRouteImport } from './routes/[__component].preview.$'
 
@@ -60,6 +61,11 @@ const WorkerTokenRoute = WorkerTokenRouteImport.update({
   path: '/$token',
   getParentRoute: () => WorkerRoute,
 } as any)
+const VoucherIdRoute = VoucherIdRouteImport.update({
+  id: '/voucher/$id',
+  path: '/voucher/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91__mockupChar93PreviewSplatRoute =
   Char91__mockupChar93PreviewSplatRouteImport.update({
     id: '/__mockup/preview/$',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRouteWithChildren
+  '/voucher/$id': typeof VoucherIdRoute
   '/worker/$token': typeof WorkerTokenRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
   '/__mockup/preview/$': typeof Char91__mockupChar93PreviewSplatRoute
@@ -93,6 +100,7 @@ export interface FileRoutesByTo {
   '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRouteWithChildren
+  '/voucher/$id': typeof VoucherIdRoute
   '/worker/$token': typeof WorkerTokenRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
   '/__mockup/preview/$': typeof Char91__mockupChar93PreviewSplatRoute
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRouteWithChildren
+  '/voucher/$id': typeof VoucherIdRoute
   '/worker/$token': typeof WorkerTokenRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
   '/__mockup/preview/$': typeof Char91__mockupChar93PreviewSplatRoute
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/supervisor'
     | '/vouchers'
     | '/worker'
+    | '/voucher/$id'
     | '/worker/$token'
     | '/__component/preview/$'
     | '/__mockup/preview/$'
@@ -132,6 +142,7 @@ export interface FileRouteTypes {
     | '/supervisor'
     | '/vouchers'
     | '/worker'
+    | '/voucher/$id'
     | '/worker/$token'
     | '/__component/preview/$'
     | '/__mockup/preview/$'
@@ -144,6 +155,7 @@ export interface FileRouteTypes {
     | '/supervisor'
     | '/vouchers'
     | '/worker'
+    | '/voucher/$id'
     | '/worker/$token'
     | '/__component/preview/$'
     | '/__mockup/preview/$'
@@ -157,6 +169,7 @@ export interface RootRouteChildren {
   SupervisorRoute: typeof SupervisorRoute
   VouchersRoute: typeof VouchersRoute
   WorkerRoute: typeof WorkerRouteWithChildren
+  VoucherIdRoute: typeof VoucherIdRoute
   Char91__componentChar93PreviewSplatRoute: typeof Char91__componentChar93PreviewSplatRoute
   Char91__mockupChar93PreviewSplatRoute: typeof Char91__mockupChar93PreviewSplatRoute
 }
@@ -219,6 +232,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkerTokenRouteImport
       parentRoute: typeof WorkerRoute
     }
+    '/voucher/$id': {
+      id: '/voucher/$id'
+      path: '/voucher/$id'
+      fullPath: '/voucher/$id'
+      preLoaderRoute: typeof VoucherIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/__mockup/preview/$': {
       id: '/__mockup/preview/$'
       path: '/__mockup/preview/$'
@@ -255,6 +275,7 @@ const rootRouteChildren: RootRouteChildren = {
   SupervisorRoute: SupervisorRoute,
   VouchersRoute: VouchersRoute,
   WorkerRoute: WorkerRouteWithChildren,
+  VoucherIdRoute: VoucherIdRoute,
   Char91__componentChar93PreviewSplatRoute:
     Char91__componentChar93PreviewSplatRoute,
   Char91__mockupChar93PreviewSplatRoute: Char91__mockupChar93PreviewSplatRoute,

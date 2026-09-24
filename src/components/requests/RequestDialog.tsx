@@ -76,8 +76,8 @@ export function RequestDialog({ open, onClose }: { open: boolean; onClose: () =>
           <Select aria-label="סיבת הדרישה" value={reason} onChange={(e) => setReason(e.target.value)}>
             <option value="">בחר סיבה…</option>
             {reasons.map((r) => (
-              <option key={r} value={r}>
-                {r}
+              <option key={r.name} value={r.name}>
+                {r.name}
               </option>
             ))}
           </Select>

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { Tabs } from "@/components/ui/Tabs";
-import { PazReport } from "@/components/reports/PazReport";
+import { B2bReport } from "@/components/reports/B2bReport";
 import {
   Badge,
   Button,
@@ -43,8 +43,8 @@ const statuses: VoucherStatus[] = ["טרם שומש", "הוקצה לעובד", "
 const empty = { from: "", to: "", branch: "", supervisor: "", client: "", status: "" };
 
 const reportTabs = [
-  { id: "master", label: "דוח מאסטר", icon: Table2 },
-  { id: "paz", label: "דוח קש פז", icon: Fuel },
+  { id: "master", label: 'דו"ח מאסטר', icon: Table2 },
+  { id: "paz", label: 'דו"ח B2B', icon: Fuel },
 ] as const;
 
 function ReportsPage() {
@@ -52,7 +52,7 @@ function ReportsPage() {
   const vouchers = useAppStore((s) => s.vouchers);
   const branchList = useAppStore((s) => s.branchList);
   const users = useAppStore((s) => s.users);
-  const clients = useAppStore((s) => s.clients);
+  const clients = useAppStore((s) => s.nonB2bClients);
   const role = useAppStore((s) => s.role);
   const me = useCurrentUser();
   const [filters, setFilters] = useState(empty);
@@ -78,6 +78,7 @@ function ReportsPage() {
   const rows = useMemo(
     () =>
       vouchers.filter((v) => {
+        if (v.route === "b2b") return false;
         if (lockedBranch && v.branch !== lockedBranch) return false;
         if (lockedSupervisor !== null && v.supervisor !== lockedSupervisor) return false;
         if (filters.from && v.updatedAt < filters.from) return false;
@@ -150,7 +151,7 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
 
       {tab === "paz" ? (
         <div className="mt-6">
-          <PazReport />
+          <B2bReport />
         </div>
       ) : (
         <>

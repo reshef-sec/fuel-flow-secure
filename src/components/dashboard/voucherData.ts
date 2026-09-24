@@ -35,7 +35,16 @@ export interface VoucherRecord {
   /** תאריך מסירה לעובד */
   deliveredAt?: string;
 
-  /* ---- Vehicle link (relational) ---- */
+  /* ---- Issuance route ---- */
+  /** "b2b" = בחיוב לקוח, "regular" = ללא חיוב */
+  route?: "b2b" | "regular";
+  /** Worker link that holds this code */
+  linkId?: string;
+  clientCode?: string;
+  accountName?: string;
+  standard?: string;
+
+  /* ---- Legacy vehicle link ---- */
   /** רישוי רכב */
   licensePlate?: string;
   /** שם נהג */

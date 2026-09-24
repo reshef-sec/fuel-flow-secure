@@ -23,7 +23,7 @@ import { useAppStore } from "@/store/appStore";
 const empty = { clientId: "", clientName: "", siteId: "", siteName: "", standard: "" };
 
 export function ClientsPanel() {
-  const clients = useAppStore((s) => s.clients);
+  const clients = useAppStore((s) => s.nonB2bClients);
   const addClient = useAppStore((s) => s.addClient);
   const updateClient = useAppStore((s) => s.updateClient);
   const importClients = useAppStore((s) => s.importClients);
@@ -126,7 +126,7 @@ export function ClientsPanel() {
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-xl font-extrabold text-secondary">
-          לקוחות ואתרים
+          מאגר ללא חיוב לקוח
           <span className="ms-2 text-sm font-semibold text-muted-foreground">
             {filtered.length.toLocaleString("he-IL")} מתוך {clients.length.toLocaleString("he-IL")}
           </span>
