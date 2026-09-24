@@ -60,7 +60,7 @@ export function B2bReport() {
     v.clientCode ?? v.clientId ?? "—",
     v.accountName ?? v.siteName ?? "—",
     v.standard ?? v.standardName ?? "—",
-    heDate(v.deliveredAt ?? v.updatedAt),
+    heDate.format(new Date(v.deliveredAt ?? v.updatedAt)),
     v.reason ?? "—",
     requesterOf(v),
     v.approver ?? "—",
