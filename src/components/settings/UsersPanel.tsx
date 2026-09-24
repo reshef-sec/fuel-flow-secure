@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { FileSpreadsheet, Pencil, Plus, Search, Trash2, UserPlus } from "lucide-react";
+import { FileSpreadsheet, KeyRound, Pencil, Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -17,6 +17,8 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
+import { useServerFn } from "@tanstack/react-start";
+import { deleteAccount, resetAccountPassword, syncAccount } from "@/lib/accounts.functions";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
 
@@ -48,6 +50,26 @@ export function UsersPanel() {
   const role = useAppStore((s) => s.role);
   const isAdmin = role === "admin";
   const fileRef = useRef<HTMLInputElement>(null);
+  const resetFn = useServerFn(resetAccountPassword);
+  const syncFn = useServerFn(syncAccount);
+  const deleteFn = useServerFn(deleteAccount);
+  const accountData = (u: UserRecord) => ({
+    phone: u.phone,
+    nationalId: u.id,
+    fullName: `${u.firstName} ${u.lastName}`.trim(),
+    branch: u.branch,
+    role: u.role,
+  });
+
+  async function resetPassword(u: UserRecord) {
+    try {
+      await resetFn({ data: accountData(u) });
+      updateUser(u.id, { requiresPasswordChange: true });
+      toast.success("סיסמת המשתמש אופסה בהצלחה לתעודת הזהות שלו");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "איפוס הסיסמה נכשל");
+    }
+  }
 
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
@@ -140,9 +162,12 @@ export function UsersPanel() {
       updateUser(editingId, payload);
       toast.success("פרטי המשתמש עודכנו");
     } else {
-      addUser(payload);
-      toast.success("המשתמש נוסף בהצלחה");
+      addUser({ ...payload, requiresPasswordChange: true });
+      toast.success("המשתמש נוסף בהצלחה — סיסמה ראשונית: ת.ז");
     }
+    syncFn({ data: accountData(payload) }).catch((err) =>
+      toast.error(err instanceof Error ? `חשבון הכניסה לא עודכן: ${err.message}` : "חשבון הכניסה לא עודכן"),
+    );
     setOpen(false);
     setEditingId(null);
     setForm({
@@ -292,8 +317,19 @@ export function UsersPanel() {
                     >
                       <Pencil className="size-4" />
                     </button>
+                    {isAdmin ? (
+                      <button
+                        onClick={() => void resetPassword(u)}
+                        aria-label={`איפוס סיסמה ל${u.lastName} ${u.firstName}`}
+                        title="איפוס סיסמה"
+                        className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-primary focus-visible:shadow-focus"
+                      >
+                        <KeyRound className="size-4" />
+                      </button>
+                    ) : null}
                     <button
                       onClick={() => {
+                        deleteFn({ data: { nationalId: u.id } }).catch(() => undefined);
                         removeUser(u.id);
                         toast.success("המשתמש הוסר");
                       }}

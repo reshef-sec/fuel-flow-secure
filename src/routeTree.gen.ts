@@ -14,6 +14,8 @@ import { Route as VouchersRouteImport } from './routes/vouchers'
 import { Route as SupervisorRouteImport } from './routes/supervisor'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AllocationsRouteImport } from './routes/allocations'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkerTokenRouteImport } from './routes/worker.$token'
@@ -44,6 +46,16 @@ const SettingsRoute = SettingsRouteImport.update({
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangePasswordRoute = ChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AllocationsRoute = AllocationsRouteImport.update({
@@ -82,6 +94,8 @@ const Char91__componentChar93PreviewSplatRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/allocations': typeof AllocationsRoute
+  '/change-password': typeof ChangePasswordRoute
+  '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/supervisor': typeof SupervisorRoute
@@ -95,6 +109,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/allocations': typeof AllocationsRoute
+  '/change-password': typeof ChangePasswordRoute
+  '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/supervisor': typeof SupervisorRoute
@@ -109,6 +125,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/allocations': typeof AllocationsRoute
+  '/change-password': typeof ChangePasswordRoute
+  '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/supervisor': typeof SupervisorRoute
@@ -124,6 +142,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/allocations'
+    | '/change-password'
+    | '/login'
     | '/reports'
     | '/settings'
     | '/supervisor'
@@ -137,6 +157,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/allocations'
+    | '/change-password'
+    | '/login'
     | '/reports'
     | '/settings'
     | '/supervisor'
@@ -150,6 +172,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/allocations'
+    | '/change-password'
+    | '/login'
     | '/reports'
     | '/settings'
     | '/supervisor'
@@ -164,6 +188,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AllocationsRoute: typeof AllocationsRoute
+  ChangePasswordRoute: typeof ChangePasswordRoute
+  LoginRoute: typeof LoginRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
   SupervisorRoute: typeof SupervisorRoute
@@ -209,6 +235,20 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/change-password': {
+      id: '/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof ChangePasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/allocations': {
@@ -270,6 +310,8 @@ const WorkerRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AllocationsRoute: AllocationsRoute,
+  ChangePasswordRoute: ChangePasswordRoute,
+  LoginRoute: LoginRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
   SupervisorRoute: SupervisorRoute,

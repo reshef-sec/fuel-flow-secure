@@ -31,6 +31,8 @@ export interface UserRecord {
   branch: string;
   /** רשאי להקים דרישה */
   canRequest?: boolean;
+  /** Must choose a new password on next login (initial password = ת.ז). */
+  requiresPasswordChange?: boolean;
 }
 
 /** "משפחה פרטי" for selects and voucher assignment labels. */
