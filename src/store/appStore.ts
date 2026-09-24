@@ -461,6 +461,7 @@ export const useAppStore = create<AppState>()(
     name: "reshef.store.v2",
     version: 3,
     skipHydration: true,
+    migrate: (persisted) => persisted as AppState,
     merge: (persisted, current) => ({ ...current, ...(persisted as Partial<AppState>) }),
     partialize: (s) => ({
       vouchers: s.vouchers,
