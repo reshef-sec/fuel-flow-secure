@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Briefcase, Building2, Car, ListChecks, ScrollText, Users } from "lucide-react";
+import { Briefcase, Building2, ListChecks, ScrollText, Users } from "lucide-react";
 
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
@@ -10,7 +10,7 @@ import { BranchesPanel } from "@/components/settings/BranchesPanel";
 import { UsersPanel } from "@/components/settings/UsersPanel";
 import { ClientsPanel } from "@/components/settings/ClientsPanel";
 import { AuditPanel } from "@/components/settings/AuditPanel";
-import { VehiclesPanel } from "@/components/settings/VehiclesPanel";
+import { B2bPanel } from "@/components/settings/B2bPanel";
 
 
 export const Route = createFileRoute("/settings")({
@@ -32,8 +32,8 @@ const tabs = [
   { id: "reasons", label: "סיבות הנפקה", icon: ListChecks },
   { id: "branches", label: "ניהול סניפים", icon: Building2 },
   { id: "users", label: "ניהול משתמשים", icon: Users },
-  { id: "clients", label: "מאגר לקוחות ואתרים", icon: Briefcase },
-  { id: "vehicles", label: "מאגר רכבים ותקנים", icon: Car },
+  { id: "clients", label: "מאגר ללא חיוב לקוח", icon: Briefcase },
+  { id: "b2b", label: "מאגר B2B", icon: Building2 },
   { id: "audit", label: "יומן פעילות", icon: ScrollText },
 ] as const;
 
@@ -49,7 +49,7 @@ function SettingsPage() {
         {tab === "branches" ? <BranchesPanel /> : null}
         {tab === "users" ? <UsersPanel /> : null}
         {tab === "clients" ? <ClientsPanel /> : null}
-        {tab === "vehicles" ? <VehiclesPanel /> : null}
+        {tab === "b2b" ? <B2bPanel /> : null}
         {tab === "audit" ? <AuditPanel /> : null}
       </div>
 

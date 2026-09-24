@@ -24,7 +24,7 @@ const navItems = [
   { to: "/", label: "דשבורד", icon: LayoutDashboard, roles: ["admin", "branch", "supervisor"] },
   { to: "/vouchers", label: "מאגר שוברים", icon: Ticket, roles: ["admin"] },
   { to: "/allocations", label: "הקצאות לסניפים", icon: Building2, roles: ["admin"] },
-  { to: "/supervisor", label: "הפקת שובר לעובד", icon: UserCheck, roles: ["admin", "branch"] },
+  { to: "/supervisor", label: "הפקת שוברי דלק", icon: UserCheck, roles: ["admin", "branch"] },
   { to: "/reports", label: "דוחות", icon: FileBarChart, roles: ["admin", "branch", "supervisor"] },
   { to: "/settings", label: "הגדרות", icon: Settings, roles: ["admin"] },
 ] as const;
@@ -57,7 +57,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
 
       <aside
         className={cn(
-          "fixed inset-y-0 right-0 z-40 w-64 shrink-0 border-s border-border bg-surface transition-transform lg:static lg:translate-x-0",
+          "fixed inset-y-0 right-0 z-40 flex w-64 shrink-0 flex-col overflow-y-auto border-s border-border bg-surface transition-transform lg:static lg:translate-x-0",
           open ? "translate-x-0" : "translate-x-full",
         )}
       >
@@ -72,7 +72,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
           </button>
         </div>
 
-        <nav className="flex flex-col gap-1 p-3">
+        <nav className="flex flex-col gap-1 px-4 py-4">
           {items.map(({ to, label, icon: Icon }) => {
             const active = pathname === to;
             return (
@@ -133,7 +133,9 @@ export function InternalLayout({ title, children }: { title: string; children: R
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-10 lg:py-8">
+          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+        </main>
       </div>
     </div>
   );
