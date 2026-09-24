@@ -20,8 +20,25 @@ import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { useAppStore, type B2BClientRecord } from "@/store/appStore";
 
-const empty: B2BClientRecord = { branch: "", accountName: "", clientCode: "", clientName: "", standard: "" };
-const cols = ["סניף", "שם חשבון", "קוד לקוח", "שם לקוח", "תקן"] as const;
+type Key = keyof B2BClientRecord;
+/** Exact Excel column order (RTL). */
+const columns: { key: Key; label: string; required?: boolean }[] = [
+  { key: "standard", label: "תקן", required: true },
+  { key: "accountName", label: "שם חשבון", required: true },
+  { key: "balance", label: 'יתרת הנה"ש' },
+  { key: "clientCode", label: "קוד לקוח", required: true },
+  { key: "clientName", label: "שם לקוח", required: true },
+  { key: "loadType", label: "סוג העמסה" },
+  { key: "branch", label: "סניף", required: true },
+  { key: "budgetSection", label: "סעיף תקציבי" },
+  { key: "accountKey", label: "מפתח חשבון אב" },
+  { key: "itemFamily", label: "משפחת פריטים" },
+  { key: "accountStatus", label: "חשבון [פעיל/כותרת]" },
+  { key: "accountType", label: "סוג חשבון" },
+];
+const cols = columns.map((c) => c.label);
+const empty = Object.fromEntries(columns.map((c) => [c.key, ""])) as unknown as Required<B2BClientRecord>;
+const norm = (h: string) => h.replace(/["'״׳\s\[\]\/]/g, "");
 
 export function B2bPanel() {
   const rows = useAppStore((s) => s.b2bClients);
@@ -52,16 +69,22 @@ export function B2bPanel() {
       return;
     }
     try {
-      const raw = stripHeader(await parseSheetFile(file), "סניף");
-      const parsed = raw
-        .map((r) => ({
-          branch: String(r[0] ?? "").trim(),
-          accountName: String(r[1] ?? "").trim(),
-          clientCode: String(r[2] ?? "").trim(),
-          clientName: String(r[3] ?? "").trim(),
-          standard: String(r[4] ?? "").trim(),
-        }))
-        .filter((r) => r.clientCode && r.accountName && r.clientName);
+      const all = await parseSheetFile(file);
+      const headerIdx = all.findIndex((r) => r.some((c) => norm(c) === norm("שם חשבון")));
+      if (headerIdx < 0) {
+        toast.error(`לא נמצאה שורת כותרות. עמודות: ${cols.join(", ")}`);
+        return;
+      }
+      const header = all[headerIdx]!.map(norm);
+      const index = Object.fromEntries(columns.map((c) => [c.key, header.indexOf(norm(c.label))]));
+      const parsed = all
+        .slice(headerIdx + 1)
+        .map((r) => {
+          const row = {} as Record<Key, string>;
+          for (const c of columns) row[c.key] = index[c.key]! >= 0 ? String(r[index[c.key]!] ?? "").trim() : "";
+          return row as B2BClientRecord;
+        })
+        .filter((r) => r.clientCode && r.accountName);
       if (!parsed.length) {
         toast.error(`לא נמצאו שורות תקינות. עמודות: ${cols.join(", ")}`);
         return;
@@ -76,10 +99,10 @@ export function B2bPanel() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const p = Object.fromEntries(
-      Object.entries(form).map(([k, v]) => [k, v.trim()]),
+      Object.entries(form).map(([k, v]) => [k, String(v ?? "").trim()]),
     ) as unknown as B2BClientRecord;
-    if (Object.values(p).some((v) => !v)) {
-      setError("יש למלא את כל השדות");
+    if (columns.some((c) => c.required && !p[c.key])) {
+      setError("יש למלא תקן, שם חשבון, קוד לקוח, שם לקוח וסניף");
       return;
     }
     const clash = rows.some(
@@ -105,12 +128,7 @@ export function B2bPanel() {
     setError(null);
   }
 
-  const fields: { key: keyof B2BClientRecord; label: string }[] = [
-    { key: "accountName", label: "שם חשבון" },
-    { key: "clientCode", label: "קוד לקוח" },
-    { key: "clientName", label: "שם לקוח" },
-    { key: "standard", label: "תקן" },
-  ];
+  const fields = columns.filter((c) => c.key !== "branch");
 
   return (
     <section>
@@ -130,7 +148,7 @@ export function B2bPanel() {
           <Button
             variant="outline"
             onClick={() =>
-              downloadCsv("b2b-template.csv", [...cols], [["צפון", "שם חשבון", "100", "שם לקוח", "תקן 1001"]])
+              downloadCsv("b2b-template.csv", cols, [columns.map((c) => (c.key === "branch" ? "צפון" : ""))])
             }
           >
             <FileSpreadsheet className="size-4" />
@@ -178,25 +196,25 @@ export function B2bPanel() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={columns.length + 1} className="py-10 text-center text-muted-foreground">
                   אין רשומות
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((r) => (
                 <TableRow key={`${r.clientCode}|${r.accountName}`}>
-                  <TableCell>{r.branch}</TableCell>
-                  <TableCell>{r.accountName}</TableCell>
-                  <TableCell className="tabular-nums">{r.clientCode}</TableCell>
-                  <TableCell>{r.clientName}</TableCell>
-                  <TableCell>{r.standard}</TableCell>
+                  {columns.map((c) => (
+                    <TableCell key={c.key} className="whitespace-nowrap">
+                      {r[c.key] || "—"}
+                    </TableCell>
+                  ))}
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <button
                         aria-label={`ערוך ${r.accountName}`}
                         onClick={() => {
                           setEditing(r);
-                          setForm(r);
+                          setForm({ ...empty, ...r });
                           setError(null);
                           setOpen(true);
                         }}
@@ -243,7 +261,7 @@ export function B2bPanel() {
             <FormField key={f.key} label={f.label}>
               <Input
                 aria-label={f.label}
-                value={form[f.key]}
+                value={form[f.key] ?? ""}
                 onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
               />
             </FormField>
