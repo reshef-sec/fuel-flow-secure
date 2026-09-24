@@ -13,11 +13,12 @@ import {
   Menu,
   Bell,
   UserCircle2,
-  X,
-} from "lucide-react";
+  X, LogOut } from "lucide-react";
 
 import { Logo, Select } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
+import { useAuthContext } from "@/lib/auth-context";
+import { supabase } from "@/integrations/supabase/client";
 import { roleLabels, storedRole, useAppStore, type Role } from "@/store/appStore";
 
 const navItems = [
@@ -36,12 +37,19 @@ export function InternalLayout({ title, children }: { title: string; children: R
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const role = useAppStore((s) => s.role);
   const setRole = useAppStore((s) => s.setRole);
+  const { profile } = useAuthContext();
+  const canSimulate = profile?.role === "admin";
 
   // Restore the simulated role after hydration so permissions survive a reload.
   useEffect(() => {
+    if (!profile) return;
+    if (!canSimulate) {
+      setRole(profile.role);
+      return;
+    }
     const saved = storedRole();
     if (saved && saved !== useAppStore.getState().role) setRole(saved);
-  }, [setRole]);
+  }, [setRole, canSimulate, profile]);
 
   const items = navItems.filter((item) => (item.roles as readonly string[]).includes(role));
 
@@ -108,7 +116,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
             {title}
           </h1>
           <div className="flex shrink-0 items-center gap-2">
-            <Select
+            {canSimulate ? <Select
               value={role}
               onChange={(e) => setRole(e.target.value as Role)}
               aria-label="תפקיד לצפייה"
@@ -119,7 +127,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
                   תצוגה: {roleLabels[r]}
                 </option>
               ))}
-            </Select>
+            </Select> : null}
             <button
               aria-label="התראות"
               className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted"
@@ -128,8 +136,16 @@ export function InternalLayout({ title, children }: { title: string; children: R
             </button>
             <span className="hidden items-center gap-2 rounded-pill bg-surface-muted px-3 py-1.5 sm:flex">
               <UserCircle2 className="size-5 text-secondary" />
-              <span className="text-sm font-semibold text-secondary">{roleLabels[role]}</span>
+              <span className="text-sm font-semibold text-secondary">{profile?.full_name || roleLabels[role]}</span>
             </span>
+            <button
+              onClick={() => void supabase.auth.signOut()}
+              aria-label="התנתקות"
+              title="התנתקות"
+              className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-danger"
+            >
+              <LogOut className="size-5" />
+            </button>
           </div>
         </header>
 
