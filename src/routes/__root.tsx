@@ -65,11 +65,16 @@ function RootShell({ children }: { children: ReactNode }) {
 // /__component) render inside it, so any chrome leaks into every frame.
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const [storeReady, setStoreReady] = useState(useAppStore.persist.hasHydrated());
+  const [storeReady, setStoreReady] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = useAppStore.persist.onFinishHydration(() => setStoreReady(true));
-    void Promise.resolve(useAppStore.persist.rehydrate()).then(() => setStoreReady(true));
+    const persistence = useAppStore.persist;
+    if (!persistence) {
+      setStoreReady(true);
+      return;
+    }
+    const unsubscribe = persistence.onFinishHydration(() => setStoreReady(true));
+    void Promise.resolve(persistence.rehydrate()).then(() => setStoreReady(true));
     return unsubscribe;
   }, []);
 
