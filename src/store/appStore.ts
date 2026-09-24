@@ -55,41 +55,61 @@ export interface ClientRecord {
   standard?: string;
 }
 
-/** רכב ותקן — linked to a client + site by codes. */
-export interface VehicleRecord {
-  /** רישוי רכב — primary key */
-  licensePlate: string;
-  /** שם נהג */
-  driverName: string;
-  /** שם תקן */
-  standardName: string;
-  /** מס' לקוח מקושר */
-  linkedClientCode: string;
-  /** מספר אתר מקושר */
-  linkedSiteCode: string;
+/** מאגר B2B — client billed per voucher. */
+export interface B2BClientRecord {
+  branch: string;
+  accountName: string;
+  clientCode: string;
+  clientName: string;
+  standard: string;
 }
 
-const seedVehicles: VehicleRecord[] = [
-  { licensePlate: "12-345-67", driverName: "לוי אדיר", standardName: "תקן 1204", linkedClientCode: "38", linkedSiteCode: "74" },
-  { licensePlate: "23-456-78", driverName: "אזרואל מאיר", standardName: "תקן 1187", linkedClientCode: "38", linkedSiteCode: "76" },
-  { licensePlate: "34-567-89", driverName: "רבינוביץ אבי", standardName: "תקן 2331", linkedClientCode: "38", linkedSiteCode: "109" },
-  { licensePlate: "45-678-90", driverName: "נגר רביב", standardName: "תקן 2440", linkedClientCode: "38", linkedSiteCode: "115" },
-  { licensePlate: "56-789-01", driverName: "שני רפי", standardName: "תקן 3102", linkedClientCode: "38", linkedSiteCode: "127" },
-  { licensePlate: "67-890-12", driverName: "כחלוני עוז", standardName: "תקן 2331", linkedClientCode: "38", linkedSiteCode: "109" },
-  { licensePlate: "78-901-23", driverName: "חטיבי ניר", standardName: "תקן 1187", linkedClientCode: "38", linkedSiteCode: "76" },
+export type ReasonCategory = "B2B" | "Regular";
+export const reasonCategoryLabels: Record<ReasonCategory, string> = {
+  B2B: "חיוב לקוח",
+  Regular: "ללא חיוב",
+};
+export interface ReasonRecord {
+  name: string;
+  category: ReasonCategory;
+}
+
+/** One-time worker link holding several 100 ₪ codes. */
+export interface WorkerLink {
+  id: string;
+  total: number;
+  serials: string[];
+  createdAt: string;
+  workerId?: string;
+  phone?: string;
+  signedAt?: string;
+}
+
+const seedB2b: B2BClientRecord[] = [
+  { branch: "צפון", accountName: 'לב העיר פ"ת 550-אבטחה', clientCode: "38", clientName: "מזרחי טפחות שרותי אבטחה", standard: "תקן 1204" },
+  { branch: "ירושלים", accountName: "חזון איש-אבטחה", clientCode: "38", clientName: "מזרחי טפחות שרותי אבטחה", standard: "תקן 1187" },
+  { branch: "דרום", accountName: "סמילנסקי נתניה-אבטחה מזדמנת", clientCode: "38", clientName: "מזרחי טפחות שרותי אבטחה", standard: "תקן 2331" },
+  { branch: "מרכז", accountName: "פארק המדע רחובות-אבטחה", clientCode: "38", clientName: "מזרחי טפחות שרותי אבטחה", standard: "תקן 2440" },
+  { branch: "שפלה", accountName: "אופקים 437-אבטחה", clientCode: "38", clientName: "מזרחי טפחות שרותי אבטחה", standard: "תקן 3102" },
+  { branch: "ירושלים", accountName: "בנייני האומה-אבטחה", clientCode: "212", clientName: "מרכז הכנסים ירושלים", standard: "תקן 5010" },
+  { branch: "צפון", accountName: "קניון עפולה-סיור", clientCode: "415", clientName: "קניוני הצפון בע\"מ", standard: "תקן 6120" },
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** Details resolved from the vehicle → client/site join when issuing a worker voucher. */
+/** Details of a worker voucher issued from the supervisor screen. */
 export interface WorkerIssuePayload {
   amount: number;
   reason: string;
   branch: string;
   supervisor?: string;
-  vehicle: VehicleRecord;
+  route: "b2b" | "regular";
   clientName: string;
-  siteName: string;
+  clientCode: string;
+  accountName?: string;
+  standard?: string;
+  siteId?: string;
+  siteName?: string;
   requester?: string;
   approver?: string;
 }
@@ -185,26 +205,30 @@ interface AppState {
   updateBranch: (id: string, patch: Partial<Omit<BranchRecord, "id">>) => void;
   removeBranch: (id: string) => void;
 
-  clients: ClientRecord[];
+  nonB2bClients: ClientRecord[];
   addClient: (client: ClientRecord) => void;
   updateClient: (clientId: string, siteId: string, patch: Partial<ClientRecord>) => void;
   /** Upsert by clientId + siteId. Returns added/updated counts. */
   importClients: (rows: ClientRecord[]) => { added: number; updated: number };
   removeClient: (clientId: string, siteId: string) => void;
 
-  vehicles: VehicleRecord[];
-  addVehicle: (vehicle: VehicleRecord) => void;
-  updateVehicle: (licensePlate: string, patch: Partial<VehicleRecord>) => void;
-  /** Upsert by licensePlate. Returns added/updated counts. */
-  importVehicles: (rows: VehicleRecord[]) => { added: number; updated: number };
-  removeVehicle: (licensePlate: string) => void;
+  b2bClients: B2BClientRecord[];
+  addB2b: (row: B2BClientRecord) => void;
+  updateB2b: (clientCode: string, accountName: string, patch: Partial<B2BClientRecord>) => void;
+  /** Upsert by clientCode + accountName. */
+  importB2b: (rows: B2BClientRecord[]) => { added: number; updated: number };
+  removeB2b: (clientCode: string, accountName: string) => void;
+
+  links: WorkerLink[];
+  /** Saves ID + phone after the worker signs. */
+  signLink: (id: string, workerId: string, phone: string) => void;
 
   /** Issues a voucher handed to an end worker, storing the resolved vehicle/client data. */
-  issueWorkerVoucher: (payload: WorkerIssuePayload) => VoucherRecord;
+  issueWorkerVoucher: (payload: WorkerIssuePayload) => WorkerLink;
 
-  reasons: string[];
-  addReason: (reason: string) => void;
-  updateReason: (index: number, reason: string) => void;
+  reasons: ReasonRecord[];
+  addReason: (reason: ReasonRecord) => void;
+  updateReason: (index: number, reason: ReasonRecord) => void;
   removeReason: (index: number) => void;
 }
 
@@ -225,7 +249,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   balance: 15000,
-  vouchers: seedVouchers,
+  vouchers: seedVouchers.map((v) =>
+    v.serial.startsWith("700") && v.clientId
+      ? {
+          ...v,
+          route: "b2b" as const,
+          clientCode: v.clientId,
+          accountName: v.siteName,
+          standard: standardBySite[`${v.clientId}|${v.siteId}`],
+        }
+      : v,
+  ),
   allocate: (branch, supervisor, amount, meta) =>
     set((s) => {
       const count = Math.floor(amount / 100);
@@ -389,17 +423,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
   removeBranch: (id) => set((s) => ({ branchList: s.branchList.filter((b) => b.id !== id) })),
 
-  clients: seedClients,
-  addClient: (client) => set((s) => ({ clients: [client, ...s.clients] })),
+  nonB2bClients: seedClients,
+  addClient: (client) => set((s) => ({ nonB2bClients: [client, ...s.nonB2bClients] })),
   updateClient: (clientId, siteId, patch) =>
     set((s) => ({
-      clients: s.clients.map((c) =>
+      nonB2bClients: s.nonB2bClients.map((c) =>
         c.clientId === clientId && c.siteId === siteId ? { ...c, ...patch } : c,
       ),
     })),
   /** Upserts imported rows by clientId + siteId (no duplicates). */
   importClients: (rows) => {
-    const existing = new Map(get().clients.map((c) => [`${c.clientId}|${c.siteId}`, c]));
+    const existing = new Map(get().nonB2bClients.map((c) => [`${c.clientId}|${c.siteId}`, c]));
     let updated = 0;
     let added = 0;
     for (const row of rows) {
@@ -412,67 +446,100 @@ export const useAppStore = create<AppState>((set, get) => ({
         added += 1;
       }
     }
-    set({ clients: [...existing.values()] });
+    set({ nonB2bClients: [...existing.values()] });
     return { added, updated };
   },
   removeClient: (clientId, siteId) =>
     set((s) => ({
-      clients: s.clients.filter((c) => !(c.clientId === clientId && c.siteId === siteId)),
+      nonB2bClients: s.nonB2bClients.filter((c) => !(c.clientId === clientId && c.siteId === siteId)),
     })),
 
-  vehicles: seedVehicles,
-  addVehicle: (vehicle) => set((s) => ({ vehicles: [vehicle, ...s.vehicles] })),
-  updateVehicle: (licensePlate, patch) =>
+  b2bClients: seedB2b,
+  addB2b: (row) => set((s) => ({ b2bClients: [row, ...s.b2bClients] })),
+  updateB2b: (code, account, patch) =>
     set((s) => ({
-      vehicles: s.vehicles.map((v) => (v.licensePlate === licensePlate ? { ...v, ...patch } : v)),
+      b2bClients: s.b2bClients.map((c) =>
+        c.clientCode === code && c.accountName === account ? { ...c, ...patch } : c,
+      ),
     })),
-  importVehicles: (rows) => {
-    const existing = new Map(get().vehicles.map((v) => [v.licensePlate, v]));
-    let updated = 0;
+  importB2b: (rows) => {
+    const existing = new Map(get().b2bClients.map((c) => [`${c.clientCode}|${c.accountName}`, c]));
     let added = 0;
+    let updated = 0;
     for (const row of rows) {
-      if (existing.has(row.licensePlate)) {
-        existing.set(row.licensePlate, { ...existing.get(row.licensePlate)!, ...row });
+      const key = `${row.clientCode}|${row.accountName}`;
+      if (existing.has(key)) {
+        existing.set(key, { ...existing.get(key)!, ...row });
         updated += 1;
       } else {
-        existing.set(row.licensePlate, row);
+        existing.set(key, row);
         added += 1;
       }
     }
-    set({ vehicles: [...existing.values()] });
+    set({ b2bClients: [...existing.values()] });
     return { added, updated };
   },
-  removeVehicle: (licensePlate) =>
-    set((s) => ({ vehicles: s.vehicles.filter((v) => v.licensePlate !== licensePlate) })),
+  removeB2b: (code, account) =>
+    set((s) => ({
+      b2bClients: s.b2bClients.filter((c) => !(c.clientCode === code && c.accountName === account)),
+    })),
+
+  links: [],
+  signLink: (id, workerId, phone) =>
+    set((s) => {
+      const link = s.links.find((l) => l.id === id);
+      const serials = new Set(link?.serials ?? []);
+      return {
+        links: s.links.map((l) =>
+          l.id === id ? { ...l, workerId, phone, signedAt: today() } : l,
+        ),
+        vouchers: s.vouchers.map((v) => (serials.has(v.serial) ? { ...v, workerId } : v)),
+      };
+    }),
 
   issueWorkerVoucher: (p) => {
-    const voucher: VoucherRecord = {
-      serial: String(Math.floor(700000 + Math.random() * 299999)),
+    const linkId = String(Math.floor(10000000 + Math.random() * 89999999));
+    const count = Math.max(1, Math.floor(p.amount / 100));
+    const base = Math.floor(700000 + Math.random() * 290000);
+    const created: VoucherRecord[] = Array.from({ length: count }, (_, i) => ({
+      serial: String(base + i),
       realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
-      amount: p.amount,
+      amount: 100,
       branch: p.branch,
       ...(p.supervisor ? { supervisor: p.supervisor } : {}),
-      status: "הוקצה לעובד",
+      status: "הוקצה לעובד" as const,
       updatedAt: today(),
       deliveredAt: today(),
+      route: p.route,
+      linkId,
       client: p.clientName,
-      clientId: p.vehicle.linkedClientCode,
-      siteId: p.vehicle.linkedSiteCode,
-      siteName: p.siteName,
+      clientId: p.clientCode,
+      clientCode: p.clientCode,
+      ...(p.accountName ? { accountName: p.accountName } : {}),
+      ...(p.standard ? { standard: p.standard } : {}),
+      ...(p.siteId ? { siteId: p.siteId } : {}),
+      ...(p.siteName ? { siteName: p.siteName } : {}),
       reason: p.reason,
-      workerName: p.vehicle.driverName,
-      licensePlate: p.vehicle.licensePlate,
-      driverName: p.vehicle.driverName,
-      standardName: p.vehicle.standardName,
       ...(p.requester ? { requester: p.requester } : {}),
       ...(p.approver ? { approver: p.approver } : {}),
+    }));
+    const link: WorkerLink = {
+      id: linkId,
+      total: count * 100,
+      serials: created.map((v) => v.serial),
+      createdAt: today(),
     };
-    set((s) => ({ vouchers: [voucher, ...s.vouchers] }));
-    return voucher;
+    set((s) => ({ vouchers: [...created, ...s.vouchers], links: [link, ...s.links] }));
+    return link;
   },
 
 
-  reasons: ["חידוש מלאי שוטף", "הקצאה חד פעמית", "סיור ניידות", "אירוע חריג"],
+  reasons: [
+    { name: "חידוש מלאי שוטף", category: "Regular" },
+    { name: "הקצאה חד פעמית", category: "Regular" },
+    { name: "סיור ניידות", category: "B2B" },
+    { name: "אירוע חריג", category: "B2B" },
+  ],
   addReason: (reason) => set((s) => ({ reasons: [...s.reasons, reason] })),
   updateReason: (index, reason) =>
     set((s) => ({ reasons: s.reasons.map((r, i) => (i === index ? reason : r)) })),
