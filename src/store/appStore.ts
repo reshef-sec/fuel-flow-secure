@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 import clientsSeed from "@/data/clients.json";
 
@@ -241,7 +242,9 @@ export function storedRole(): Role | null {
   return saved === "admin" || saved === "branch" || saved === "supervisor" ? saved : null;
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>()(
+  persist(
+  (set, get) => ({
   role: "admin",
   setRole: (role) => {
     if (typeof window !== "undefined") window.localStorage.setItem(ROLE_KEY, role);
@@ -544,7 +547,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateReason: (index, reason) =>
     set((s) => ({ reasons: s.reasons.map((r, i) => (i === index ? reason : r)) })),
   removeReason: (index) => set((s) => ({ reasons: s.reasons.filter((_, i) => i !== index) })),
-}));
+}),
+  {
+    name: "reshef.store.v2",
+    skipHydration: true,
+    partialize: (s) => ({
+      vouchers: s.vouchers,
+      links: s.links,
+      b2bClients: s.b2bClients,
+      reasons: s.reasons,
+      balance: s.balance,
+      requests: s.requests,
+    }),
+  },
+  ),
+);
+
 
 /** The user represented by the role simulator; prefers one allowed to request. */
 export function pickCurrentUser(users: UserRecord[], role: Role) {
