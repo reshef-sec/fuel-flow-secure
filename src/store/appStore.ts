@@ -63,6 +63,13 @@ export interface B2BClientRecord {
   clientCode: string;
   clientName: string;
   standard: string;
+  balance?: string;
+  loadType?: string;
+  budgetSection?: string;
+  accountKey?: string;
+  itemFamily?: string;
+  accountStatus?: string;
+  accountType?: string;
 }
 
 export type ReasonCategory = "B2B" | "Regular";
