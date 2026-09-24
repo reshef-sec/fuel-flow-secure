@@ -39,7 +39,7 @@ async function upsertAccount(input: AccountInput, resetPassword: boolean) {
       password: input.nationalId,
       email_confirm: true,
     });
-    if (error || !data.user) throw new Error(error?.message ?? "יצירת החשבון נכשלה");
+    if (error || !data.user) throw new Error(/weak|pwned|guess/i.test(error?.message ?? "") ? "ת.ז זו נחסמה כסיסמה חלשה — יש לבחור ת.ז אחרת" : error?.message ?? "יצירת החשבון נכשלה");
     userId = data.user.id;
   } else {
     const patch: { email: string; password?: string } = { email: phoneToLoginEmail(phone) };
