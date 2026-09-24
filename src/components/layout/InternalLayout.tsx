@@ -42,9 +42,14 @@ export function InternalLayout({ title, children }: { title: string; children: R
 
   // Restore the simulated role after hydration so permissions survive a reload.
   useEffect(() => {
+    if (!profile) return;
+    if (!canSimulate) {
+      setRole(profile.role);
+      return;
+    }
     const saved = storedRole();
     if (saved && saved !== useAppStore.getState().role) setRole(saved);
-  }, [setRole]);
+  }, [setRole, canSimulate, profile]);
 
   const items = navItems.filter((item) => (item.roles as readonly string[]).includes(role));
 

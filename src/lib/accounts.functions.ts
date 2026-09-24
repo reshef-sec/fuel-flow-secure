@@ -48,7 +48,10 @@ async function upsertAccount(input: AccountInput, resetPassword: boolean) {
     if (error) throw new Error(error.message);
   }
 
-  const profile: Record<string, unknown> = {
+  const profile: {
+    id: string; phone: string; national_id: string; full_name: string; branch: string;
+    role: AccountInput["role"]; updated_at: string; requires_password_change?: boolean;
+  } = {
     id: userId,
     phone,
     national_id: input.nationalId,
