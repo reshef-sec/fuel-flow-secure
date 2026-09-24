@@ -5,7 +5,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAppStore } from "@/store/appStore";
 
 import { Toaster } from "sonner";
@@ -65,14 +65,29 @@ function RootShell({ children }: { children: ReactNode }) {
 // /__component) render inside it, so any chrome leaks into every frame.
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const [storeReady, setStoreReady] = useState(false);
+
   useEffect(() => {
-    void useAppStore.persist.rehydrate();
+    const persistence = useAppStore.persist;
+    if (!persistence) {
+      setStoreReady(true);
+      return;
+    }
+    const unsubscribe = persistence.onFinishHydration(() => setStoreReady(true));
+    void Promise.resolve(persistence.rehydrate()).then(() => setStoreReady(true));
+    return unsubscribe;
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      {storeReady ? (
+        <Outlet />
+      ) : (
+        <main className="grid min-h-screen place-items-center bg-background" aria-busy="true">
+          <p className="text-sm font-semibold text-muted-foreground">טוען נתונים…</p>
+        </main>
+      )}
       <Toaster position="top-center" dir="rtl" richColors />
     </QueryClientProvider>
   );
