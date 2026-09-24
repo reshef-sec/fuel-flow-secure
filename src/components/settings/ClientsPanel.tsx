@@ -157,8 +157,23 @@ export function ClientsPanel() {
             }}
           >
             <FileSpreadsheet className="size-4" />
-            הורד תבנית אקסל
+            הורד תבנית
           </Button>
+          <Button variant="outline" onClick={() => inputRef.current?.click()}>
+            <UploadCloud className="size-4" />
+            ייבוא מאקסל
+          </Button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            aria-label="בחירת קובץ לקוחות"
+            onChange={(e) => {
+              void handleFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
           <Button
             onClick={() => {
               setEditing(null);
@@ -168,51 +183,10 @@ export function ClientsPanel() {
             }}
           >
             <Plus className="size-4" />
-            הוספה ידנית
+            הוספה
           </Button>
         </div>
       </div>
-
-      <Card padding="lg" className="mt-4">
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            handleFiles(e.dataTransfer.files);
-          }}
-          className={cn(
-            "flex flex-col items-center gap-3 rounded-xl border border-dashed p-8 text-center transition-colors",
-            dragging ? "border-primary bg-blue-100" : "border-border bg-surface-muted",
-          )}
-        >
-          <span className="grid size-12 place-items-center rounded-xl bg-blue-100 text-blue-700">
-            <UploadCloud className="size-6" />
-          </span>
-          <p className="font-display text-base font-extrabold text-secondary">
-            ייבוא לקוחות ואתרים מקובץ אקסל
-          </p>
-          <p className="text-sm text-muted-foreground">
-            עמודות נדרשות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן
-          </p>
-          <Button type="button" variant="outline" onClick={() => inputRef.current?.click()}>
-            <FileSpreadsheet className="size-4" />
-            בחירת קובץ
-          </Button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-            aria-label="בחירת קובץ לקוחות"
-            onChange={(e) => handleFiles(e.target.files)}
-          />
-        </div>
-      </Card>
 
       <div className="mt-6">
         <Table>
