@@ -1,0 +1,144 @@
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import type { VoucherRecord } from "@/components/dashboard/voucherData";
+import type {
+  B2BClientRecord,
+  BranchRecord,
+  ClientRecord,
+  ReasonRecord,
+  UserRecord,
+  VoucherRequest,
+  WorkerLink,
+} from "@/store/appStore";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = supabase as any;
+type Row = Record<string, unknown>;
+const s = (v: unknown) => (v == null ? undefined : String(v));
+
+/** Runs a cloud write and reports failures to the user. */
+export function run(p: PromiseLike<{ error: { message: string } | null }>) {
+  void Promise.resolve(p).then(({ error }) => {
+    if (error) toast.error(`שמירה בענן נכשלה: ${error.message}`);
+  });
+}
+
+/* ---------- mappers ---------- */
+export const voucherToRow = (v: VoucherRecord) => ({
+  serial: v.serial, real_code: v.realCode, amount: v.amount, branch: v.branch,
+  supervisor: v.supervisor ?? null, client: v.client ?? null, status: v.status, updated_on: v.updatedAt,
+  requester: v.requester ?? null, approver: v.approver ?? null, client_id: v.clientId ?? null,
+  site_id: v.siteId ?? null, site_name: v.siteName ?? null, reason: v.reason ?? null,
+  worker_name: v.workerName ?? null, worker_id: v.workerId ?? null, delivered_at: v.deliveredAt ?? null,
+  route: v.route ?? null, link_id: v.linkId ?? null, client_code: v.clientCode ?? null,
+  account_name: v.accountName ?? null, standard: v.standard ?? null, license_plate: v.licensePlate ?? null,
+  driver_name: v.driverName ?? null, standard_name: v.standardName ?? null,
+});
+const rowToVoucher = (r: Row): VoucherRecord => {
+  const v: Row = {
+    serial: r.serial, realCode: r.real_code, amount: r.amount, branch: r.branch, status: r.status,
+    updatedAt: r.updated_on, supervisor: s(r.supervisor), client: s(r.client), requester: s(r.requester),
+    approver: s(r.approver), clientId: s(r.client_id), siteId: s(r.site_id), siteName: s(r.site_name),
+    reason: s(r.reason), workerName: s(r.worker_name), workerId: s(r.worker_id),
+    deliveredAt: s(r.delivered_at), route: s(r.route), linkId: s(r.link_id), clientCode: s(r.client_code),
+    accountName: s(r.account_name), standard: s(r.standard), licensePlate: s(r.license_plate),
+    driverName: s(r.driver_name), standardName: s(r.standard_name),
+  };
+  Object.keys(v).forEach((k) => v[k] === undefined && delete v[k]);
+  return v as unknown as VoucherRecord;
+};
+
+export const userToRow = (u: UserRecord) => ({
+  national_id: u.id, last_name: u.lastName, first_name: u.firstName, role: u.role, title: u.title,
+  phone: u.phone, branch: u.branch, can_request: !!u.canRequest,
+  requires_password_change: u.requiresPasswordChange ?? true,
+});
+export const userPatch = (p: Partial<UserRecord>) => {
+  const m: Row = {};
+  if (p.id !== undefined) m.national_id = p.id;
+  if (p.lastName !== undefined) m.last_name = p.lastName;
+  if (p.firstName !== undefined) m.first_name = p.firstName;
+  if (p.role !== undefined) m.role = p.role;
+  if (p.title !== undefined) m.title = p.title;
+  if (p.phone !== undefined) m.phone = p.phone;
+  if (p.branch !== undefined) m.branch = p.branch;
+  if (p.canRequest !== undefined) m.can_request = p.canRequest;
+  if (p.requiresPasswordChange !== undefined) m.requires_password_change = p.requiresPasswordChange;
+  return m;
+};
+
+export const clientToRow = (c: ClientRecord) => ({
+  client_id: c.clientId, client_name: c.clientName, site_id: c.siteId, site_name: c.siteName,
+  standard: c.standard ?? null,
+});
+export const b2bToRow = (c: B2BClientRecord) => ({
+  client_code: c.clientCode, account_name: c.accountName, client_name: c.clientName, branch: c.branch,
+  standard: c.standard, balance: c.balance ?? null, load_type: c.loadType ?? null,
+  budget_section: c.budgetSection ?? null, account_key: c.accountKey ?? null,
+  item_family: c.itemFamily ?? null, account_status: c.accountStatus ?? null,
+  account_type: c.accountType ?? null,
+});
+export const requestToRow = (r: VoucherRequest) => ({
+  id: r.id, requester: r.requester, requester_id: r.requesterId, branch: r.branch, amount: r.amount,
+  reason: r.reason, created_on: r.createdAt, status: r.status,
+  approved_amount: r.approvedAmount ?? null, approver: r.approver ?? null,
+});
+export const linkToRow = (l: WorkerLink) => ({
+  id: l.id, total: l.total, serials: l.serials, created_on: l.createdAt,
+  worker_id: l.workerId ?? null, phone: l.phone ?? null, signed_at: l.signedAt ?? null,
+});
+
+/** Reads every table in pages (the API returns at most 1,000 rows per call). */
+async function all(table: string, order?: string): Promise<Row[]> {
+  const out: Row[] = [];
+  for (let from = 0; ; from += 1000) {
+    let q = db.from(table).select("*").range(from, from + 999);
+    if (order) q = q.order(order, { ascending: true });
+    const { data, error } = await q;
+    if (error) throw error;
+    out.push(...(data as Row[]));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
+export async function loadAll() {
+  const [branches, reasons, b2b, clients, vouchers, users, requests, links, settings] = await Promise.all([
+    all("branches", "created_at"), all("issue_reasons", "created_at"), all("b2b_clients", "created_at"),
+    all("regular_clients", "created_at"), all("vouchers", "created_at"), all("app_users", "created_at"),
+    all("voucher_requests", "created_at"), all("worker_links", "created_at"), all("app_settings"),
+  ]);
+  return {
+    branchList: branches.map((r) => ({ id: String(r.id), name: String(r.name), manager: String(r.manager), city: String(r.city) })) as BranchRecord[],
+    reasons: reasons.map((r) => ({ id: String(r.id), name: String(r.name), category: r.category === "B2B" ? "B2B" : "Regular" })) as ReasonRecord[],
+    b2bClients: b2b.map((r) => ({
+      clientCode: String(r.client_code), accountName: String(r.account_name), clientName: String(r.client_name),
+      branch: String(r.branch), standard: String(r.standard), balance: s(r.balance), loadType: s(r.load_type),
+      budgetSection: s(r.budget_section), accountKey: s(r.account_key), itemFamily: s(r.item_family),
+      accountStatus: s(r.account_status), accountType: s(r.account_type),
+    })) as B2BClientRecord[],
+    nonB2bClients: clients.map((r) => ({
+      clientId: String(r.client_id), clientName: String(r.client_name), siteId: String(r.site_id),
+      siteName: String(r.site_name), standard: s(r.standard),
+    })) as ClientRecord[],
+    vouchers: vouchers.map(rowToVoucher).reverse(),
+    users: users.map((r) => ({
+      id: String(r.national_id), lastName: String(r.last_name), firstName: String(r.first_name),
+      role: r.role as UserRecord["role"], title: String(r.title), phone: String(r.phone), branch: String(r.branch),
+      canRequest: !!r.can_request, requiresPasswordChange: !!r.requires_password_change,
+    })).reverse() as UserRecord[],
+    requests: requests.map((r) => ({
+      id: String(r.id), requester: String(r.requester), requesterId: String(r.requester_id), branch: String(r.branch),
+      amount: Number(r.amount), reason: String(r.reason), createdAt: String(r.created_on),
+      status: r.status as VoucherRequest["status"],
+      approvedAmount: r.approved_amount == null ? undefined : Number(r.approved_amount), approver: s(r.approver),
+    })).reverse() as VoucherRequest[],
+    links: links.map((r) => ({
+      id: String(r.id), total: Number(r.total), serials: (r.serials as string[]) ?? [], createdAt: String(r.created_on),
+      workerId: s(r.worker_id), phone: s(r.phone), signedAt: s(r.signed_at),
+    })).reverse() as WorkerLink[],
+    balance: Number(settings.find((r) => r.key === "main")?.balance ?? 0),
+  };
+}
+
+export { db };
