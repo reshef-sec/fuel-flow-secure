@@ -18,7 +18,7 @@ import {
 import { Logo, Select } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { useAuthContext } from "@/lib/auth-context";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { roleLabels, storedRole, useAppStore, type Role } from "@/store/appStore";
 
 const navItems = [

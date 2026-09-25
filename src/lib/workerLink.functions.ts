@@ -10,7 +10,7 @@ const identSchema = idSchema.extend({
 type Code = { serial: string; realCode: string; amount: number };
 
 async function codesFor(serials: string[]): Promise<Code[]> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = (await import("@/lib/supabaseAdmin.server")).getAdmin();
   const { data } = await supabaseAdmin.from("vouchers").select("serial, real_code, amount").in("serial", serials);
   return (data ?? []).map((r) => ({ serial: r.serial, realCode: r.real_code, amount: r.amount }));
 }
@@ -19,7 +19,7 @@ async function codesFor(serials: string[]): Promise<Code[]> {
 export const getWorkerLinkStatus = createServerFn({ method: "POST" })
   .inputValidator((d) => idSchema.parse(d))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = (await import("@/lib/supabaseAdmin.server")).getAdmin();
     const { data: link } = await supabaseAdmin
       .from("worker_links").select("total, worker_id").eq("id", data.id).maybeSingle();
     if (!link) return { exists: false as const };
@@ -30,7 +30,7 @@ export const getWorkerLinkStatus = createServerFn({ method: "POST" })
 export const openWorkerWallet = createServerFn({ method: "POST" })
   .inputValidator((d) => identSchema.parse(d))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = (await import("@/lib/supabaseAdmin.server")).getAdmin();
     const { data: link } = await supabaseAdmin
       .from("worker_links").select("*").eq("id", data.id).maybeSingle();
     if (!link || link.worker_id !== data.workerId || link.phone !== data.phone)
@@ -42,7 +42,7 @@ export const openWorkerWallet = createServerFn({ method: "POST" })
 export const signWorkerLink = createServerFn({ method: "POST" })
   .inputValidator((d) => identSchema.parse(d))
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const supabaseAdmin = (await import("@/lib/supabaseAdmin.server")).getAdmin();
     const today = new Date().toISOString().slice(0, 10);
     const { data: link } = await supabaseAdmin
       .from("worker_links")

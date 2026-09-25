@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireExternalAuth as requireSupabaseAuth } from "./externalAuth";
 import { normalizePhone, phoneToLoginEmail } from "./phoneLogin";
 
 const accountSchema = z.object({
@@ -13,7 +13,7 @@ const accountSchema = z.object({
 type AccountInput = z.infer<typeof accountSchema>;
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const supabaseAdmin = (await import("@/lib/supabaseAdmin.server")).getAdmin();
   return supabaseAdmin;
 }
 
