@@ -1,5 +1,8 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { toast } from "sonner";
+import {
+  b2bToRow, clientToRow, db, linkToRow, loadAll, requestToRow, run, userPatch, userToRow, voucherToRow,
+} from "@/lib/cloudSync";
 
 import {
   MAIN_POOL,
@@ -77,6 +80,7 @@ export const reasonCategoryLabels: Record<ReasonCategory, string> = {
   Regular: "ללא חיוב",
 };
 export interface ReasonRecord {
+  id?: string;
   name: string;
   category: ReasonCategory;
 }
@@ -137,6 +141,9 @@ export function siteStandard(clients: ClientRecord[], clientId?: string, siteId?
 }
 
 interface AppState {
+  loaded: boolean;
+  /** Loads every table from the cloud database. */
+  loadFromCloud: () => Promise<void>;
   role: Role;
   setRole: (role: Role) => void;
 
@@ -205,19 +212,23 @@ export const ROLE_KEY = "reshef.role";
 
 /** Reads the simulated role saved in the browser, if any. */
 export function storedRole(): Role | null {
-  if (typeof window === "undefined") return null;
-  const saved = window.localStorage.getItem(ROLE_KEY);
-  return saved === "admin" || saved === "branch" || saved === "supervisor" ? saved : null;
+  return null;
 }
 
 export const useAppStore = create<AppState>()(
-  persist(
   (set, get) => ({
-  role: "admin",
-  setRole: (role) => {
-    if (typeof window !== "undefined") window.localStorage.setItem(ROLE_KEY, role);
-    set({ role });
+  loaded: false,
+  loadFromCloud: async () => {
+    try {
+      const data = await loadAll();
+      set({ ...data, loaded: true });
+    } catch (e) {
+      set({ loaded: true });
+      toast.error(`טעינת הנתונים מהענן נכשלה: ${(e as Error).message}`);
+    }
   },
+  role: "admin",
+  setRole: (role) => set({ role }),
 
   balance: 0,
   vouchers: [],
@@ -459,25 +470,6 @@ export const useAppStore = create<AppState>()(
     set((s) => ({ reasons: s.reasons.map((r, i) => (i === index ? reason : r)) })),
   removeReason: (index) => set((s) => ({ reasons: s.reasons.filter((_, i) => i !== index) })),
 }),
-  {
-    name: "reshef.store.v2",
-    version: 3,
-    skipHydration: true,
-    migrate: (persisted) => persisted as AppState,
-    merge: (persisted, current) => ({ ...current, ...(persisted as Partial<AppState>) }),
-    partialize: (s) => ({
-      vouchers: s.vouchers,
-      links: s.links,
-      b2bClients: s.b2bClients,
-      reasons: s.reasons,
-      balance: s.balance,
-      requests: s.requests,
-      users: s.users,
-      branchList: s.branchList,
-      nonB2bClients: s.nonB2bClients,
-    }),
-  },
-  ),
 );
 
 
