@@ -4,7 +4,8 @@ import { Copy, KeyRound, ShieldCheck, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, Card, Checkbox, FormField, Input, Logo } from "@/design-system/delek-1ea111";
-import { useAppStore } from "@/store/appStore";
+import { useServerFn } from "@tanstack/react-start";
+import { getWorkerLinkStatus, openWorkerWallet, signWorkerLink } from "@/lib/workerLink.functions";
 
 const SignatureField = lazy(() => import("@/components/worker/SignatureField"));
 
@@ -24,12 +25,16 @@ export const Route = createFileRoute("/voucher/$id")({
 
 type Step = "identify" | "sign" | "wallet";
 
+type Code = { serial: string; realCode: string; amount: number };
+
 function VoucherWallet() {
   const { id } = Route.useParams();
   const [ready, setReady] = useState(false);
-  const link = useAppStore((s) => s.links.find((l) => l.id === id));
-  const vouchers = useAppStore((s) => s.vouchers);
-  const signLink = useAppStore((s) => s.signLink);
+  const [link, setLink] = useState<{ total: number; signed: boolean } | null>(null);
+  const [codes, setCodes] = useState<Code[]>([]);
+  const fetchStatus = useServerFn(getWorkerLinkStatus);
+  const openWallet = useServerFn(openWorkerWallet);
+  const signFn = useServerFn(signWorkerLink);
 
   const [step, setStep] = useState<Step>("identify");
   const [idNumber, setIdNumber] = useState("");
@@ -39,18 +44,25 @@ function VoucherWallet() {
   const [consent, setConsent] = useState(false);
 
   useEffect(() => {
-    void Promise.resolve(useAppStore.persist.rehydrate()).then(() => setReady(true));
-  }, []);
+    if (!/^\d{4,12}$/.test(id)) {
+      setReady(true);
+      return;
+    }
+    fetchStatus({ data: { id } })
+      .then((r) => setLink(r.exists ? { total: r.total, signed: r.signed } : null))
+      .catch(() => setLink(null))
+      .finally(() => setReady(true));
+  }, [id, fetchStatus]);
 
-  const codes = link ? vouchers.filter((v) => link.serials.includes(v.serial)) : [];
-
-  function identify(e: React.FormEvent) {
+  async function identify(e: React.FormEvent) {
     e.preventDefault();
     if (!/^\d{9}$/.test(idNumber)) return setError("ת.ז חייבת להכיל 9 ספרות");
     if (!/^0\d{8,9}$/.test(phone)) return setError("מספר טלפון לא תקין (ספרות בלבד)");
     if (!link) return;
-    if (link.workerId) {
-      if (link.workerId === idNumber && link.phone === phone) {
+    if (link.signed) {
+      const r = await openWallet({ data: { id, workerId: idNumber, phone } });
+      if (r.ok) {
+        setCodes(r.codes);
         setError(null);
         setStep("wallet");
       } else setError("הפרטים אינם תואמים לבעל הלינק");
@@ -60,10 +72,12 @@ function VoucherWallet() {
     setStep("sign");
   }
 
-  function sign(e: React.FormEvent) {
+  async function sign(e: React.FormEvent) {
     e.preventDefault();
     if (!hasSignature || !consent) return setError("נדרשת חתימה ואישור קבלה");
-    signLink(id, idNumber, phone);
+    const r = await signFn({ data: { id, workerId: idNumber, phone } });
+    if (!r.ok) return setError("הלינק כבר נחתם על ידי עובד אחר");
+    setCodes(r.codes);
     setError(null);
     setStep("wallet");
     toast.success("החתימה נשמרה — הקודים זמינים");

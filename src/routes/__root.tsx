@@ -5,8 +5,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
-import { useAppStore } from "@/store/appStore";
+import type { ReactNode } from "react";
 import { AuthProvider } from "@/lib/auth-context";
 
 import { Toaster } from "sonner";
@@ -66,18 +65,7 @@ function RootShell({ children }: { children: ReactNode }) {
 // /__component) render inside it, so any chrome leaks into every frame.
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const [storeReady, setStoreReady] = useState(false);
-
-  useEffect(() => {
-    const persistence = useAppStore.persist;
-    if (!persistence) {
-      setStoreReady(true);
-      return;
-    }
-    const unsubscribe = persistence.onFinishHydration(() => setStoreReady(true));
-    void Promise.resolve(persistence.rehydrate()).then(() => setStoreReady(true));
-    return unsubscribe;
-  }, []);
+  const storeReady = true;
 
   return (
     <QueryClientProvider client={queryClient}>

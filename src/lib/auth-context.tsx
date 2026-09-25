@@ -21,6 +21,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const setRole = useAppStore((s) => s.setRole);
+  const loaded = useAppStore((s) => s.loaded);
+  const loadFromCloud = useAppStore((s) => s.loadFromCloud);
+  const signedIn = Boolean(auth.session && auth.profile && !auth.profile.requires_password_change);
+
+  useEffect(() => {
+    if (signedIn && !loaded) void loadFromCloud();
+  }, [signedIn, loaded, loadFromCloud]);
   const isPublic = isPublicPath(pathname);
 
   useEffect(() => {
@@ -41,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const blocked =
     !isPublic &&
     pathname !== "/change-password" &&
-    (auth.loading || !auth.profile || auth.profile.requires_password_change);
+    (auth.loading || !auth.profile || auth.profile.requires_password_change || !loaded);
 
   return (
     <AuthContext.Provider value={auth}>
