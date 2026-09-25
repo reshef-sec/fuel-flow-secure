@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 
 import {
@@ -15,6 +15,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/design-system/delek-1ea111";
+import { supabase } from "@/lib/supabaseClient";
 
 interface AuditRecord {
   id: string;
@@ -26,16 +27,12 @@ interface AuditRecord {
   ip: string;
 }
 
-const auditLog: AuditRecord[] = [
-  { id: "a1", user: "דנה כהן", role: "אדמין מרכזי", action: "הקצאת שוברים", target: "סניף צפון · 1,200 ₪", at: "2026-09-08 09:14", ip: "10.0.4.21" },
-  { id: "a2", user: "אורי לוי", role: "מנהל סניף", action: "הנפקת שובר לעובד", target: "מפקח דן · שובר 481233", at: "2026-09-08 08:52", ip: "10.0.7.14" },
-  { id: "a3", user: "דנה כהן", role: "אדמין מרכזי", action: "ייבוא שוברים", target: "120 שוברים מקובץ אקסל", at: "2026-09-07 17:31", ip: "10.0.4.21" },
-  { id: "a4", user: "מפקח דן", role: "מפקח", action: "מימוש שובר", target: "שובר 552901", at: "2026-09-07 15:05", ip: "77.126.8.44" },
-  { id: "a5", user: "נועה ברק", role: "מנהל סניף", action: "עדכון סניף", target: "סניף ירושלים", at: "2026-09-07 11:47", ip: "10.0.9.3" },
-  { id: "a6", user: "דנה כהן", role: "אדמין מרכזי", action: "הוספת משתמש", target: "מפקח אורי", at: "2026-09-06 16:20", ip: "10.0.4.21" },
-  { id: "a7", user: "רון אלמוג", role: "מנהל סניף", action: "חסימת שובר", target: "שובר 330118", at: "2026-09-06 12:02", ip: "10.0.5.88" },
-  { id: "a8", user: "דן מזרחי", role: "מנהל סניף", action: "כניסה למערכת", target: "—", at: "2026-09-06 07:58", ip: "10.0.6.19" },
-];
+const formatAt = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
 
 const actionVariant = (action: string) =>
   action.includes("חסימת")
@@ -49,6 +46,38 @@ const actionVariant = (action: string) =>
 export function AuditPanel() {
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("all");
+  const [auditLog, setAuditLog] = useState<AuditRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void supabase
+      .from("activity_logs")
+      .select("id, created_at, user_name, role, action, target, ip_address")
+      .order("created_at", { ascending: false })
+      .limit(1000)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) setError(error.message);
+        else
+          setAuditLog(
+            (data ?? []).map((r) => ({
+              id: String(r.id),
+              user: String(r.user_name ?? ""),
+              role: String(r.role ?? ""),
+              action: String(r.action ?? ""),
+              target: r.target ?? "—",
+              at: formatAt(String(r.created_at)),
+              ip: r.ip_address ?? "—",
+            })),
+          );
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const rows = useMemo(() => {
     const q = query.trim();
@@ -57,7 +86,7 @@ export function AuditPanel() {
         (role === "all" || r.role === role) &&
         (!q || r.user.includes(q) || r.action.includes(q) || r.target.includes(q)),
     );
-  }, [query, role]);
+  }, [auditLog, query, role]);
 
   return (
     <Card padding="lg">
@@ -108,7 +137,11 @@ export function AuditPanel() {
             {rows.length === 0 ? (
               <TableRow>
                 <TableCell className="py-8 text-center text-sm text-muted-foreground">
-                  לא נמצאו רשומות מתאימות
+                  {loading
+                    ? "טוען רשומות…"
+                    : error
+                      ? `טעינת היומן נכשלה: ${error}`
+                      : "לא נמצאו רשומות מתאימות"}
                 </TableCell>
               </TableRow>
             ) : (
