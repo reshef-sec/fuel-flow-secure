@@ -232,78 +232,86 @@ export const useAppStore = create<AppState>()(
 
   balance: 0,
   vouchers: [],
-  allocate: (branch, supervisor, amount, meta) =>
-    set((s) => {
-      const count = Math.floor(amount / 100);
-      const created: VoucherRecord[] = Array.from({ length: count }, (_, i) => ({
-        serial: String(Math.floor(100000 + Math.random() * 899999) + i),
-        realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
-        amount: 100,
-        branch,
-        ...(supervisor ? { supervisor } : {}),
-        status: supervisor ? ("הוקצה לעובד" as const) : ("טרם שומש" as const),
-        updatedAt: today(),
-        ...(meta?.requester ? { requester: meta.requester } : {}),
-        ...(meta?.approver ? { approver: meta.approver } : {}),
-      }));
-      return {
-        balance: Math.max(0, s.balance - amount),
-        vouchers: [...created, ...s.vouchers],
-      };
-    }),
-  assignToSupervisor: (branch, supervisor, amount) =>
-    set((s) => {
-      let left = amount;
-      const vouchers = s.vouchers.map((v) => {
-        if (left <= 0) return v;
-        if (v.branch !== branch || v.supervisor || v.status !== "טרם שומש") return v;
-        if (v.amount > left) return v;
-        left -= v.amount;
-        return { ...v, supervisor, status: "הוקצה לעובד" as const, updatedAt: today() };
-      });
-      return { vouchers };
-    }),
-  markPazRedeemed: (count) => {
-    let updated = 0;
-    set((s) => {
-      let left = count;
-      const vouchers = s.vouchers.map((v) => {
-        if (left <= 0 || v.status !== "הוקצה לעובד") return v;
-        left -= 1;
-        updated += 1;
-        return { ...v, status: "מומש סופית" as const, updatedAt: today() };
-      });
-      return { vouchers };
+  allocate: (branch, supervisor, amount, meta) => {
+    const count = Math.floor(amount / 100);
+    const created: VoucherRecord[] = Array.from({ length: count }, (_, i) => ({
+      serial: String(Math.floor(100000 + Math.random() * 899999) + i),
+      realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
+      amount: 100,
+      branch,
+      ...(supervisor ? { supervisor } : {}),
+      status: supervisor ? ("הוקצה לעובד" as const) : ("טרם שומש" as const),
+      updatedAt: today(),
+      ...(meta?.requester ? { requester: meta.requester } : {}),
+      ...(meta?.approver ? { approver: meta.approver } : {}),
+    }));
+    const balance = Math.max(0, get().balance - amount);
+    set((s) => ({ balance, vouchers: [...created, ...s.vouchers] }));
+    if (created.length) run(db.from("vouchers").insert(created.map(voucherToRow)));
+    run(db.from("app_settings").update({ balance }).eq("key", "main"));
+  },
+  assignToSupervisor: (branch, supervisor, amount) => {
+    let left = amount;
+    const changed: VoucherRecord[] = [];
+    const vouchers = get().vouchers.map((v) => {
+      if (left <= 0) return v;
+      if (v.branch !== branch || v.supervisor || v.status !== "טרם שומש") return v;
+      if (v.amount > left) return v;
+      left -= v.amount;
+      const nv = { ...v, supervisor, status: "הוקצה לעובד" as const, updatedAt: today() };
+      changed.push(nv);
+      return nv;
     });
-    return updated;
+    set({ vouchers });
+    if (changed.length) run(db.from("vouchers").upsert(changed.map(voucherToRow)));
+  },
+  markPazRedeemed: (count) => {
+    let left = count;
+    const changed: VoucherRecord[] = [];
+    const vouchers = get().vouchers.map((v) => {
+      if (left <= 0 || v.status !== "הוקצה לעובד") return v;
+      left -= 1;
+      const nv = { ...v, status: "מומש סופית" as const, updatedAt: today() };
+      changed.push(nv);
+      return nv;
+    });
+    set({ vouchers });
+    if (changed.length) run(db.from("vouchers").upsert(changed.map(voucherToRow)));
+    return changed.length;
   },
   markSerialsRedeemed: (serials) => {
     const wanted = new Set(serials.map((s) => s.trim()).filter(Boolean));
-    let updated = 0;
-    set((s) => ({
-      vouchers: s.vouchers.map((v) => {
-        if (!wanted.has(v.serial) || v.status === "מומש סופית") return v;
-        updated += 1;
-        return { ...v, status: "מומש סופית" as const, updatedAt: today() };
-      }),
-    }));
-    return updated;
+    const changed: VoucherRecord[] = [];
+    const vouchers = get().vouchers.map((v) => {
+      if (!wanted.has(v.serial) || v.status === "מומש סופית") return v;
+      const nv = { ...v, status: "מומש סופית" as const, updatedAt: today() };
+      changed.push(nv);
+      return nv;
+    });
+    set({ vouchers });
+    if (changed.length) run(db.from("vouchers").upsert(changed.map(voucherToRow)));
+    return changed.length;
   },
-  importVouchers: (rows) => set((s) => ({ vouchers: [...rows, ...s.vouchers] })),
+  importVouchers: (rows) => {
+    set((s) => {
+      const incoming = new Set(rows.map((r) => r.serial));
+      return { vouchers: [...rows, ...s.vouchers.filter((v) => !incoming.has(v.serial))] };
+    });
+    for (let i = 0; i < rows.length; i += 500)
+      run(db.from("vouchers").upsert(rows.slice(i, i + 500).map(voucherToRow)));
+  },
 
   requests: [],
-  addRequest: (req) =>
-    set((s) => ({
-      requests: [
-        {
-          ...req,
-          id: `req-${Date.now()}-${Math.floor(Math.random() * 999)}`,
-          createdAt: today(),
-          status: "ממתין לאישור" as const,
-        },
-        ...s.requests,
-      ],
-    })),
+  addRequest: (req) => {
+    const row: VoucherRequest = {
+      ...req,
+      id: `req-${Date.now()}-${Math.floor(Math.random() * 999)}`,
+      createdAt: today(),
+      status: "ממתין לאישור",
+    };
+    set((s) => ({ requests: [row, ...s.requests] }));
+    run(db.from("voucher_requests").insert(requestToRow(row)));
+  },
   approveRequest: (id, amount, approver) => {
     const req = get().requests.find((r) => r.id === id);
     if (!req) return;
@@ -313,20 +321,28 @@ export const useAppStore = create<AppState>()(
         r.id === id ? { ...r, status: "אושר" as const, approvedAmount: amount, approver } : r,
       ),
     }));
+    run(db.from("voucher_requests").update({ status: "אושר", approved_amount: amount, approver }).eq("id", id));
   },
-  rejectRequest: (id, approver) =>
+  rejectRequest: (id, approver) => {
     set((s) => ({
-      requests: s.requests.map((r) =>
-        r.id === id ? { ...r, status: "נדחה" as const, approver } : r,
-      ),
-    })),
-
+      requests: s.requests.map((r) => (r.id === id ? { ...r, status: "נדחה" as const, approver } : r)),
+    }));
+    run(db.from("voucher_requests").update({ status: "נדחה", approver }).eq("id", id));
+  },
 
   users: [],
-  addUser: (user) => set((s) => ({ users: [user, ...s.users] })),
-  updateUser: (id, patch) =>
-    set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) })),
-  removeUser: (id) => set((s) => ({ users: s.users.filter((u) => u.id !== id) })),
+  addUser: (user) => {
+    set((s) => ({ users: [user, ...s.users.filter((u) => u.id !== user.id)] }));
+    run(db.from("app_users").upsert(userToRow(user)));
+  },
+  updateUser: (id, patch) => {
+    set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) }));
+    run(db.from("app_users").update(userPatch(patch)).eq("national_id", id));
+  },
+  removeUser: (id) => {
+    set((s) => ({ users: s.users.filter((u) => u.id !== id) }));
+    run(db.from("app_users").delete().eq("national_id", id));
+  },
   importUsers: (rows) => {
     const existing = new Set(get().users.map((u) => u.id));
     const fresh: UserRecord[] = [];
@@ -339,28 +355,45 @@ export const useAppStore = create<AppState>()(
       existing.add(row.id);
       fresh.push(row);
     }
-    if (fresh.length) set((s) => ({ users: [...fresh, ...s.users] }));
+    if (fresh.length) {
+      set((s) => ({ users: [...fresh, ...s.users] }));
+      run(db.from("app_users").insert(fresh.map(userToRow)));
+    }
     return { added: fresh.length, skipped };
   },
-  setUserCanRequest: (id, value) =>
-    set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, canRequest: value } : u)) })),
+  setUserCanRequest: (id, value) => get().updateUser(id, { canRequest: value }),
 
   branchList: [],
-  addBranch: (branch) => set((s) => ({ branchList: [...s.branchList, branch] })),
-  updateBranch: (id, patch) =>
-    set((s) => ({
-      branchList: s.branchList.map((b) => (b.id === id ? { ...b, ...patch } : b)),
-    })),
-  removeBranch: (id) => set((s) => ({ branchList: s.branchList.filter((b) => b.id !== id) })),
+  addBranch: (branch) => {
+    set((s) => ({ branchList: [...s.branchList, branch] }));
+    run(db.from("branches").insert(branch));
+  },
+  updateBranch: (id, patch) => {
+    set((s) => ({ branchList: s.branchList.map((b) => (b.id === id ? { ...b, ...patch } : b)) }));
+    run(db.from("branches").update(patch).eq("id", id));
+  },
+  removeBranch: (id) => {
+    set((s) => ({ branchList: s.branchList.filter((b) => b.id !== id) }));
+    run(db.from("branches").delete().eq("id", id));
+  },
 
   nonB2bClients: [],
-  addClient: (client) => set((s) => ({ nonB2bClients: [client, ...s.nonB2bClients] })),
-  updateClient: (clientId, siteId, patch) =>
+  addClient: (client) => {
+    set((s) => ({ nonB2bClients: [client, ...s.nonB2bClients] }));
+    run(db.from("regular_clients").upsert(clientToRow(client), { onConflict: "client_id,site_id" }));
+  },
+  updateClient: (clientId, siteId, patch) => {
+    let next: ClientRecord | undefined;
     set((s) => ({
-      nonB2bClients: s.nonB2bClients.map((c) =>
-        c.clientId === clientId && c.siteId === siteId ? { ...c, ...patch } : c,
-      ),
-    })),
+      nonB2bClients: s.nonB2bClients.map((c) => {
+        if (c.clientId !== clientId || c.siteId !== siteId) return c;
+        next = { ...c, ...patch };
+        return next;
+      }),
+    }));
+    if (next)
+      run(db.from("regular_clients").update(clientToRow(next)).eq("client_id", clientId).eq("site_id", siteId));
+  },
   /** Upserts imported rows by clientId + siteId (no duplicates). */
   importClients: (rows) => {
     const existing = new Map(get().nonB2bClients.map((c) => [`${c.clientId}|${c.siteId}`, c]));
@@ -376,22 +409,38 @@ export const useAppStore = create<AppState>()(
         added += 1;
       }
     }
-    set({ nonB2bClients: [...existing.values()] });
+    const list = [...existing.values()];
+    set({ nonB2bClients: list });
+    const keys = new Set(rows.map((r) => `${r.clientId}|${r.siteId}`));
+    const toSave = list.filter((c) => keys.has(`${c.clientId}|${c.siteId}`)).map(clientToRow);
+    for (let i = 0; i < toSave.length; i += 500)
+      run(db.from("regular_clients").upsert(toSave.slice(i, i + 500), { onConflict: "client_id,site_id" }));
     return { added, updated };
   },
-  removeClient: (clientId, siteId) =>
+  removeClient: (clientId, siteId) => {
     set((s) => ({
       nonB2bClients: s.nonB2bClients.filter((c) => !(c.clientId === clientId && c.siteId === siteId)),
-    })),
+    }));
+    run(db.from("regular_clients").delete().eq("client_id", clientId).eq("site_id", siteId));
+  },
 
   b2bClients: [],
-  addB2b: (row) => set((s) => ({ b2bClients: [row, ...s.b2bClients] })),
-  updateB2b: (code, account, patch) =>
+  addB2b: (row) => {
+    set((s) => ({ b2bClients: [row, ...s.b2bClients] }));
+    run(db.from("b2b_clients").upsert(b2bToRow(row), { onConflict: "client_code,account_name" }));
+  },
+  updateB2b: (code, account, patch) => {
+    let next: B2BClientRecord | undefined;
     set((s) => ({
-      b2bClients: s.b2bClients.map((c) =>
-        c.clientCode === code && c.accountName === account ? { ...c, ...patch } : c,
-      ),
-    })),
+      b2bClients: s.b2bClients.map((c) => {
+        if (c.clientCode !== code || c.accountName !== account) return c;
+        next = { ...c, ...patch };
+        return next;
+      }),
+    }));
+    if (next)
+      run(db.from("b2b_clients").update(b2bToRow(next)).eq("client_code", code).eq("account_name", account));
+  },
   importB2b: (rows) => {
     const existing = new Map(get().b2bClients.map((c) => [`${c.clientCode}|${c.accountName}`, c]));
     let added = 0;
@@ -406,13 +455,20 @@ export const useAppStore = create<AppState>()(
         added += 1;
       }
     }
-    set({ b2bClients: [...existing.values()] });
+    const list = [...existing.values()];
+    set({ b2bClients: list });
+    const keys = new Set(rows.map((r) => `${r.clientCode}|${r.accountName}`));
+    const toSave = list.filter((c) => keys.has(`${c.clientCode}|${c.accountName}`)).map(b2bToRow);
+    for (let i = 0; i < toSave.length; i += 500)
+      run(db.from("b2b_clients").upsert(toSave.slice(i, i + 500), { onConflict: "client_code,account_name" }));
     return { added, updated };
   },
-  removeB2b: (code, account) =>
+  removeB2b: (code, account) => {
     set((s) => ({
       b2bClients: s.b2bClients.filter((c) => !(c.clientCode === code && c.accountName === account)),
-    })),
+    }));
+    run(db.from("b2b_clients").delete().eq("client_code", code).eq("account_name", account));
+  },
 
   links: [],
   signLink: (id, workerId, phone) =>
@@ -420,9 +476,7 @@ export const useAppStore = create<AppState>()(
       const link = s.links.find((l) => l.id === id);
       const serials = new Set(link?.serials ?? []);
       return {
-        links: s.links.map((l) =>
-          l.id === id ? { ...l, workerId, phone, signedAt: today() } : l,
-        ),
+        links: s.links.map((l) => (l.id === id ? { ...l, workerId, phone, signedAt: today() } : l)),
         vouchers: s.vouchers.map((v) => (serials.has(v.serial) ? { ...v, workerId } : v)),
       };
     }),
@@ -460,15 +514,32 @@ export const useAppStore = create<AppState>()(
       createdAt: today(),
     };
     set((s) => ({ vouchers: [...created, ...s.vouchers], links: [link, ...s.links] }));
+    void Promise.resolve(db.from("vouchers").insert(created.map(voucherToRow))).then(
+      ({ error }: { error: { message: string } | null }) => {
+        if (error) toast.error(`שמירה בענן נכשלה: ${error.message}`);
+        else run(db.from("worker_links").insert(linkToRow(link)));
+      },
+    );
     return link;
   },
 
-
   reasons: [],
-  addReason: (reason) => set((s) => ({ reasons: [...s.reasons, reason] })),
-  updateReason: (index, reason) =>
-    set((s) => ({ reasons: s.reasons.map((r, i) => (i === index ? reason : r)) })),
-  removeReason: (index) => set((s) => ({ reasons: s.reasons.filter((_, i) => i !== index) })),
+  addReason: (reason) => {
+    const row = { ...reason, id: reason.id ?? crypto.randomUUID() };
+    set((s) => ({ reasons: [...s.reasons, row] }));
+    run(db.from("issue_reasons").insert({ id: row.id, name: row.name, category: row.category }));
+  },
+  updateReason: (index, reason) => {
+    const prev = get().reasons[index];
+    const row = { ...reason, id: prev?.id ?? reason.id };
+    set((s) => ({ reasons: s.reasons.map((r, i) => (i === index ? row : r)) }));
+    if (row.id) run(db.from("issue_reasons").update({ name: row.name, category: row.category }).eq("id", row.id));
+  },
+  removeReason: (index) => {
+    const prev = get().reasons[index];
+    set((s) => ({ reasons: s.reasons.filter((_, i) => i !== index) }));
+    if (prev?.id) run(db.from("issue_reasons").delete().eq("id", prev.id));
+  },
 }),
 );
 
