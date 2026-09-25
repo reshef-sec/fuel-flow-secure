@@ -1,6 +1,6 @@
 import { createStart } from "@tanstack/react-start";
-import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { attachExternalAuth } from "@/lib/externalAuth";
 
 export const startInstance = createStart(() => ({
-  functionMiddleware: [attachSupabaseAuth],
+  functionMiddleware: [attachExternalAuth],
 }));

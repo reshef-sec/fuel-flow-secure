@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { Button, FormField, Input, Logo } from "@/design-system/delek-1ea111";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseClient";
 import { bootstrapAdmin, getSetupStatus } from "@/lib/accounts.functions";
 import { phoneToLoginEmail } from "@/lib/phoneLogin";
 
