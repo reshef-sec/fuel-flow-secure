@@ -14,6 +14,171 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          balance: number
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      app_users: {
+        Row: {
+          branch: string
+          can_request: boolean
+          created_at: string
+          first_name: string
+          last_name: string
+          national_id: string
+          phone: string
+          requires_password_change: boolean
+          role: Database["public"]["Enums"]["app_role"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          branch?: string
+          can_request?: boolean
+          created_at?: string
+          first_name?: string
+          last_name?: string
+          national_id: string
+          phone?: string
+          requires_password_change?: boolean
+          role?: Database["public"]["Enums"]["app_role"]
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          branch?: string
+          can_request?: boolean
+          created_at?: string
+          first_name?: string
+          last_name?: string
+          national_id?: string
+          phone?: string
+          requires_password_change?: boolean
+          role?: Database["public"]["Enums"]["app_role"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      b2b_clients: {
+        Row: {
+          account_key: string | null
+          account_name: string
+          account_status: string | null
+          account_type: string | null
+          balance: string | null
+          branch: string
+          budget_section: string | null
+          client_code: string
+          client_name: string
+          created_at: string
+          id: string
+          item_family: string | null
+          load_type: string | null
+          standard: string
+          updated_at: string
+        }
+        Insert: {
+          account_key?: string | null
+          account_name: string
+          account_status?: string | null
+          account_type?: string | null
+          balance?: string | null
+          branch?: string
+          budget_section?: string | null
+          client_code: string
+          client_name?: string
+          created_at?: string
+          id?: string
+          item_family?: string | null
+          load_type?: string | null
+          standard?: string
+          updated_at?: string
+        }
+        Update: {
+          account_key?: string | null
+          account_name?: string
+          account_status?: string | null
+          account_type?: string | null
+          balance?: string | null
+          branch?: string
+          budget_section?: string | null
+          client_code?: string
+          client_name?: string
+          created_at?: string
+          id?: string
+          item_family?: string | null
+          load_type?: string | null
+          standard?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      branches: {
+        Row: {
+          city: string
+          created_at: string
+          id: string
+          manager: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          city?: string
+          created_at?: string
+          id: string
+          manager?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          city?: string
+          created_at?: string
+          id?: string
+          manager?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      issue_reasons: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           branch: string
@@ -50,6 +215,39 @@ export type Database = {
         }
         Relationships: []
       }
+      regular_clients: {
+        Row: {
+          client_id: string
+          client_name: string
+          created_at: string
+          id: string
+          site_id: string
+          site_name: string
+          standard: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          client_name?: string
+          created_at?: string
+          id?: string
+          site_id: string
+          site_name?: string
+          standard?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          client_name?: string
+          created_at?: string
+          id?: string
+          site_id?: string
+          site_name?: string
+          standard?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -65,6 +263,177 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      voucher_requests: {
+        Row: {
+          amount: number
+          approved_amount: number | null
+          approver: string | null
+          branch: string
+          created_at: string
+          created_on: string
+          id: string
+          reason: string
+          requester: string
+          requester_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          approved_amount?: number | null
+          approver?: string | null
+          branch: string
+          created_at?: string
+          created_on: string
+          id: string
+          reason?: string
+          requester: string
+          requester_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          approved_amount?: number | null
+          approver?: string | null
+          branch?: string
+          created_at?: string
+          created_on?: string
+          id?: string
+          reason?: string
+          requester?: string
+          requester_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vouchers: {
+        Row: {
+          account_name: string | null
+          amount: number
+          approver: string | null
+          branch: string
+          client: string | null
+          client_code: string | null
+          client_id: string | null
+          created_at: string
+          delivered_at: string | null
+          driver_name: string | null
+          license_plate: string | null
+          link_id: string | null
+          real_code: string
+          reason: string | null
+          requester: string | null
+          route: string | null
+          serial: string
+          site_id: string | null
+          site_name: string | null
+          standard: string | null
+          standard_name: string | null
+          status: string
+          supervisor: string | null
+          updated_at: string
+          updated_on: string
+          worker_id: string | null
+          worker_name: string | null
+        }
+        Insert: {
+          account_name?: string | null
+          amount?: number
+          approver?: string | null
+          branch?: string
+          client?: string | null
+          client_code?: string | null
+          client_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          driver_name?: string | null
+          license_plate?: string | null
+          link_id?: string | null
+          real_code?: string
+          reason?: string | null
+          requester?: string | null
+          route?: string | null
+          serial: string
+          site_id?: string | null
+          site_name?: string | null
+          standard?: string | null
+          standard_name?: string | null
+          status?: string
+          supervisor?: string | null
+          updated_at?: string
+          updated_on?: string
+          worker_id?: string | null
+          worker_name?: string | null
+        }
+        Update: {
+          account_name?: string | null
+          amount?: number
+          approver?: string | null
+          branch?: string
+          client?: string | null
+          client_code?: string | null
+          client_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          driver_name?: string | null
+          license_plate?: string | null
+          link_id?: string | null
+          real_code?: string
+          reason?: string | null
+          requester?: string | null
+          route?: string | null
+          serial?: string
+          site_id?: string | null
+          site_name?: string | null
+          standard?: string | null
+          standard_name?: string | null
+          status?: string
+          supervisor?: string | null
+          updated_at?: string
+          updated_on?: string
+          worker_id?: string | null
+          worker_name?: string | null
+        }
+        Relationships: []
+      }
+      worker_links: {
+        Row: {
+          created_at: string
+          created_on: string
+          id: string
+          phone: string | null
+          serials: string[]
+          signed_at: string | null
+          total: number
+          updated_at: string
+          worker_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_on: string
+          id: string
+          phone?: string | null
+          serials?: string[]
+          signed_at?: string | null
+          total: number
+          updated_at?: string
+          worker_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_on?: string
+          id?: string
+          phone?: string | null
+          serials?: string[]
+          signed_at?: string | null
+          total?: number
+          updated_at?: string
+          worker_id?: string | null
         }
         Relationships: []
       }
