@@ -220,6 +220,11 @@ export const useAppStore = create<AppState>()(
   loaded: false,
   loadFromCloud: async () => {
     try {
+      // Clean up the old browser-only copy; the cloud is the only source now.
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("reshef.store.v2");
+        window.localStorage.removeItem(ROLE_KEY);
+      }
       const data = await loadAll();
       set({ ...data, loaded: true });
     } catch (e) {
