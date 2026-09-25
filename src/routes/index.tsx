@@ -84,6 +84,15 @@ function Dashboard() {
   const allocated = sum("הוקצה לעובד");
   const blocked = timed.filter((v) => v.status === "חסום").length;
   const total = vouchers.reduce((t, v) => t + v.amount, 0);
+  const unusedValue = vouchers
+    .filter((v) => v.status === "טרם שומש")
+    .reduce((t, v) => t + v.amount, 0);
+  /** Safe percentage: 0 when the denominator is empty or the result isn't finite. */
+  const pct = (part: number, whole: number) => {
+    if (!whole) return 0;
+    const r = Math.round((part / whole) * 100);
+    return Number.isFinite(r) ? Math.max(0, Math.min(100, r)) : 0;
+  };
 
   return (
     <InternalLayout title="דשבורד ניהול שוברים">
@@ -151,27 +160,27 @@ function Dashboard() {
           label="יתרה זמינה לחלוקה"
           value={`${balance.toLocaleString("he-IL")} ₪`}
           caption="ארנק וירטואלי"
-          percent={Math.min(100, Math.round((balance / 15000) * 100))}
+          percent={pct(balance, balance + total)}
         />
         <StatCard
           label="שווי מלאי שוברים"
           value={`${total.toLocaleString("he-IL")} ₪`}
           caption="כלל השוברים במערכת"
-          percent={70}
+          percent={pct(unusedValue, total)}
           tone="accent"
         />
         <StatCard
           label="שוברים שמומשו"
           value={`${claimed.toLocaleString("he-IL")} ₪`}
           caption={periodLabels[period]}
-          percent={total ? Math.round((claimed / total) * 100) : 0}
+          percent={pct(claimed, total)}
           tone="secondary"
         />
         <StatCard
           label="שוברים חסומים"
           value={blocked}
           caption={`ממתינים לבדיקה · ${periodLabels[period]}`}
-          percent={timed.length ? Math.round((blocked / timed.length) * 100) : 0}
+          percent={pct(blocked, timed.length)}
         />
       </div>
 
