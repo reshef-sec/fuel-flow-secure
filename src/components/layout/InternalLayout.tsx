@@ -18,6 +18,7 @@ import {
 import { Logo, Select } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { useAuthContext } from "@/lib/auth-context";
+import { useIsSuperAdmin } from "@/lib/superAdmin";
 import { supabase } from "@/lib/supabaseClient";
 import { roleLabels, storedRole, useAppStore, type Role } from "@/store/appStore";
 
@@ -38,7 +39,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
   const role = useAppStore((s) => s.role);
   const setRole = useAppStore((s) => s.setRole);
   const { profile } = useAuthContext();
-  const canSimulate = profile?.role === "admin";
+  const canSimulate = useIsSuperAdmin();
 
   // Restore the simulated role after hydration so permissions survive a reload.
   useEffect(() => {
