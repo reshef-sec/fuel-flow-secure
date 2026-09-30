@@ -30,7 +30,16 @@ const headers = [
 ];
 
 /** B2B billing report — one row per 100 ₪ code issued via the "בחיוב לקוח" route. */
-export function B2bReport() {
+export interface ReportFilterValues {
+  from: string;
+  to: string;
+  branch: string;
+  supervisor: string;
+  client: string;
+  status: string;
+}
+
+export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
   const vouchers = useAppStore((s) => s.vouchers);
   const branchList = useAppStore((s) => s.branchList);
   const role = useAppStore((s) => s.role);
@@ -41,13 +50,25 @@ export function B2bReport() {
     let list = vouchers.filter((v) => v.route === "b2b");
     if (role === "branch" && me?.branch) list = list.filter((v) => v.branch === me.branch);
     if (role === "supervisor") list = list.filter((v) => v.supervisor === myName);
+    if (filters) {
+      const f = filters;
+      list = list.filter((v) => {
+        if (f.from && v.updatedAt < f.from) return false;
+        if (f.to && v.updatedAt > f.to) return false;
+        if (f.branch && v.branch !== f.branch) return false;
+        if (f.supervisor && v.supervisor !== f.supervisor) return false;
+        if (f.client && v.client !== f.client) return false;
+        if (f.status && v.status !== f.status) return false;
+        return true;
+      });
+    }
     // Split multi-code vouchers into one row per 100 ₪ code.
     return list.flatMap((v) => {
       const n = Math.max(1, Math.round(v.amount / 100));
       if (n === 1) return [{ v, value: v.amount, code: v.serial }];
       return Array.from({ length: n }, (_, i) => ({ v, value: 100, code: `${v.serial}-${i + 1}` }));
     });
-  }, [vouchers, role, me?.branch, myName]);
+  }, [vouchers, role, me?.branch, myName, filters]);
 
   const requesterOf = (v: VoucherRecord) =>
     v.requester ?? branchList.find((b) => b.name === v.branch)?.manager ?? "—";

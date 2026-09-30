@@ -30,10 +30,12 @@ export const Route = createFileRoute("/reports")({
       { title: "דוחות | רשף ביטחון" },
       {
         name: "description",
-        content: "דוח מאסטר על שוברי הדלק עם סינון לפי תאריך, סניף, מפקח, לקוח וסטטוס וייצוא לאקסל ו-PDF.",
+        content: "דוח ללא חיוב לקוח ודוח B2B על שוברי הדלק עם סינון לפי תאריך, סניף, מפקח, לקוח וסטטוס וייצוא לאקסל ו-PDF.",
       },
       { property: "og:title", content: "דוחות | רשף ביטחון" },
-      { property: "og:description", content: "דוח מאסטר עם סינון מתקדם וייצוא לאקסל ו-PDF." },
+      { property: "og:description", content: "דוחות שוברים עם סינון מתקדם וייצוא לאקסל ו-PDF." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: ReportsPage,
@@ -43,7 +45,7 @@ const statuses: VoucherStatus[] = ["טרם שומש", "הוקצה לעובד", "
 const empty = { from: "", to: "", branch: "", supervisor: "", client: "", status: "" };
 
 const reportTabs = [
-  { id: "master", label: 'דו"ח מאסטר', icon: Table2 },
+  { id: "master", label: "דוח ללא חיוב לקוח", icon: Table2 },
   { id: "paz", label: 'דו"ח B2B', icon: Fuel },
 ] as const;
 
@@ -117,7 +119,7 @@ function ReportsPage() {
   ]);
 
   function exportExcel() {
-    downloadCsv("master-report.csv", headers, cells);
+    downloadCsv("non-billing-report.csv", headers, cells);
     toast.success("הדוח יוצא לאקסל בהצלחה");
   }
 
@@ -132,11 +134,11 @@ function ReportsPage() {
       .map((r) => `<tr>${r.map((c) => `<td>${String(c)}</td>`).join("")}</tr>`)
       .join("");
     win.document.write(`<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8">
-<title>דוח מאסטר שוברים</title><style>
+<title>דוח ללא חיוב לקוח</title><style>
 body{font-family:Assistant,Arial,sans-serif;padding:24px;color:#0f2445}
 h1{font-size:20px}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
 th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0fb}
-</style></head><body><h1>דוח מאסטר שוברים · רשף ביטחון</h1>
+</style></head><body><h1>דוח ללא חיוב לקוח · רשף ביטחון</h1>
 <p>${rows.length} רשומות · סה"כ ${total.toLocaleString("he-IL")} ₪</p>
 <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`);
     win.document.close();
@@ -149,12 +151,6 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
     <InternalLayout title="דוחות">
       <Tabs items={reportTabs} value={tab} onChange={setTab} />
 
-      {tab === "paz" ? (
-        <div className="mt-6">
-          <B2bReport />
-        </div>
-      ) : (
-        <>
       <Card padding="lg" className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 font-display text-lg font-extrabold text-secondary">
@@ -256,10 +252,16 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
         </div>
       </Card>
 
+      {tab === "paz" ? (
+        <div className="mt-8">
+          <B2bReport filters={filters} />
+        </div>
+      ) : (
+        <>
       <section className="mt-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-display text-xl font-extrabold text-secondary">דוח מאסטר</h2>
+            <h2 className="font-display text-xl font-extrabold text-secondary">דוח ללא חיוב לקוח</h2>
             <p className="text-sm tabular-nums text-muted-foreground">
               {rows.length} רשומות · סה"כ {total.toLocaleString("he-IL")} ₪
             </p>
