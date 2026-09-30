@@ -11,6 +11,9 @@ import { UsersPanel } from "@/components/settings/UsersPanel";
 import { ClientsPanel } from "@/components/settings/ClientsPanel";
 import { AuditPanel } from "@/components/settings/AuditPanel";
 import { B2bPanel } from "@/components/settings/B2bPanel";
+import { DemoPanel } from "@/components/settings/DemoPanel";
+import { useIsSuperAdmin } from "@/lib/superAdmin";
+import { FlaskConical } from "lucide-react";
 
 
 export const Route = createFileRoute("/settings")({
@@ -40,10 +43,13 @@ const tabs = [
 
 function SettingsPage() {
   const [tab, setTab] = useState<string>("reasons");
+  const isSuper = useIsSuperAdmin();
+  const items = isSuper ? [...tabs, { id: "demo", label: "סביבת דמו", icon: FlaskConical }] : tabs;
 
   return (
     <InternalLayout title="הגדרות מערכת">
-      <Tabs items={tabs} value={tab} onChange={setTab} />
+      <Tabs items={items} value={tab} onChange={setTab} />
+      {isSuper && tab === "demo" ? <div className="mt-6"><DemoPanel /></div> : null}
       <div className="mt-6">
         {tab === "reasons" ? <ReasonsPanel /> : null}
         {tab === "branches" ? <BranchesPanel /> : null}
