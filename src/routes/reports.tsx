@@ -107,10 +107,8 @@ function ReportsPage() {
     "ת.ז",
     "טלפון",
     "סיבת הפקה",
-    "דורש ההקצאה",
-    "גורם מאשר",
     "סטטוס",
-    "תאריך עדכון",
+    "תאריך מסירה",
   ];
   const cells = rows.map((v) => [
     v.serial,
@@ -122,8 +120,6 @@ function ReportsPage() {
     v.workerId ?? "—",
     v.workerPhone ?? "—",
     v.reason ?? "—",
-    v.requester ?? "—",
-    v.approver ?? "—",
     v.status,
     heDate.format(new Date(v.updatedAt)),
   ]);
