@@ -133,3 +133,13 @@ export const completePasswordChange = createServerFn({ method: "POST" })
     await sb.from("profiles").update({ requires_password_change: false }).eq("id", context.userId);
     return { ok: true };
   });
+
+/** Signed-in staff: login account id for a ת.ז (used to tag vouchers with supervisor_id). */
+export const lookupAuthId = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ nationalId: z.string().regex(/^\d{5,12}$/) }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = await admin();
+    const { data: row } = await sb.from("profiles").select("id").eq("national_id", data.nationalId).maybeSingle();
+    return { id: (row?.id as string | undefined) ?? null };
+  });

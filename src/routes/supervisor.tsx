@@ -8,6 +8,8 @@ import {
   Hash,
   Link2,
   MapPin,
+  Plus,
+  Trash2,
   Search,
   Send,
   SquareArrowOutUpRight,
@@ -26,14 +28,15 @@ import {
   Select,
 } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
-import { NoAccess } from "@/components/layout/NoAccess";
 import {
   fullName,
   useAppStore,
   useCurrentUser,
   type B2BClientRecord,
   type ClientRecord,
+  type WorkerIssueItem,
 } from "@/store/appStore";
+import { ProducedLinks } from "@/components/production/ProducedLinks";
 
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
@@ -41,10 +44,10 @@ export const Route = createFileRoute("/supervisor")({
       { title: "הפקת שוברי דלק | רשף ביטחון" },
       {
         name: "description",
-        content: "הפקת לינק שוברי דלק לעובד — בחיוב לקוח (B2B) או ללא חיוב לקוח.",
+        content: "הפקת לינק שוברי דלק לעובד — רכב עבודה או רכב פרטי.",
       },
       { property: "og:title", content: "הפקת שוברי דלק | רשף ביטחון" },
-      { property: "og:description", content: "הפקת לינק שוברי דלק לעובד בחיוב או ללא חיוב לקוח." },
+      { property: "og:description", content: "הפקת לינק שוברי דלק לעובד לרכב עבודה או רכב פרטי." },
     ],
   }),
   component: SupervisorPage,
@@ -52,93 +55,71 @@ export const Route = createFileRoute("/supervisor")({
 
 type Mode = "b2b" | "regular";
 
+interface Block {
+  key: number;
+  mode: Mode;
+  search: string;
+  b2b: B2BClientRecord | null;
+  regular: ClientRecord | null;
+  amount: string;
+  reason: string;
+}
+
+let blockSeq = 1;
+const newBlock = (mode: Mode = "b2b"): Block => ({
+  key: blockSeq++, mode, search: "", b2b: null, regular: null, amount: "", reason: "",
+});
+
 function SupervisorPage() {
-  const b2bClients = useAppStore((s) => s.b2bClients);
-  const nonB2b = useAppStore((s) => s.nonB2bClients);
-  const reasons = useAppStore((s) => s.reasons);
   const role = useAppStore((s) => s.role);
   const issueWorkerVoucher = useAppStore((s) => s.issueWorkerVoucher);
   const me = useCurrentUser();
 
-  const [mode, setMode] = useState<Mode>("b2b");
-  const [search, setSearch] = useState("");
-  const [b2b, setB2b] = useState<B2BClientRecord | null>(null);
-  const [regular, setRegular] = useState<ClientRecord | null>(null);
-  const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
+  const [employeeName, setEmployeeName] = useState("");
+  const [blocks, setBlocks] = useState<Block[]>(() => [newBlock()]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // Security filter: non-admins only see B2B clients of their own branch.
-  const allowedB2b = useMemo(
-    () => (role === "admin" ? b2bClients : b2bClients.filter((c) => c.branch === me?.branch)),
-    [b2bClients, role, me?.branch],
-  );
-  const modeReasons = reasons.filter((r) => r.category === (mode === "b2b" ? "B2B" : "Regular"));
-  const selected = mode === "b2b" ? b2b : regular;
-
-  const matches = useMemo(() => {
-    const q = search.trim();
-    if (!q || selected) return [];
-    if (mode === "b2b") return allowedB2b.filter((c) => c.clientName.includes(q) || c.accountName.includes(q)).slice(0, 8);
-    return nonB2b.filter((c) => c.clientName.includes(q) || c.siteName.includes(q)).slice(0, 8);
-  }, [search, selected, mode, allowedB2b, nonB2b]);
-
-  function switchMode(next: Mode) {
-    setMode(next);
-    setSearch("");
-    setB2b(null);
-    setRegular(null);
-    setReason("");
-    setError(null);
-  }
-
-  const numeric = Number(amount);
+  const patch = (key: number, p: Partial<Block>) =>
+    setBlocks((bs) => bs.map((b) => (b.key === key ? { ...b, ...p } : b)));
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selected || !numeric || !reason) {
-      setError("יש לבחור לקוח, למלא סכום ולבחור סיבת הנפקה");
-      return;
-    }
-    if (numeric % 100 !== 0) {
-      setError("הסכום חייב להיות בכפולות של 100 ₪");
-      return;
+    if (employeeName.trim().length < 2) return setError("יש למלא שם עובד");
+    const items: WorkerIssueItem[] = [];
+    for (const [i, b] of blocks.entries()) {
+      const n = Number(b.amount);
+      const sel = b.mode === "b2b" ? b.b2b : b.regular;
+      if (!sel || !n || !b.reason) return setError(`לקוח ${i + 1}: יש לבחור לקוח, למלא סכום ולבחור סיבה`);
+      if (n % 100 !== 0) return setError(`לקוח ${i + 1}: הסכום חייב להיות בכפולות של 100 ₪`);
+      items.push(
+        b.mode === "b2b" && b.b2b
+          ? { amount: n, reason: b.reason, route: "b2b", clientName: b.b2b.clientName, clientCode: b.b2b.clientCode, accountName: b.b2b.accountName, standard: b.b2b.standard }
+          : { amount: n, reason: b.reason, route: "regular", clientName: b.regular!.clientName, clientCode: b.regular!.clientId, siteId: b.regular!.siteId, siteName: b.regular!.siteName, ...(b.regular!.standard ? { standard: b.regular!.standard } : {}) },
+      );
     }
     setError(null);
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      const base = {
-        amount: numeric,
-        reason,
-        branch: me?.branch ?? "הנהלה",
+      const created = issueWorkerVoucher({
+        employeeName: employeeName.trim(),
+        branch: me?.branch || "הנהלה",
         ...(me ? { supervisor: fullName(me), requester: fullName(me) } : {}),
-      };
-      const created =
-        mode === "b2b" && b2b
-          ? issueWorkerVoucher({
-              ...base,
-              route: "b2b",
-              clientName: b2b.clientName,
-              clientCode: b2b.clientCode,
-              accountName: b2b.accountName,
-              standard: b2b.standard,
-            })
-          : issueWorkerVoucher({
-              ...base,
-              route: "regular",
-              clientName: regular!.clientName,
-              clientCode: regular!.clientId,
-              siteId: regular!.siteId,
-              siteName: regular!.siteName,
-            });
+        items,
+      });
+      if ("error" in created) {
+        setError(created.error);
+        return;
+      }
       setLink(`${window.location.origin}/voucher/${created.id}`);
       setCopied(false);
-      toast.success(`הופקו ${created.serials.length} קודים והלינק מוכן`);
-    }, 800);
+      setEmployeeName("");
+      setBlocks([newBlock()]);
+      toast.success(`הופקו ${created.serials.length} קודים בלינק אחד`);
+    }, 600);
   }
 
   async function copyLink() {
@@ -151,8 +132,6 @@ function SupervisorPage() {
       toast.error("ההעתקה נכשלה, יש להעתיק ידנית");
     }
   }
-
-  if (role === "supervisor") return <NoAccess title="הפקת שוברי דלק" />;
 
   return (
     <InternalLayout title="הפקת שוברי דלק">
@@ -167,117 +146,26 @@ function SupervisorPage() {
           </CardHeader>
 
           <form onSubmit={submit} className="mt-2 space-y-5">
-            <div role="radiogroup" aria-label="סוג הנפקה" className="grid grid-cols-2 gap-2 rounded-xl bg-surface-muted p-1">
-              {(
-                [
-                  ["b2b", "רכב עבודה"],
-                  ["regular", "רכב פרטי"],
-                ] as const
-              ).map(([value, label]) => (
-                <label
-                  key={value}
-                  className={cn(
-                    "flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold transition-colors",
-                    mode === value ? "bg-surface text-primary shadow-card" : "text-muted-foreground",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="mode"
-                    value={value}
-                    checked={mode === value}
-                    onChange={() => switchMode(value)}
-                    className="accent-primary"
-                  />
-                  {label}
-                </label>
-              ))}
-            </div>
-
-            <FormField
-              label="בחירת לקוח"
-              hint={mode === "b2b" ? "מוצגים רק לקוחות הסניף שלך" : "חיפוש לפי שם לקוח או אתר"}
-            >
-              <div className="relative">
-                <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  aria-label="חיפוש לקוח"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setB2b(null);
-                    setRegular(null);
-                  }}
-                  placeholder="הקלד שם לקוח…"
-                  className="pe-9"
-                />
-                {matches.length > 0 ? (
-                  <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-raised">
-                    {matches.map((c) => {
-                      const isB2b = "accountName" in c;
-                      const title = c.clientName;
-                      const sub = isB2b ? c.accountName : (c as ClientRecord).siteName;
-                      return (
-                        <li key={isB2b ? `${c.clientCode}|${c.accountName}` : `${(c as ClientRecord).clientId}|${(c as ClientRecord).siteId}`}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isB2b) setB2b(c);
-                              else setRegular(c as ClientRecord);
-                              setSearch(`${title} · ${sub}`);
-                            }}
-                            className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-start text-sm hover:bg-blue-100"
-                          >
-                            <span className="font-bold text-secondary">{title}</span>
-                            <span className="truncate text-muted-foreground">{sub}</span>
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : null}
-              </div>
+            <FormField label="שם עובד" hint="השם יופיע מראש בלינק — העובד יאמת עם ת.ז וטלפון">
+              <Input aria-label="שם עובד" value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} placeholder="שם מלא של העובד" required />
             </FormField>
 
-            {b2b && mode === "b2b" ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <InfoCard icon={Building2} label="שם לקוח" value={b2b.clientName} />
-                <InfoCard icon={Hash} label="קוד לקוח" value={b2b.clientCode} />
-                <InfoCard icon={MapPin} label="שם חשבון" value={b2b.accountName} />
-                <InfoCard icon={BadgeCheck} label="תקן" value={b2b.standard} />
-              </div>
-            ) : null}
-            {regular && mode === "regular" ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <InfoCard icon={Building2} label="לקוח" value={`${regular.clientName} (${regular.clientId})`} />
-                <InfoCard icon={MapPin} label="אתר" value={`${regular.siteName} (${regular.siteId})`} />
-              </div>
-            ) : null}
-
-            <FormField label="סכום (₪)" hint="בכפולות של 100 ₪ — כל 100 ₪ הם קוד נפרד">
-              <Input
-                aria-label="סכום"
-                type="number"
-                min={100}
-                step={100}
-                inputMode="numeric"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="300"
-                className="tabular-nums"
+            {blocks.map((b, i) => (
+              <ClientBlock
+                key={b.key}
+                index={i}
+                block={b}
+                role={role}
+                branch={me?.branch}
+                onChange={(p) => patch(b.key, p)}
+                onRemove={blocks.length > 1 ? () => setBlocks((bs) => bs.filter((x) => x.key !== b.key)) : undefined}
               />
-            </FormField>
+            ))}
 
-            <FormField label="סיבת הנפקה">
-              <Select aria-label="בחר סיבת הנפקה" value={reason} onChange={(e) => setReason(e.target.value)}>
-                <option value="">בחר סיבה…</option>
-                {modeReasons.map((r) => (
-                  <option key={r.name} value={r.name}>
-                    {r.name}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
+            <Button type="button" variant="outline" block onClick={() => setBlocks((bs) => [...bs, newBlock()])}>
+              <Plus className="size-4" />
+              הוספת לקוח
+            </Button>
 
             {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
 
@@ -296,9 +184,7 @@ function SupervisorPage() {
             <div className="space-y-4">
               <div className="rounded-xl border-2 border-dashed border-primary bg-blue-100/60 p-5 text-center">
                 <p className="text-xs font-semibold text-muted-foreground">לינק אישי לעובד</p>
-                <p dir="ltr" className="mt-2 break-all font-display text-lg font-extrabold text-secondary">
-                  {link}
-                </p>
+                <p dir="ltr" className="mt-2 break-all font-display text-lg font-extrabold text-secondary">{link}</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Button variant="accent" block onClick={copyLink}>
@@ -322,12 +208,146 @@ function SupervisorPage() {
                 <Link2 className="size-7" />
               </span>
               <p className="mt-3 font-display text-base font-extrabold text-secondary">עדיין לא הופק לינק</p>
-              <p className="mt-1 text-sm text-muted-foreground">בחר סוג הנפקה, לקוח, סכום וסיבה כדי לקבל לינק.</p>
+              <p className="mt-1 text-sm text-muted-foreground">מלא שם עובד, לקוח, סכום וסיבה כדי לקבל לינק.</p>
             </div>
           )}
         </Card>
       </div>
+
+      <section className="mt-8">
+        <h2 className="mb-3 font-display text-xl font-extrabold text-secondary">שוברים שהופקו</h2>
+        <ProducedLinks limit={10} />
+      </section>
     </InternalLayout>
+  );
+}
+
+function ClientBlock({
+  index, block, role, branch, onChange, onRemove,
+}: {
+  index: number;
+  block: Block;
+  role: string;
+  branch?: string;
+  onChange: (p: Partial<Block>) => void;
+  onRemove?: () => void;
+}) {
+  const b2bClients = useAppStore((s) => s.b2bClients);
+  const nonB2b = useAppStore((s) => s.nonB2bClients);
+  const reasons = useAppStore((s) => s.reasons);
+  const { mode, search, b2b, regular } = block;
+
+  // Inactive clients (missing from the last import) are never offered.
+  const allowedB2b = useMemo(
+    () => b2bClients.filter((c) => c.isActive !== false && (role === "admin" || c.branch === branch)),
+    [b2bClients, role, branch],
+  );
+  const modeReasons = reasons.filter((r) => r.category === (mode === "b2b" ? "B2B" : "Regular"));
+  const selected = mode === "b2b" ? b2b : regular;
+
+  const matches = useMemo(() => {
+    const q = search.trim();
+    if (!q || selected) return [];
+    if (mode === "b2b") return allowedB2b.filter((c) => c.clientName.includes(q) || c.accountName.includes(q)).slice(0, 8);
+    return nonB2b.filter((c) => c.isActive !== false && (c.clientName.includes(q) || c.siteName.includes(q))).slice(0, 8);
+  }, [search, selected, mode, allowedB2b, nonB2b]);
+
+  return (
+    <div className="space-y-4 rounded-xl border border-border p-4">
+      <div className="flex items-center justify-between">
+        <p className="font-display text-sm font-extrabold text-secondary">לקוח {index + 1}</p>
+        {onRemove ? (
+          <button type="button" aria-label="הסרת לקוח" onClick={onRemove} className="grid size-8 place-items-center rounded-md text-danger hover:bg-surface-muted">
+            <Trash2 className="size-4" />
+          </button>
+        ) : null}
+      </div>
+      <div role="radiogroup" aria-label="סוג רכב" className="grid grid-cols-2 gap-2 rounded-xl bg-surface-muted p-1">
+        {([["b2b", "רכב עבודה"], ["regular", "רכב פרטי"]] as const).map(([value, label]) => (
+          <label
+            key={value}
+            className={cn(
+              "flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold transition-colors",
+              mode === value ? "bg-surface text-primary shadow-card" : "text-muted-foreground",
+            )}
+          >
+            <input
+              type="radio"
+              name={`mode-${block.key}`}
+              value={value}
+              checked={mode === value}
+              onChange={() => onChange({ mode: value, search: "", b2b: null, regular: null, reason: "" })}
+              className="accent-primary"
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+
+      <FormField label="בחירת לקוח">
+        <div className="relative">
+          <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label="חיפוש לקוח"
+            value={search}
+            onChange={(e) => onChange({ search: e.target.value, b2b: null, regular: null })}
+            placeholder="הקלד שם לקוח…"
+            className="pe-9"
+          />
+          {matches.length > 0 ? (
+            <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-raised">
+              {matches.map((c) => {
+                const isB2b = "accountName" in c;
+                const sub = isB2b ? c.accountName : (c as ClientRecord).siteName;
+                return (
+                  <li key={isB2b ? `${c.clientCode}|${c.accountName}` : `${(c as ClientRecord).clientId}|${(c as ClientRecord).siteId}`}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange(isB2b ? { b2b: c, search: `${c.clientName} · ${sub}` } : { regular: c as ClientRecord, search: `${c.clientName} · ${sub}` })
+                      }
+                      className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-start text-sm hover:bg-blue-100"
+                    >
+                      <span className="font-bold text-secondary">{c.clientName}</span>
+                      <span className="truncate text-muted-foreground">{sub}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </div>
+      </FormField>
+
+      {b2b && mode === "b2b" ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <InfoCard icon={Building2} label="שם לקוח" value={b2b.clientName} />
+          <InfoCard icon={Hash} label="קוד לקוח" value={b2b.clientCode} />
+          <InfoCard icon={MapPin} label="שם חשבון" value={b2b.accountName} />
+          <InfoCard icon={BadgeCheck} label="תקן" value={b2b.standard} />
+        </div>
+      ) : null}
+      {regular && mode === "regular" ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <InfoCard icon={Building2} label="לקוח" value={`${regular.clientName} (${regular.clientId})`} />
+          <InfoCard icon={MapPin} label="אתר" value={`${regular.siteName} (${regular.siteId})`} />
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField label="סכום (₪)" hint="בכפולות של 100 ₪">
+          <Input aria-label="סכום" type="number" min={100} step={100} inputMode="numeric" value={block.amount} onChange={(e) => onChange({ amount: e.target.value })} placeholder="300" className="tabular-nums" />
+        </FormField>
+        <FormField label="סיבת הנפקה">
+          <Select aria-label="בחר סיבת הנפקה" value={block.reason} onChange={(e) => onChange({ reason: e.target.value })}>
+            <option value="">בחר סיבה…</option>
+            {modeReasons.map((r) => (
+              <option key={r.name} value={r.name}>{r.name}</option>
+            ))}
+          </Select>
+        </FormField>
+      </div>
+    </div>
   );
 }
 

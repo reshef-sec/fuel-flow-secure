@@ -17,7 +17,6 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { InternalLayout } from "@/components/layout/InternalLayout";
-import { NoAccess } from "@/components/layout/NoAccess";
 import { supabase } from "@/lib/supabaseClient";
 import { useAppStore } from "@/store/appStore";
 
@@ -60,16 +59,26 @@ function SignaturesPage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<SignatureRecord | null>(null);
 
+  const vouchers = useAppStore((s) => s.vouchers);
+  const codeOf = useMemo(() => new Map(vouchers.map((v) => [v.serial, v.realCode])), [vouchers]);
+
   useEffect(() => {
-    if (role === "supervisor") return;
-    void supabase
-      .from("signature_archive")
+    // The database only returns rows the viewer may see (own branch / own records).
+    void (supabase as any)
+      .from("signatures_archive")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(1000)
-      .then(({ data, error }) => {
+      .then(({ data, error }: { data: unknown[] | null; error: { message: string } | null }) => {
         if (error) setError(error.message);
-        else setRows((data ?? []) as SignatureRecord[]);
+        else
+          setRows(
+            ((data ?? []) as Record<string, any>[]).map((r) => ({
+              id: r.id, created_at: r.created_at, full_name: r.employee_name, national_id: r.employee_id_number,
+              phone: r.employee_phone, total_amount: Number(r.total_amount), serials: r.voucher_record_ids ?? [],
+              signature: r.signature_image_url ?? "",
+            })),
+          );
         setLoading(false);
       });
   }, [role]);
@@ -86,7 +95,6 @@ function SignaturesPage() {
     );
   }, [rows, query]);
 
-  if (role === "supervisor") return <NoAccess title="ארכיון חתימות" />;
 
   return (
     <InternalLayout title="ארכיון חתימות">
@@ -120,13 +128,14 @@ function SignaturesPage() {
                   <TableHeaderCell>טלפון</TableHeaderCell>
                   <TableHeaderCell>סכום השוברים</TableHeaderCell>
                   <TableHeaderCell>מס"ד שוברים</TableHeaderCell>
+                  {role === "admin" ? <TableHeaderCell>סיריאלי</TableHeaderCell> : null}
                   <TableHeaderCell className="text-center">טופס</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={role === "admin" ? 8 : 7} className="py-8 text-center text-muted-foreground">
                       אין חתימות בארכיון
                     </TableCell>
                   </TableRow>
@@ -139,6 +148,11 @@ function SignaturesPage() {
                       <TableCell dir="ltr" className="text-end">{r.phone}</TableCell>
                       <TableCell>{r.total_amount.toLocaleString("he-IL")} ₪</TableCell>
                       <TableCell className="max-w-xs truncate">{r.serials.join(", ")}</TableCell>
+                      {role === "admin" ? (
+                        <TableCell dir="ltr" className="max-w-xs truncate text-start">
+                          {r.serials.map((x) => codeOf.get(x) || "—").join(", ")}
+                        </TableCell>
+                      ) : null}
                       <TableCell className="text-center">
                         <Button size="sm" variant="ghost" aria-label="צפייה בטופס">
                           <Eye className="size-4" />

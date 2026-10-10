@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { FileDown } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,20 +14,6 @@ import {
 import { downloadCsv, heDate } from "@/components/dashboard/statusVariant";
 import type { VoucherRecord } from "@/components/dashboard/voucherData";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
-
-const headers = [
-  "סניף",
-  "ערך כרטיס",
-  'מס"ד כרטיס',
-  "שם לקוח",
-  "קוד לקוח",
-  "שם חשבון",
-  "תקן",
-  "תאריך מסירה",
-  "סיבת הפקה",
-  "דורש הקצאה",
-  "מאשר הקצאה",
-];
 
 /** B2B billing report — one row per 100 ₪ code issued via the "ברכב עבודה" route. */
 export interface ReportFilterValues {
@@ -70,22 +56,39 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
     });
   }, [vouchers, role, me?.branch, myName, filters]);
 
+  const [view, setView] = useState<"detail" | "summary">("detail");
+  const isAdmin = role === "admin";
   const requesterOf = (v: VoucherRecord) =>
     v.requester ?? branchList.find((b) => b.name === v.branch)?.manager ?? "—";
 
-  const flat = rows.map(({ v, value, code }) => [
-    v.branch,
-    `${value} ₪`,
-    code,
-    v.client ?? "—",
-    v.clientCode ?? v.clientId ?? "—",
-    v.accountName ?? v.siteName ?? "—",
-    v.standard ?? v.standardName ?? "—",
-    heDate.format(new Date(v.deliveredAt ?? v.updatedAt)),
-    v.reason ?? "—",
-    requesterOf(v),
-    v.approver ?? "—",
+  const detailHeaders = [
+    "סניף", "ערך כרטיס", 'מס"ד כרטיס', ...(isAdmin ? ["סיריאלי"] : []), "שם לקוח", "קוד לקוח", "שם חשבון", "תקן",
+    "שם עובד", "ת.ז", "טלפון", "תאריך מסירה", "סיבת הפקה", "דורש הקצאה", "מאשר הקצאה",
+  ];
+  const detail = rows.map(({ v, value, code }) => [
+    v.branch, `${value} ₪`, code, ...(isAdmin ? [v.realCode || "—"] : []), v.client ?? "—",
+    v.clientCode ?? v.clientId ?? "—", v.accountName ?? v.siteName ?? "—", v.standard ?? v.standardName ?? "—",
+    v.workerName ?? "—", v.workerId ?? "—", v.workerPhone ?? "—",
+    heDate.format(new Date(v.deliveredAt ?? v.updatedAt)), v.reason ?? "—", requesterOf(v), v.approver ?? "—",
   ]);
+
+  // One row per תקן for the filtered period.
+  const summaryHeaders = ["תקן", "קוד לקוח", "שם לקוח", 'סה"כ ערך שוברים'];
+  const summary = useMemo(() => {
+    const m = new Map<string, { standard: string; codes: Set<string>; names: Set<string>; total: number }>();
+    for (const { v, value } of rows) {
+      const std = v.standard ?? v.standardName ?? "—";
+      const g = m.get(std) ?? { standard: std, codes: new Set(), names: new Set(), total: 0 };
+      g.codes.add(v.clientCode ?? v.clientId ?? "—");
+      g.names.add(v.client ?? "—");
+      g.total += value;
+      m.set(std, g);
+    }
+    return [...m.values()].map((g) => [g.standard, [...g.codes].join(", "), [...g.names].join(", "), `${g.total.toLocaleString("he-IL")} ₪`]);
+  }, [rows]);
+
+  const headers = view === "detail" ? detailHeaders : summaryHeaders;
+  const flat = view === "detail" ? detail : summary;
   const total = rows.reduce((s, r) => s + r.value, 0);
 
   return (
@@ -97,23 +100,38 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
             {rows.length} כרטיסים · סה"כ {total.toLocaleString("he-IL")} ₪
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => {
-            downloadCsv("b2b-report.csv", headers, flat);
-            toast.success('דוח רכב עבודה יוצא לאקסל');
-          }}
-        >
-          <FileDown className="size-4" />
-          ייצוא לאקסל
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <div role="radiogroup" aria-label="תצוגת דוח" className="flex gap-1 rounded-lg bg-surface-muted p-1">
+            {([["detail", "דוח מפורט"], ["summary", "דוח מסכם"]] as const).map(([k, label]) => (
+              <button
+                key={k}
+                role="radio"
+                aria-checked={view === k}
+                onClick={() => setView(k)}
+                className={`rounded-md px-3 py-1.5 text-sm font-bold ${view === k ? "bg-surface text-primary shadow-card" : "text-muted-foreground"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              downloadCsv(view === "detail" ? "work-vehicle-detailed.csv" : "work-vehicle-summary.csv", headers, flat);
+              toast.success("הדוח יוצא לאקסל");
+            }}
+          >
+            <FileDown className="size-4" />
+            ייצוא לאקסל
+          </Button>
+        </div>
       </div>
       <div className="mt-4 overflow-x-auto">
         <Table>
           <TableHead>
             <TableRow>
               {headers.map((h) => (
-                <TableHeaderCell key={h}>{h}</TableHeaderCell>
+                <TableHeaderCell key={h} className="whitespace-nowrap">{h}</TableHeaderCell>
               ))}
             </TableRow>
           </TableHead>
@@ -121,12 +139,12 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
             {flat.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={headers.length} className="py-10 text-center text-muted-foreground">
-                  אין שוברים שהופקו ברכב עבודה
+                  אין שוברים שהופקו לרכב עבודה
                 </TableCell>
               </TableRow>
             ) : (
               flat.map((cells, i) => (
-                <TableRow key={`${rows[i]!.code}-${i}`}>
+                <TableRow key={i}>
                   {cells.map((c, j) => (
                     <TableCell key={j} className="whitespace-nowrap">
                       {c}

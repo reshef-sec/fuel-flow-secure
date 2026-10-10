@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AllocationsRouteImport } from './routes/allocations'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ProducedRouteImport } from './routes/produced'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignaturesRouteImport } from './routes/signatures'
@@ -42,6 +43,11 @@ const ChangePasswordRoute = ChangePasswordRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProducedRoute = ProducedRouteImport.update({
+  id: '/produced',
+  path: '/produced',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/allocations': typeof AllocationsRoute
   '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
+  '/produced': typeof ProducedRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/signatures': typeof SignaturesRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/allocations': typeof AllocationsRoute
   '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
+  '/produced': typeof ProducedRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/signatures': typeof SignaturesRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/allocations': typeof AllocationsRoute
   '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
+  '/produced': typeof ProducedRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/signatures': typeof SignaturesRoute
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/allocations'
     | '/change-password'
     | '/login'
+    | '/produced'
     | '/reports'
     | '/settings'
     | '/signatures'
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/allocations'
     | '/change-password'
     | '/login'
+    | '/produced'
     | '/reports'
     | '/settings'
     | '/signatures'
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/allocations'
     | '/change-password'
     | '/login'
+    | '/produced'
     | '/reports'
     | '/settings'
     | '/signatures'
@@ -202,6 +214,7 @@ export interface RootRouteChildren {
   AllocationsRoute: typeof AllocationsRoute
   ChangePasswordRoute: typeof ChangePasswordRoute
   LoginRoute: typeof LoginRoute
+  ProducedRoute: typeof ProducedRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
   SignaturesRoute: typeof SignaturesRoute
@@ -241,6 +254,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/produced': {
+      id: '/produced'
+      path: '/produced'
+      fullPath: '/produced'
+      preLoaderRoute: typeof ProducedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -332,6 +352,7 @@ const rootRouteChildren: RootRouteChildren = {
   AllocationsRoute: AllocationsRoute,
   ChangePasswordRoute: ChangePasswordRoute,
   LoginRoute: LoginRoute,
+  ProducedRoute: ProducedRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
   SignaturesRoute: SignaturesRoute,

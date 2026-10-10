@@ -95,12 +95,18 @@ function ReportsPage() {
   );
 
   const total = rows.reduce((sum, v) => sum + v.amount, 0);
+  const isAdmin = role === "admin";
+  // Real serial numbers are shown to admins only; others see the internal מס"ד.
   const headers = [
     'מס"ד',
-    "סיריאלי",
+    ...(isAdmin ? ["סיריאלי"] : []),
     "סכום",
     "שויך ל",
     "לקוח",
+    "שם עובד",
+    "ת.ז",
+    "טלפון",
+    "סיבת הפקה",
     "דורש ההקצאה",
     "גורם מאשר",
     "סטטוס",
@@ -108,15 +114,20 @@ function ReportsPage() {
   ];
   const cells = rows.map((v) => [
     v.serial,
-    v.realCode,
-    v.amount,
+    ...(isAdmin ? [v.realCode || "—"] : []),
+    `${v.amount.toLocaleString("he-IL")} ₪`,
     formatAssignment(v),
     v.client ?? "—",
+    v.workerName ?? "—",
+    v.workerId ?? "—",
+    v.workerPhone ?? "—",
+    v.reason ?? "—",
     v.requester ?? "—",
     v.approver ?? "—",
     v.status,
-    v.updatedAt,
+    heDate.format(new Date(v.updatedAt)),
   ]);
+  const statusCol = headers.indexOf("סטטוס");
 
   function exportExcel() {
     downloadCsv("non-billing-report.csv", headers, cells);
@@ -282,46 +293,30 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
           <Table>
             <TableHead>
               <TableRow>
-                <TableHeaderCell>מס"ד</TableHeaderCell>
-                <TableHeaderCell>סיריאלי</TableHeaderCell>
-                <TableHeaderCell>סכום</TableHeaderCell>
-                <TableHeaderCell>שויך ל</TableHeaderCell>
-                <TableHeaderCell>לקוח</TableHeaderCell>
-                <TableHeaderCell>דורש ההקצאה</TableHeaderCell>
-                <TableHeaderCell>גורם מאשר</TableHeaderCell>
-                <TableHeaderCell>סטטוס</TableHeaderCell>
-                <TableHeaderCell>תאריך עדכון</TableHeaderCell>
+                {headers.map((h) => (
+                  <TableHeaderCell key={h} className="whitespace-nowrap">{h}</TableHeaderCell>
+                ))}
               </TableRow>
             </TableHead>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={headers.length} className="py-10 text-center text-muted-foreground">
                     לא נמצאו רשומות מתאימות לסינון
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((v) => (
+                rows.map((v, i) => (
                   <TableRow key={v.serial}>
-                    <TableCell className="font-semibold tabular-nums">{v.serial}</TableCell>
-                    <TableCell dir="ltr" className="text-start tabular-nums">
-                      {v.realCode}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {v.amount.toLocaleString("he-IL")} ₪
-                    </TableCell>
-                    <TableCell>{formatAssignment(v)}</TableCell>
-                    <TableCell>{v.client ?? "—"}</TableCell>
-                    <TableCell>{v.requester ?? "—"}</TableCell>
-                    <TableCell>{v.approver ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant[v.status]} size="md">
-                        {v.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">
-                      {heDate.format(new Date(v.updatedAt))}
-                    </TableCell>
+                    {cells[i]!.map((c, j) => (
+                      <TableCell key={j} className="whitespace-nowrap">
+                        {j === statusCol ? (
+                          <Badge variant={statusVariant[v.status]} size="md">{v.status}</Badge>
+                        ) : (
+                          c
+                        )}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))
               )}

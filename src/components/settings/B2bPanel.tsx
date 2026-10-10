@@ -20,7 +20,7 @@ import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { useAppStore, type B2BClientRecord } from "@/store/appStore";
 
-type Key = keyof B2BClientRecord;
+type Key = Exclude<keyof B2BClientRecord, "isActive">;
 /** Exact Excel column order (RTL). */
 const columns: { key: Key; label: string; required?: boolean }[] = [
   { key: "standard", label: "תקן", required: true },
@@ -82,7 +82,7 @@ export function B2bPanel() {
         .map((r) => {
           const row = {} as Record<Key, string>;
           for (const c of columns) row[c.key] = index[c.key]! >= 0 ? String(r[index[c.key]!] ?? "").trim() : "";
-          return row as B2BClientRecord;
+          return row as unknown as B2BClientRecord;
         })
         .filter((r) => r.clientCode && r.accountName);
       if (!parsed.length) {
@@ -90,7 +90,7 @@ export function B2bPanel() {
         return;
       }
       const { added, updated } = importB2b(parsed);
-      toast.success(`נוספו ${added}, עודכנו ${updated}`);
+      toast.success(`נוספו ${added} חדשים, ${updated} סומנו כלא פעילים`);
     } catch {
       toast.error("קריאת הקובץ נכשלה");
     }
@@ -202,7 +202,7 @@ export function B2bPanel() {
               </TableRow>
             ) : (
               filtered.map((r) => (
-                <TableRow key={`${r.clientCode}|${r.accountName}`}>
+                <TableRow key={`${r.clientCode}|${r.accountName}`} className={r.isActive === false ? "opacity-50" : undefined} title={r.isActive === false ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}>
                   {columns.map((c) => (
                     <TableCell key={c.key} className="whitespace-nowrap">
                       {r[c.key] || "—"}
