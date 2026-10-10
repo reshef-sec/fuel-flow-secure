@@ -58,8 +58,6 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
 
   const [view, setView] = useState<"detail" | "summary">("detail");
   const isAdmin = role === "admin";
-  const requesterOf = (v: VoucherRecord) =>
-    v.requester ?? branchList.find((b) => b.name === v.branch)?.manager ?? "—";
 
   const detailHeaders = [
     "סניף", "ערך כרטיס", 'מס"ד כרטיס', ...(isAdmin ? ["סיריאלי"] : []), "שם לקוח", "קוד לקוח", "שם חשבון", "תקן",
