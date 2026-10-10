@@ -132,7 +132,7 @@ function Dashboard() {
         </Card>
       ) : null}
 
-      {me?.canRequest ? (
+      {me?.canRequest && !isSupervisor ? (
         <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="font-display text-lg font-extrabold text-secondary">
@@ -196,7 +196,7 @@ function Dashboard() {
 
       <VoucherTable since={since} periodLabel={periodLabels[period]} />
 
-      <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} />
+      {!isSupervisor && <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} />}
 
       {isBranchManager ? (
         <SupervisorAllocationDialog
