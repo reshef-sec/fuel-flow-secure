@@ -21,6 +21,7 @@ import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { useAuthContext } from "@/lib/auth-context";
 import { useIsSuperAdmin } from "@/lib/superAdmin";
 import { supabase } from "@/lib/supabaseClient";
+import { RealtimeNotifications } from "@/components/layout/RealtimeNotifications";
 import { roleLabels, storedRole, useAppStore, type Role } from "@/store/appStore";
 
 const navItems = [
@@ -59,6 +60,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
 
   return (
     <div className="flex min-h-screen w-full bg-background">
+      <RealtimeNotifications />
       {open ? (
         <button
           aria-label="סגור תפריט"
