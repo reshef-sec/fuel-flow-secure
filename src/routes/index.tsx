@@ -9,6 +9,7 @@ import { PendingRequests } from "@/components/requests/PendingRequests";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
 import { Button, Card, Select, StatCard } from "@/design-system/delek-1ea111";
 import { fullName, MAIN_POOL, useAppStore, useCurrentUser } from "@/store/appStore";
+import { BudgetUtilization } from "@/components/dashboard/BudgetUtilization";
 import { isAvailable, isIssued } from "@/components/dashboard/voucherData";
 
 export const Route = createFileRoute("/")({
@@ -188,6 +189,8 @@ function Dashboard() {
           />
         </div>
       )}
+
+      <BudgetUtilization vouchers={allVouchers as never} since={since} role={role} myBranch={myBranch} periodLabel={periodLabels[period]} />
 
       {role === "admin" ? <PendingRequests /> : null}
 
