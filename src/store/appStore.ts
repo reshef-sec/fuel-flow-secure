@@ -652,6 +652,12 @@ export const useAppStore = create<AppState>()(
 
 /** The user represented by the role simulator; prefers one allowed to request. */
 export function pickCurrentUser(users: UserRecord[], role: Role) {
+  if (role === "branch") {
+    // Preview: prefer a branch manager whose branch actually has supervisors.
+    const staffed = new Set(users.filter((u) => u.role === "supervisor").map((u) => u.branch.trim()));
+    const m = users.find((u) => u.role === "branch" && staffed.has(u.branch.trim()));
+    if (m) return m;
+  }
   return users.find((u) => u.role === role && u.canRequest) ?? users.find((u) => u.role === role);
 }
 

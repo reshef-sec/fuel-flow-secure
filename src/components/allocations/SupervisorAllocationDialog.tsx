@@ -20,7 +20,7 @@ export function SupervisorAllocationDialog({
   const users = useAppStore((s) => s.users);
   const assignToSupervisor = useAppStore((s) => s.assignToSupervisor);
 
-  const supervisors = users.filter((u) => u.role === "supervisor" && u.branch === branch);
+  const supervisors = users.filter((u) => u.role === "supervisor" && u.branch.trim() === branch.trim());
   const [supervisor, setSupervisor] = useState("");
   const [amount, setAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
