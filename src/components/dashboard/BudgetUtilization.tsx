@@ -5,7 +5,7 @@ import { MAIN_POOL, type Role } from "@/store/appStore";
 import { isAvailable, isIssued } from "@/components/dashboard/voucherData";
 
 type V = { branch: string; amount: number; deliveredAt?: string | null; updatedAt: string };
-type Slice = { name: string; value: number; branches: string[] };
+type Slice = { name: string; value: number; branches: string[]; details?: { name: string; value: number }[] };
 
 const OTHERS = "אחרים";
 const TOP = 5;
@@ -15,13 +15,18 @@ const LEFT = "var(--color-success)";
 
 const ils = (n: number) => `${n.toLocaleString("he-IL")} ₪`;
 
-function Tip({ active, payload, total }: { active?: boolean; payload?: { name: string; value: number }[]; total: number }) {
+function Tip({ active, payload, total }: { active?: boolean; payload?: { name: string; value: number; payload?: Slice }[]; total: number }) {
   if (!active || !payload?.length) return null;
   const p = payload[0];
   return (
     <div className="rounded-md border border-border bg-surface px-3 py-2 text-sm shadow-md">
       <p className="font-bold text-secondary">{p.name}</p>
-      <p>{ils(p.value)} · {total ? Math.round((p.value / total) * 100) : 0}%</p>
+      <p>{p.payload?.details ? "סה\"כ: " : ""}{ils(p.value)} · {total ? Math.round((p.value / total) * 100) : 0}%</p>
+      {p.payload?.details ? (
+        <ul className="mt-1 max-h-48 space-y-0.5 overflow-y-auto border-t border-border pt-1 text-xs">
+          {p.payload.details.map((d) => <li key={d.name} className="flex justify-between gap-4"><span>{d.name}</span><span className="tabular-nums">{ils(d.value)}</span></li>)}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -48,7 +53,7 @@ export function BudgetUtilization({ vouchers, since, role, myBranch, periodLabel
   const sorted = [...stats.entries()].filter(([, s]) => s.budget > 0).sort((a, b) => b[1].budget - a[1].budget);
   const slices: Slice[] = sorted.slice(0, TOP).map(([name, s]) => ({ name, value: s.budget, branches: [name] }));
   const rest = sorted.slice(TOP);
-  if (rest.length) slices.push({ name: OTHERS, value: rest.reduce((t, [, s]) => t + s.budget, 0), branches: rest.map(([n]) => n) });
+  if (rest.length) slices.push({ name: OTHERS, value: rest.reduce((t, [, s]) => t + s.budget, 0), branches: rest.map(([n]) => n), details: rest.map(([name, s]) => ({ name, value: s.budget })) });
   const allocTotal = slices.reduce((t, s) => t + s.value, 0);
 
   const scope = role === "branch" ? [myBranch.trim()] : selected ? slices.find((s) => s.name === selected)?.branches ?? null : null;
