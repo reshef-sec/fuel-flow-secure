@@ -53,7 +53,7 @@ export function AuditPanel() {
   useEffect(() => {
     let cancelled = false;
     void supabase
-      .from("activity_logs")
+      .from("activity_log")
       .select("id, created_at, user_name, role, action, target, ip_address")
       .order("created_at", { ascending: false })
       .limit(1000)
