@@ -31,6 +31,7 @@ function VoucherWallet() {
   const { id } = Route.useParams();
   const [ready, setReady] = useState(false);
   const [link, setLink] = useState<{ total: number; signed: boolean } | null>(null);
+  const [blocked, setBlocked] = useState<"locked" | "expired" | null>(null);
   const [codes, setCodes] = useState<Code[]>([]);
   const fetchStatus = useServerFn(getWorkerLinkStatus);
   const openWallet = useServerFn(openWorkerWallet);
@@ -53,6 +54,7 @@ function VoucherWallet() {
     }
     fetchStatus({ data: { id } })
       .then((r) => {
+        if (r.exists && r.state !== "ok") setBlocked(r.state);
         setLink(r.exists ? { total: r.total, signed: r.signed } : null);
         if (r.exists && r.employeeName) {
           setFullName(r.employeeName);
@@ -75,7 +77,8 @@ function VoucherWallet() {
         setCodes(r.codes);
         setError(null);
         setStep("wallet");
-      } else setError("הפרטים אינם תואמים לבעל הלינק");
+      } else if (r.state === "locked" || r.state === "expired") setBlocked(r.state);
+      else setError(`הפרטים אינם תואמים לבעל הלינק · נותרו ${r.attemptsLeft} ניסיונות`);
       return;
     }
     setError(null);
@@ -110,6 +113,16 @@ function VoucherWallet() {
         <div className="px-6 py-6">
           {!ready ? (
             <p className="text-center text-sm text-muted-foreground">טוען…</p>
+          ) : blocked === "locked" ? (
+            <div className="space-y-2 text-center">
+              <p className="font-display text-lg font-extrabold text-danger">הלינק ננעל</p>
+              <p className="text-sm text-muted-foreground">הוזנו פרטים שגויים 3 פעמים. יש לפנות למי שהפיק את השובר לשחרור הלינק.</p>
+            </div>
+          ) : blocked === "expired" ? (
+            <div className="space-y-2 text-center">
+              <p className="font-display text-lg font-extrabold text-danger">פג תוקף הלינק</p>
+              <p className="text-sm text-muted-foreground">הלינק היה בתוקף 3 חודשים מיום ההפקה. יש לפנות למי שהפיק את השובר.</p>
+            </div>
           ) : !link ? (
             <p className="text-center font-semibold text-danger">הלינק אינו תקף או שפג תוקפו</p>
           ) : step === "identify" ? (
