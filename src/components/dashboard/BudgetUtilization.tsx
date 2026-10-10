@@ -9,6 +9,7 @@ type Slice = { name: string; value: number; branches: string[]; details?: { name
 
 const OTHERS = "אחרים";
 const TOP = 5;
+const DIRECT = "הונפק ישירות ממאגר ראשי";
 const PALETTE = ["var(--color-primary)", "var(--color-accent)", "var(--color-secondary)", "var(--color-warning)", "var(--color-mint-300)", "var(--color-muted-foreground)"];
 const USED = "var(--color-danger)";
 const LEFT = "var(--color-success)";
@@ -40,10 +41,13 @@ export function BudgetUtilization({ vouchers, since, role, myBranch, periodLabel
 
   const stats = new Map<string, { issued: number; budget: number }>();
   for (const v of vouchers) {
-    const b = mainBranch(v.branch);
-    if (!b || b === MAIN_POOL) continue;
-    const s = stats.get(b) ?? { issued: 0, budget: 0 };
     const vv = v as never;
+    const raw = mainBranch(v.branch);
+    const central = !raw || raw === MAIN_POOL;
+    // Unissued central stock is not branch budget; vouchers issued straight from it still count.
+    if (central && !isIssued(vv)) continue;
+    const b = central ? DIRECT : raw;
+    const s = stats.get(b) ?? { issued: 0, budget: 0 };
     if (isIssued(vv)) {
       if (!since || (v.deliveredAt ?? v.updatedAt) >= since) { s.issued += v.amount; s.budget += v.amount; }
     } else if (isAvailable(vv)) s.budget += v.amount;
