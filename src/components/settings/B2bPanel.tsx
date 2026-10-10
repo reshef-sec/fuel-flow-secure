@@ -133,7 +133,7 @@ export function B2bPanel() {
   return (
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-extrabold text-secondary">מאגר B2B</h2>
+        <h2 className="font-display text-xl font-extrabold text-secondary">מאגר רכב עבודה</h2>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -241,7 +241,7 @@ export function B2bPanel() {
         </Table>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editing ? "עריכת לקוח B2B" : "הוספת לקוח B2B"}>
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? "עריכת לקוח רכב עבודה" : "הוספת לקוח רכב עבודה"}>
         <form onSubmit={submit} className="space-y-4">
           <FormField label="סניף">
             <Select

@@ -13,8 +13,8 @@ function CategorySelect({ value, onChange }: { value: ReasonCategory; onChange: 
       onChange={(e) => onChange(e.target.value as ReasonCategory)}
       className="w-40"
     >
-      <option value="B2B">B2B (חיוב לקוח)</option>
-      <option value="Regular">רגיל (ללא חיוב)</option>
+      <option value="B2B">רכב עבודה</option>
+      <option value="Regular">רכב פרטי</option>
     </Select>
   );
 }

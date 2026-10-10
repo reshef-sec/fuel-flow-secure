@@ -170,8 +170,8 @@ function SupervisorPage() {
             <div role="radiogroup" aria-label="סוג הנפקה" className="grid grid-cols-2 gap-2 rounded-xl bg-surface-muted p-1">
               {(
                 [
-                  ["b2b", "בחיוב לקוח"],
-                  ["regular", "ללא חיוב לקוח"],
+                  ["b2b", "רכב עבודה"],
+                  ["regular", "רכב פרטי"],
                 ] as const
               ).map(([value, label]) => (
                 <label
@@ -195,7 +195,7 @@ function SupervisorPage() {
             </div>
 
             <FormField
-              label={mode === "b2b" ? "חיפוש לקוח B2B" : "בחירת לקוח (ללא חיוב)"}
+              label="בחירת לקוח"
               hint={mode === "b2b" ? "מוצגים רק לקוחות הסניף שלך" : "חיפוש לפי שם לקוח או אתר"}
             >
               <div className="relative">

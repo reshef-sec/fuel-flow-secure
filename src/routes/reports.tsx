@@ -30,7 +30,7 @@ export const Route = createFileRoute("/reports")({
       { title: "דוחות | רשף ביטחון" },
       {
         name: "description",
-        content: "דוח ללא חיוב לקוח ודוח B2B על שוברי הדלק עם סינון לפי תאריך, סניף, מפקח, לקוח וסטטוס וייצוא לאקסל ו-PDF.",
+        content: "דוח רכב פרטי ודוח רכב עבודה על שוברי הדלק עם סינון לפי תאריך, סניף, מפקח, לקוח וסטטוס וייצוא לאקסל ו-PDF.",
       },
       { property: "og:title", content: "דוחות | רשף ביטחון" },
       { property: "og:description", content: "דוחות שוברים עם סינון מתקדם וייצוא לאקסל ו-PDF." },
@@ -45,8 +45,8 @@ const statuses: VoucherStatus[] = ["טרם שומש", "הוקצה לעובד", "
 const empty = { from: "", to: "", branch: "", supervisor: "", client: "", status: "" };
 
 const reportTabs = [
-  { id: "master", label: "דוח ללא חיוב לקוח", icon: Table2 },
-  { id: "paz", label: 'דו"ח B2B', icon: Fuel },
+  { id: "master", label: "דוח רכב פרטי", icon: Table2 },
+  { id: "paz", label: 'דוח רכב עבודה', icon: Fuel },
 ] as const;
 
 function ReportsPage() {
@@ -134,11 +134,11 @@ function ReportsPage() {
       .map((r) => `<tr>${r.map((c) => `<td>${String(c)}</td>`).join("")}</tr>`)
       .join("");
     win.document.write(`<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8">
-<title>דוח ללא חיוב לקוח</title><style>
+<title>דוח רכב פרטי</title><style>
 body{font-family:Assistant,Arial,sans-serif;padding:24px;color:#0f2445}
 h1{font-size:20px}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:16px}
 th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0fb}
-</style></head><body><h1>דוח ללא חיוב לקוח · רשף ביטחון</h1>
+</style></head><body><h1>דוח רכב פרטי · רשף ביטחון</h1>
 <p>${rows.length} רשומות · סה"כ ${total.toLocaleString("he-IL")} ₪</p>
 <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></body></html>`);
     win.document.close();
@@ -261,7 +261,7 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
       <section className="mt-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-display text-xl font-extrabold text-secondary">דוח ללא חיוב לקוח</h2>
+            <h2 className="font-display text-xl font-extrabold text-secondary">דוח רכב פרטי</h2>
             <p className="text-sm tabular-nums text-muted-foreground">
               {rows.length} רשומות · סה"כ {total.toLocaleString("he-IL")} ₪
             </p>

@@ -35,8 +35,8 @@ const tabs = [
   { id: "reasons", label: "סיבות הנפקה", icon: ListChecks },
   { id: "branches", label: "ניהול סניפים", icon: Building2 },
   { id: "users", label: "ניהול משתמשים", icon: Users },
-  { id: "clients", label: "מאגר ללא חיוב לקוח", icon: Briefcase },
-  { id: "b2b", label: "מאגר B2B", icon: Building2 },
+  { id: "clients", label: "מאגר רכב פרטי", icon: Briefcase },
+  { id: "b2b", label: "מאגר רכב עבודה", icon: Building2 },
   { id: "audit", label: "יומן פעילות", icon: ScrollText },
 ] as const;
 
