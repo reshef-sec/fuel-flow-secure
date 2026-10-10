@@ -34,6 +34,14 @@ export interface VoucherRecord {
   workerId?: string;
   /** תאריך מסירה לעובד */
   deliveredAt?: string;
+  /** טלפון עובד */
+  workerPhone?: string;
+  /** ISO timestamp when handed to the employee; expiry starts here. */
+  issuedAt?: string;
+  /** ISO timestamp — 3 months after issuedAt. */
+  expiresAt?: string;
+  /** Auth user id of the supervisor holding / issuing the voucher. */
+  supervisorId?: string;
 
   /* ---- Issuance route ---- */
   /** "b2b" = בחיוב לקוח, "regular" = ללא חיוב */
@@ -54,6 +62,13 @@ export interface VoucherRecord {
 }
 
 /** True for vouchers handed to an end worker (billing-relevant). */
+/** True once the voucher was handed to an employee through a link. */
+export const isIssued = (v: VoucherRecord) => Boolean(v.linkId || v.workerName || v.workerId);
+
+/** Unused budget still available to hand out (not issued, redeemed or blocked). */
+export const isAvailable = (v: VoucherRecord) =>
+  !isIssued(v) && v.status !== "מומש סופית" && v.status !== "חסום";
+
 export const isWorkerVoucher = (v: VoucherRecord) =>
   Boolean(v.workerId || v.workerName) || v.status === "הוקצה לעובד";
 

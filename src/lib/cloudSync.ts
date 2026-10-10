@@ -25,7 +25,7 @@ export function run(p: PromiseLike<{ error: { message: string } | null }>) {
 
 /* ---------- mappers ---------- */
 export const voucherToRow = (v: VoucherRecord) => ({
-  serial: v.serial, real_code: v.realCode, amount: v.amount, branch: v.branch,
+  serial: v.serial, real_code: "", amount: v.amount, branch: v.branch,
   supervisor: v.supervisor ?? null, client: v.client ?? null, status: v.status, updated_on: v.updatedAt,
   requester: v.requester ?? null, approver: v.approver ?? null, client_id: v.clientId ?? null,
   site_id: v.siteId ?? null, site_name: v.siteName ?? null, reason: v.reason ?? null,
@@ -33,13 +33,18 @@ export const voucherToRow = (v: VoucherRecord) => ({
   route: v.route ?? null, link_id: v.linkId ?? null, client_code: v.clientCode ?? null,
   account_name: v.accountName ?? null, standard: v.standard ?? null, license_plate: v.licensePlate ?? null,
   driver_name: v.driverName ?? null, standard_name: v.standardName ?? null,
+  employee_name: v.workerName ?? null, employee_id: v.workerId ?? null, employee_phone: v.workerPhone ?? null,
+  issue_reason: v.reason ?? null, issued_at: v.issuedAt ?? null, expires_at: v.expiresAt ?? null,
+  supervisor_id: v.supervisorId ?? null,
 });
-const rowToVoucher = (r: Row): VoucherRecord => {
+const rowToVoucher = (r: Row, codes: Map<string, string>): VoucherRecord => {
   const v: Row = {
-    serial: r.serial, realCode: r.real_code, amount: r.amount, branch: r.branch, status: r.status,
+    serial: r.serial, realCode: codes.get(String(r.serial)) ?? (r.real_code || ""), amount: r.amount, branch: r.branch, status: r.status,
     updatedAt: r.updated_on, supervisor: s(r.supervisor), client: s(r.client), requester: s(r.requester),
     approver: s(r.approver), clientId: s(r.client_id), siteId: s(r.site_id), siteName: s(r.site_name),
-    reason: s(r.reason), workerName: s(r.worker_name), workerId: s(r.worker_id),
+    reason: s(r.issue_reason) ?? s(r.reason), workerName: s(r.employee_name) ?? s(r.worker_name),
+    workerId: s(r.employee_id) ?? s(r.worker_id), workerPhone: s(r.employee_phone),
+    issuedAt: s(r.issued_at), expiresAt: s(r.expires_at), supervisorId: s(r.supervisor_id),
     deliveredAt: s(r.delivered_at), route: s(r.route), linkId: s(r.link_id), clientCode: s(r.client_code),
     accountName: s(r.account_name), standard: s(r.standard), licensePlate: s(r.license_plate),
     driverName: s(r.driver_name), standardName: s(r.standard_name),
@@ -69,14 +74,14 @@ export const userPatch = (p: Partial<UserRecord>) => {
 
 export const clientToRow = (c: ClientRecord) => ({
   client_id: c.clientId, client_name: c.clientName, site_id: c.siteId, site_name: c.siteName,
-  standard: c.standard ?? null,
+  standard: c.standard ?? null, is_active: c.isActive !== false,
 });
 export const b2bToRow = (c: B2BClientRecord) => ({
   client_code: c.clientCode, account_name: c.accountName, client_name: c.clientName, branch: c.branch,
   standard: c.standard, balance: c.balance ?? null, load_type: c.loadType ?? null,
   budget_section: c.budgetSection ?? null, account_key: c.accountKey ?? null,
   item_family: c.itemFamily ?? null, account_status: c.accountStatus ?? null,
-  account_type: c.accountType ?? null,
+  account_type: c.accountType ?? null, is_active: c.isActive !== false,
 });
 export const requestToRow = (r: VoucherRequest) => ({
   id: r.id, requester: r.requester, requester_id: r.requesterId, branch: r.branch, amount: r.amount,
@@ -86,6 +91,7 @@ export const requestToRow = (r: VoucherRequest) => ({
 export const linkToRow = (l: WorkerLink) => ({
   id: l.id, total: l.total, serials: l.serials, created_on: l.createdAt,
   worker_id: l.workerId ?? null, phone: l.phone ?? null, signed_at: l.signedAt ?? null,
+  employee_name: l.employeeName ?? null, branch: l.branch ?? null, supervisor_id: l.supervisorId ?? null,
 });
 
 /** Reads every table in pages (the API returns at most 1,000 rows per call). */
@@ -108,6 +114,9 @@ export async function loadAll() {
     all("regular_clients", "created_at"), all("vouchers", "created_at"), all("app_users", "created_at"),
     all("voucher_requests", "created_at"), all("worker_links", "created_at"), all("app_settings"),
   ]);
+  // Real codes are admin-only; other roles get an access error and see none.
+  const codeRows = await all("voucher_codes").catch(() => [] as Row[]);
+  const codes = new Map(codeRows.map((r) => [String(r.serial), String(r.real_code)]));
   return {
     branchList: branches.map((r) => ({ id: String(r.id), name: String(r.name), manager: String(r.manager), city: String(r.city) })) as BranchRecord[],
     reasons: reasons.map((r) => ({ id: String(r.id), name: String(r.name), category: r.category === "B2B" ? "B2B" : "Regular" })) as ReasonRecord[],
@@ -115,13 +124,13 @@ export async function loadAll() {
       clientCode: String(r.client_code), accountName: String(r.account_name), clientName: String(r.client_name),
       branch: String(r.branch), standard: String(r.standard), balance: s(r.balance), loadType: s(r.load_type),
       budgetSection: s(r.budget_section), accountKey: s(r.account_key), itemFamily: s(r.item_family),
-      accountStatus: s(r.account_status), accountType: s(r.account_type),
+      accountStatus: s(r.account_status), accountType: s(r.account_type), isActive: r.is_active !== false,
     })) as B2BClientRecord[],
     nonB2bClients: clients.map((r) => ({
       clientId: String(r.client_id), clientName: String(r.client_name), siteId: String(r.site_id),
-      siteName: String(r.site_name), standard: s(r.standard),
+      siteName: String(r.site_name), standard: s(r.standard), isActive: r.is_active !== false,
     })) as ClientRecord[],
-    vouchers: vouchers.map(rowToVoucher).reverse(),
+    vouchers: vouchers.map((r) => rowToVoucher(r, codes)).reverse(),
     users: users.map((r) => ({
       id: String(r.national_id), lastName: String(r.last_name), firstName: String(r.first_name),
       role: r.role as UserRecord["role"], title: String(r.title), phone: String(r.phone), branch: String(r.branch),
@@ -136,6 +145,7 @@ export async function loadAll() {
     links: links.map((r) => ({
       id: String(r.id), total: Number(r.total), serials: (r.serials as string[]) ?? [], createdAt: String(r.created_on),
       workerId: s(r.worker_id), phone: s(r.phone), signedAt: s(r.signed_at),
+      employeeName: s(r.employee_name), branch: s(r.branch), supervisorId: s(r.supervisor_id),
     })).reverse() as WorkerLink[],
     balance: Number(settings.find((r) => r.key === "main")?.balance ?? 0),
   };
