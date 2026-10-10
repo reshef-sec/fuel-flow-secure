@@ -346,7 +346,13 @@ export const useAppStore = create<AppState>()(
       return { vouchers: [...rows, ...s.vouchers.filter((v) => !incoming.has(v.serial))] };
     });
     for (let i = 0; i < rows.length; i += 500)
-      run(db.from("vouchers").upsert(rows.slice(i, i + 500).map(voucherToRow)));
+      void Promise.resolve(db.from("vouchers").upsert(rows.slice(i, i + 500).map(voucherToRow))).then(
+        ({ error }: { error: { message: string } | null }) => {
+          if (error) return toast.error(`שמירה בענן נכשלה: ${error.message}`);
+          const codes = rows.slice(i, i + 500).filter((v) => v.realCode).map((v) => ({ serial: v.serial, real_code: v.realCode }));
+          if (codes.length) run(db.from("voucher_codes").upsert(codes));
+        },
+      );
   },
 
   requests: [],
