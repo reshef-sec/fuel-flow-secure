@@ -1,3 +1,4 @@
+import { publicVoucherUrl } from "@/lib/publicUrl";
 import { useMemo } from "react";
 import { Copy, SquareArrowOutUpRight } from "lucide-react";
 import { toast } from "sonner";
@@ -14,7 +15,7 @@ import {
 import { useAppStore, useCurrentUser } from "@/store/appStore";
 
 const linkUrl = (id: string) =>
-  typeof window === "undefined" ? `/voucher/${id}` : `${window.location.origin}/voucher/${id}`;
+  publicVoucherUrl(id);
 
 /** Recently produced worker links, scoped to the viewer's role, with copy-again. */
 export function ProducedLinks({ limit }: { limit?: number }) {
