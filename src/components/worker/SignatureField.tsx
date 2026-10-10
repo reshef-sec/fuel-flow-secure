@@ -6,9 +6,12 @@ const HEIGHT = 150;
 
 export function SignatureField({
   onChange,
+  onCapture,
   error,
 }: {
   onChange: (hasSignature: boolean) => void;
+  /** Receives the signature as a PNG data URL (or null when cleared). */
+  onCapture?: (dataUrl: string | null) => void;
   error?: string;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -19,9 +22,14 @@ export function SignatureField({
   // never re-runs (which would wipe an existing signature).
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const captureRef = useRef(onCapture);
+  captureRef.current = onCapture;
 
   const report = useCallback(() => {
-    onChangeRef.current(!padRef.current?.isEmpty());
+    const pad = padRef.current;
+    const has = Boolean(pad && !pad.isEmpty());
+    onChangeRef.current(has);
+    captureRef.current?.(has && pad ? pad.toDataURL("image/png") : null);
   }, []);
 
   // Keep the canvas bitmap in sync with its rendered size so strokes land
@@ -43,6 +51,7 @@ export function SignatureField({
       canvas.getContext("2d")?.scale(ratio, ratio);
       pad.clear();
       onChangeRef.current(false);
+      captureRef.current?.(null);
     };
 
     resize();
@@ -65,6 +74,7 @@ export function SignatureField({
           onClick={() => {
             padRef.current?.clear();
             onChangeRef.current(false);
+            captureRef.current?.(null);
           }}
           className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-semibold text-primary hover:bg-blue-100"
         >

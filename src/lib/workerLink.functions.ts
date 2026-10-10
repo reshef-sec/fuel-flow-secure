@@ -7,6 +7,11 @@ const identSchema = idSchema.extend({
   phone: z.string().regex(/^0\d{8,9}$/),
 });
 
+const signSchema = identSchema.extend({
+  fullName: z.string().trim().min(2).max(80),
+  signature: z.string().startsWith("data:image/png;base64,").max(800_000),
+});
+
 type Code = { serial: string; realCode: string; amount: number };
 
 async function codesFor(serials: string[]): Promise<Code[]> {
@@ -40,7 +45,7 @@ export const openWorkerWallet = createServerFn({ method: "POST" })
 
 /** Public: first signature claims the link, then returns its codes. */
 export const signWorkerLink = createServerFn({ method: "POST" })
-  .inputValidator((d) => identSchema.parse(d))
+  .inputValidator((d) => signSchema.parse(d))
   .handler(async ({ data }) => {
     const supabaseAdmin = (await import("@/lib/supabaseAdmin.server")).getAdmin();
     const today = new Date().toISOString().slice(0, 10);
@@ -49,6 +54,20 @@ export const signWorkerLink = createServerFn({ method: "POST" })
       .update({ worker_id: data.workerId, phone: data.phone, signed_at: today })
       .eq("id", data.id).is("worker_id", null).select("*").maybeSingle();
     if (!link) return { ok: false as const, codes: [] as Code[] };
-    await supabaseAdmin.from("vouchers").update({ worker_id: data.workerId }).in("serial", link.serials);
-    return { ok: true as const, codes: await codesFor(link.serials) };
+    await supabaseAdmin
+      .from("vouchers")
+      .update({ worker_id: data.workerId, worker_name: data.fullName })
+      .in("serial", link.serials);
+    const codes = await codesFor(link.serials);
+    const { error: archiveError } = await supabaseAdmin.from("signature_archive").insert({
+      link_id: data.id,
+      full_name: data.fullName,
+      national_id: data.workerId,
+      phone: data.phone,
+      total_amount: codes.reduce((s, c) => s + c.amount, 0) || link.total,
+      serials: link.serials,
+      signature: data.signature,
+    });
+    if (archiveError) console.error("signature_archive insert failed", archiveError.message);
+    return { ok: true as const, codes };
   });
