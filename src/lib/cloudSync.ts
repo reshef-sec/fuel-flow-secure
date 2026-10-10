@@ -146,6 +146,7 @@ export async function loadAll() {
       id: String(r.id), total: Number(r.total), serials: (r.serials as string[]) ?? [], createdAt: String(r.created_on),
       workerId: s(r.worker_id), phone: s(r.phone), signedAt: s(r.signed_at),
       employeeName: s(r.employee_name), branch: s(r.branch), supervisorId: s(r.supervisor_id),
+      locked: Boolean(r.locked) || Number(r.failed_attempts ?? 0) >= 3,
     })).reverse() as WorkerLink[],
     balance: Number(settings.find((r) => r.key === "main")?.balance ?? 0),
   };

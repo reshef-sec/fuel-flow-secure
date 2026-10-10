@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { supabase } from "@/lib/supabaseClient";
+import { Pager, usePaged } from "@/components/ui/Pager";
 
 interface AuditRecord {
   id: string;
@@ -87,6 +88,7 @@ export function AuditPanel() {
         (!q || r.user.includes(q) || r.action.includes(q) || r.target.includes(q)),
     );
   }, [auditLog, query, role]);
+  const paged = usePaged(rows);
 
   return (
     <Card padding="lg">
@@ -145,7 +147,7 @@ export function AuditPanel() {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((r) => (
+              paged.slice.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-semibold text-secondary">{r.user}</TableCell>
                   <TableCell>{r.role}</TableCell>
@@ -164,6 +166,7 @@ export function AuditPanel() {
             )}
           </TableBody>
         </Table>
+        <Pager {...paged} />
       </div>
     </Card>
   );

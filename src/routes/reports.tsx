@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { Tabs } from "@/components/ui/Tabs";
+import { Pager, usePaged } from "@/components/ui/Pager";
 import { B2bReport } from "@/components/reports/B2bReport";
 import {
   Badge,
@@ -94,6 +95,7 @@ function ReportsPage() {
     [vouchers, filters, lockedBranch, lockedSupervisor],
   );
 
+  const paged = usePaged(rows);
   const total = rows.reduce((sum, v) => sum + v.amount, 0);
   const isAdmin = role === "admin";
   // Real serial numbers are shown to admins only; others see the internal מס"ד.
@@ -302,9 +304,9 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
                   </TableCell>
                 </TableRow>
               ) : (
-                rows.map((v, i) => (
+                paged.slice.map((v, i) => (
                   <TableRow key={v.serial}>
-                    {cells[i]!.map((c, j) => (
+                    {cells[paged.offset + i]!.map((c, j) => (
                       <TableCell key={j} className="whitespace-nowrap">
                         {j === statusCol ? (
                           <Badge variant={statusVariant[v.status]} size="md">{v.status}</Badge>
@@ -318,6 +320,7 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
               )}
             </TableBody>
           </Table>
+          <Pager {...paged} />
         </div>
       </section>
         </>

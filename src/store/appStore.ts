@@ -103,6 +103,8 @@ export interface WorkerLink {
   employeeName?: string;
   branch?: string;
   supervisorId?: string;
+  /** Locked after 3 wrong ID/phone attempts. */
+  locked?: boolean;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -246,17 +248,8 @@ export const useAppStore = create<AppState>()(
         window.localStorage.removeItem(ROLE_KEY);
       }
       const data = await loadAll();
-      // 3-month rule: unredeemed vouchers past their expiry become blocked.
-      const now = new Date().toISOString();
-      const expired: VoucherRecord[] = [];
-      data.vouchers = data.vouchers.map((v) => {
-        if (!v.expiresAt || v.expiresAt > now || v.status === "מומש סופית" || v.status === "חסום") return v;
-        const nv = { ...v, status: "חסום" as const, updatedAt: today() };
-        expired.push(nv);
-        return nv;
-      });
+      // Vouchers never expire; only the employee link does (checked server-side).
       set({ ...data, loaded: true });
-      if (expired.length) run(db.from("vouchers").upsert(expired.map(voucherToRow)));
     } catch (e) {
       set({ loaded: true });
       toast.error(`טעינת הנתונים מהענן נכשלה: ${(e as Error).message}`);
