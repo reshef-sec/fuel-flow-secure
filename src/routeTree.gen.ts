@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkerRouteImport } from './routes/worker'
 import { Route as VouchersRouteImport } from './routes/vouchers'
 import { Route as SupervisorRouteImport } from './routes/supervisor'
+import { Route as SignaturesRouteImport } from './routes/signatures'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as LoginRouteImport } from './routes/login'
@@ -36,6 +37,11 @@ const VouchersRoute = VouchersRouteImport.update({
 const SupervisorRoute = SupervisorRouteImport.update({
   id: '/supervisor',
   path: '/supervisor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignaturesRoute = SignaturesRouteImport.update({
+  id: '/signatures',
+  path: '/signatures',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/signatures': typeof SignaturesRoute
   '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRouteWithChildren
@@ -113,6 +120,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/signatures': typeof SignaturesRoute
   '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRouteWithChildren
@@ -129,6 +137,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
+  '/signatures': typeof SignaturesRoute
   '/supervisor': typeof SupervisorRoute
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRouteWithChildren
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reports'
     | '/settings'
+    | '/signatures'
     | '/supervisor'
     | '/vouchers'
     | '/worker'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reports'
     | '/settings'
+    | '/signatures'
     | '/supervisor'
     | '/vouchers'
     | '/worker'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reports'
     | '/settings'
+    | '/signatures'
     | '/supervisor'
     | '/vouchers'
     | '/worker'
@@ -192,6 +204,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
+  SignaturesRoute: typeof SignaturesRoute
   SupervisorRoute: typeof SupervisorRoute
   VouchersRoute: typeof VouchersRoute
   WorkerRoute: typeof WorkerRouteWithChildren
@@ -221,6 +234,13 @@ declare module '@tanstack/react-router' {
       path: '/supervisor'
       fullPath: '/supervisor'
       preLoaderRoute: typeof SupervisorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signatures': {
+      id: '/signatures'
+      path: '/signatures'
+      fullPath: '/signatures'
+      preLoaderRoute: typeof SignaturesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -314,6 +334,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
+  SignaturesRoute: SignaturesRoute,
   SupervisorRoute: SupervisorRoute,
   VouchersRoute: VouchersRoute,
   WorkerRoute: WorkerRouteWithChildren,
