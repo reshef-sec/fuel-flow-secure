@@ -69,7 +69,7 @@ function SignaturesPage() {
       .select("*")
       .order("created_at", { ascending: false })
       .limit(1000)
-      .then(({ data, error }) => {
+      .then(({ data, error }: { data: unknown[] | null; error: { message: string } | null }) => {
         if (error) setError(error.message);
         else
           setRows(
