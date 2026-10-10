@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Card } from "@/design-system/delek-1ea111";
 import { MAIN_POOL, type Role } from "@/store/appStore";
-import { isAvailable, isIssued } from "@/components/dashboard/voucherData";
+import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
 
 type V = { branch: string; amount: number; deliveredAt?: string | null; updatedAt: string };
 type Slice = { name: string; value: number; branches: string[]; details?: { name: string; value: number }[] };
@@ -40,7 +40,7 @@ export function BudgetUtilization({ vouchers, since, role, myBranch, periodLabel
 
   const stats = new Map<string, { issued: number; budget: number }>();
   for (const v of vouchers) {
-    const b = v.branch?.trim();
+    const b = mainBranch(v.branch);
     if (!b || b === MAIN_POOL) continue;
     const s = stats.get(b) ?? { issued: 0, budget: 0 };
     const vv = v as never;
@@ -56,7 +56,7 @@ export function BudgetUtilization({ vouchers, since, role, myBranch, periodLabel
   if (rest.length) slices.push({ name: OTHERS, value: rest.reduce((t, [, s]) => t + s.budget, 0), branches: rest.map(([n]) => n), details: rest.map(([name, s]) => ({ name, value: s.budget })) });
   const allocTotal = slices.reduce((t, s) => t + s.value, 0);
 
-  const scope = role === "branch" ? [myBranch.trim()] : selected ? slices.find((s) => s.name === selected)?.branches ?? null : null;
+  const scope = role === "branch" ? [mainBranch(myBranch)] : selected ? slices.find((s) => s.name === selected)?.branches ?? null : null;
   const pick = scope ? [...stats.entries()].filter(([n]) => scope.includes(n)).map(([, s]) => s) : [...stats.values()];
   const used = pick.reduce((t, s) => t + s.issued, 0);
   const left = Math.max(0, pick.reduce((t, s) => t + s.budget, 0) - used);

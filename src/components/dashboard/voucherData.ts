@@ -78,3 +78,7 @@ export function formatAssignment(v: { branch: string; supervisor?: string }) {
 }
 
 export const vouchers: VoucherRecord[] = [];
+
+/** Main branch name only: strips a "(מפקח …)" suffix and a leading "סניף ". */
+export const mainBranch = (b: string | null | undefined) =>
+  (b ?? "").replace(/\s*\([^)]*\)\s*$/, "").replace(/^סניף\s+/, "").trim();
