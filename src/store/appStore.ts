@@ -6,6 +6,7 @@ import {
 
 import {
   MAIN_POOL,
+  isAvailable,
   type VoucherRecord,
 } from "@/components/dashboard/voucherData";
 
@@ -272,7 +273,7 @@ export const useAppStore = create<AppState>()(
       amount: 100,
       branch,
       ...(supervisor ? { supervisor } : {}),
-      status: supervisor ? ("הוקצה לעובד" as const) : ("טרם שומש" as const),
+      status: "טרם שומש" as const,
       updatedAt: today(),
       ...(meta?.requester ? { requester: meta.requester } : {}),
       ...(meta?.approver ? { approver: meta.approver } : {}),
@@ -290,7 +291,7 @@ export const useAppStore = create<AppState>()(
       if (v.branch !== branch || v.supervisor || v.status !== "טרם שומש") return v;
       if (v.amount > left) return v;
       left -= v.amount;
-      const nv = { ...v, supervisor, status: "הוקצה לעובד" as const, updatedAt: today() };
+      const nv = { ...v, supervisor, updatedAt: today() };
       changed.push(nv);
       return nv;
     });
@@ -441,28 +442,28 @@ export const useAppStore = create<AppState>()(
     if (next)
       run(db.from("regular_clients").update(clientToRow(next)).eq("client_id", clientId).eq("site_id", siteId));
   },
-  /** Upserts imported rows by clientId + siteId (no duplicates). */
   importClients: (rows) => {
-    const existing = new Map(get().nonB2bClients.map((c) => [`${c.clientId}|${c.siteId}`, c]));
-    let updated = 0;
-    let added = 0;
-    for (const row of rows) {
-      const key = `${row.clientId}|${row.siteId}`;
-      if (existing.has(key)) {
-        existing.set(key, { ...existing.get(key)!, ...row });
-        updated += 1;
-      } else {
-        existing.set(key, row);
-        added += 1;
-      }
-    }
-    const list = [...existing.values()];
-    set({ nonB2bClients: list });
-    const keys = new Set(rows.map((r) => `${r.clientId}|${r.siteId}`));
-    const toSave = list.filter((c) => keys.has(`${c.clientId}|${c.siteId}`)).map(clientToRow);
+    const key = (c: ClientRecord) => `${c.clientId}|${c.siteId}`;
+    const incoming = new Map(rows.map((r) => [key(r), r]));
+    const current = get().nonB2bClients;
+    const known = new Set(current.map(key));
+    let deactivated = 0;
+    const changed: ClientRecord[] = [];
+    const list = current.map((c) => {
+      const inFile = incoming.has(key(c));
+      const active = c.isActive !== false;
+      if (inFile === active) return c;
+      if (!inFile) deactivated += 1;
+      const nc = { ...c, isActive: inFile };
+      changed.push(nc);
+      return nc;
+    });
+    const fresh = [...incoming.values()].filter((r) => !known.has(key(r))).map((r) => ({ ...r, isActive: true }));
+    set({ nonB2bClients: [...fresh, ...list] });
+    const toSave = [...fresh, ...changed].map(clientToRow);
     for (let i = 0; i < toSave.length; i += 500)
       run(db.from("regular_clients").upsert(toSave.slice(i, i + 500), { onConflict: "client_id,site_id" }));
-    return { added, updated };
+    return { added: fresh.length, updated: deactivated };
   },
   removeClient: (clientId, siteId) => {
     set((s) => ({
@@ -489,26 +490,27 @@ export const useAppStore = create<AppState>()(
       run(db.from("b2b_clients").update(b2bToRow(next)).eq("client_code", code).eq("account_name", account));
   },
   importB2b: (rows) => {
-    const existing = new Map(get().b2bClients.map((c) => [`${c.clientCode}|${c.accountName}`, c]));
-    let added = 0;
-    let updated = 0;
-    for (const row of rows) {
-      const key = `${row.clientCode}|${row.accountName}`;
-      if (existing.has(key)) {
-        existing.set(key, { ...existing.get(key)!, ...row });
-        updated += 1;
-      } else {
-        existing.set(key, row);
-        added += 1;
-      }
-    }
-    const list = [...existing.values()];
-    set({ b2bClients: list });
-    const keys = new Set(rows.map((r) => `${r.clientCode}|${r.accountName}`));
-    const toSave = list.filter((c) => keys.has(`${c.clientCode}|${c.accountName}`)).map(b2bToRow);
+    const key = (c: B2BClientRecord) => `${c.clientCode}|${c.accountName}`;
+    const incoming = new Map(rows.map((r) => [key(r), r]));
+    const current = get().b2bClients;
+    const known = new Set(current.map(key));
+    let deactivated = 0;
+    const changed: B2BClientRecord[] = [];
+    const list = current.map((c) => {
+      const inFile = incoming.has(key(c));
+      const active = c.isActive !== false;
+      if (inFile === active) return c;
+      if (!inFile) deactivated += 1;
+      const nc = { ...c, isActive: inFile };
+      changed.push(nc);
+      return nc;
+    });
+    const fresh = [...incoming.values()].filter((r) => !known.has(key(r))).map((r) => ({ ...r, isActive: true }));
+    set({ b2bClients: [...fresh, ...list] });
+    const toSave = [...fresh, ...changed].map(b2bToRow);
     for (let i = 0; i < toSave.length; i += 500)
       run(db.from("b2b_clients").upsert(toSave.slice(i, i + 500), { onConflict: "client_code,account_name" }));
-    return { added, updated };
+    return { added: fresh.length, updated: deactivated };
   },
   removeB2b: (code, account) => {
     set((s) => ({
@@ -529,42 +531,93 @@ export const useAppStore = create<AppState>()(
     }),
 
   issueWorkerVoucher: (p) => {
+    const st = get();
     const linkId = String(Math.floor(10000000 + Math.random() * 89999999));
-    const count = Math.max(1, Math.floor(p.amount / 100));
-    const base = Math.floor(700000 + Math.random() * 290000);
-    const created: VoucherRecord[] = Array.from({ length: count }, (_, i) => ({
-      serial: String(base + i),
-      realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
-      amount: 100,
-      branch: p.branch,
-      ...(p.supervisor ? { supervisor: p.supervisor } : {}),
-      status: "הוקצה לעובד" as const,
-      updatedAt: today(),
-      deliveredAt: today(),
-      route: p.route,
-      linkId,
-      client: p.clientName,
-      clientId: p.clientCode,
-      clientCode: p.clientCode,
-      ...(p.accountName ? { accountName: p.accountName } : {}),
-      ...(p.standard ? { standard: p.standard } : {}),
-      ...(p.siteId ? { siteId: p.siteId } : {}),
-      ...(p.siteName ? { siteName: p.siteName } : {}),
-      reason: p.reason,
-      ...(p.requester ? { requester: p.requester } : {}),
-      ...(p.approver ? { approver: p.approver } : {}),
-    }));
+    const needed = p.items.reduce((t, it) => t + Math.max(1, Math.floor(it.amount / 100)), 0);
+    // Branch managers and supervisors hand out budget they already hold.
+    const pool =
+      st.role === "admin"
+        ? []
+        : st.vouchers.filter(
+            (v) =>
+              isAvailable(v) &&
+              v.branch === p.branch &&
+              (st.role === "supervisor" ? v.supervisor === p.supervisor : true),
+          );
+    if (st.role !== "admin" && pool.length < needed)
+      return { error: `אין מספיק יתרה: נדרשים ${needed * 100} ₪, זמינים ${pool.length * 100} ₪` };
+    const issuedAt = new Date().toISOString();
+    const exp = new Date();
+    exp.setMonth(exp.getMonth() + 3);
+    const expiresAt = exp.toISOString();
+    let used = 0;
+    let base = Math.floor(700000 + Math.random() * 290000);
+    const out: VoucherRecord[] = [];
+    for (const it of p.items) {
+      const count = Math.max(1, Math.floor(it.amount / 100));
+      for (let i = 0; i < count; i++) {
+        const src = pool[used++];
+        const seed: VoucherRecord = src ?? {
+          serial: String(base++),
+          realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
+          amount: 100,
+          branch: p.branch,
+          status: "טרם שומש",
+          updatedAt: today(),
+        };
+        out.push({
+          ...seed,
+          ...(p.supervisor ? { supervisor: p.supervisor } : {}),
+          ...(st.authId ? { supervisorId: st.authId } : {}),
+          status: "הוקצה לעובד",
+          updatedAt: today(),
+          deliveredAt: today(),
+          issuedAt,
+          expiresAt,
+          workerName: p.employeeName,
+          route: it.route,
+          linkId,
+          client: it.clientName,
+          clientId: it.clientCode,
+          clientCode: it.clientCode,
+          ...(it.accountName ? { accountName: it.accountName } : {}),
+          ...(it.standard ? { standard: it.standard } : {}),
+          ...(it.siteId ? { siteId: it.siteId } : {}),
+          ...(it.siteName ? { siteName: it.siteName } : {}),
+          reason: it.reason,
+          ...(p.requester ? { requester: p.requester } : {}),
+        });
+      }
+    }
     const link: WorkerLink = {
       id: linkId,
-      total: count * 100,
-      serials: created.map((v) => v.serial),
+      total: out.reduce((t, v) => t + v.amount, 0),
+      serials: out.map((v) => v.serial),
       createdAt: today(),
+      employeeName: p.employeeName,
+      branch: p.branch,
+      ...(st.authId ? { supervisorId: st.authId } : {}),
     };
-    set((s) => ({ vouchers: [...created, ...s.vouchers], links: [link, ...s.links] }));
-    void Promise.resolve(db.from("vouchers").insert(created.map(voucherToRow))).then(
+    const bySerial = new Map(out.map((v) => [v.serial, v]));
+    set((s) => {
+      const existing = new Set(s.vouchers.map((v) => v.serial));
+      return {
+        vouchers: [
+          ...out.filter((v) => !existing.has(v.serial)),
+          ...s.vouchers.map((v) => bySerial.get(v.serial) ?? v),
+        ],
+        links: [link, ...s.links],
+      };
+    });
+    void Promise.resolve(db.from("vouchers").upsert(out.map(voucherToRow))).then(
       ({ error }: { error: { message: string } | null }) => {
-        if (error) toast.error(`שמירה בענן נכשלה: ${error.message}`);
-        else run(db.from("worker_links").insert(linkToRow(link)));
+        if (error) {
+          toast.error(`שמירה בענן נכשלה: ${error.message}`);
+          return;
+        }
+        run(db.from("worker_links").insert(linkToRow(link)));
+        if (st.role === "admin")
+          run(db.from("voucher_codes").upsert(out.map((v) => ({ serial: v.serial, real_code: v.realCode }))));
       },
     );
     return link;
@@ -599,6 +652,10 @@ export function pickCurrentUser(users: UserRecord[], role: Role) {
 export function useCurrentUser() {
   const users = useAppStore((s) => s.users);
   const role = useAppStore((s) => s.role);
+  const nid = useAppStore((s) => s.myNationalId);
+  const mine = nid ? users.find((u) => u.id === nid) : undefined;
+  // The signed-in person, unless the super admin is previewing another role.
+  if (mine && mine.role === role) return mine;
   return pickCurrentUser(users, role);
 }
 
