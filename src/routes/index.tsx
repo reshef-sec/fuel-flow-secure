@@ -10,7 +10,7 @@ import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorA
 import { Button, Card, Select, StatCard } from "@/design-system/delek-1ea111";
 import { fullName, MAIN_POOL, useAppStore, useCurrentUser } from "@/store/appStore";
 import { BudgetUtilization } from "@/components/dashboard/BudgetUtilization";
-import { isAvailable, isIssued } from "@/components/dashboard/voucherData";
+import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -65,7 +65,7 @@ function Dashboard() {
   const authId = useAppStore((s) => s.authId);
   // Branch managers see their own branch; supervisors only what is assigned to them.
   const vouchers = isBranchManager
-    ? allVouchers.filter((v) => v.branch === myBranch)
+    ? allVouchers.filter((v) => mainBranch(v.branch) === mainBranch(myBranch))
     : isSupervisor
       ? allVouchers.filter((v) => (authId && v.supervisorId === authId) || v.supervisor === myName)
       : allVouchers;
@@ -75,7 +75,7 @@ function Dashboard() {
   // Branch-manager budget = branch vouchers not yet given to a supervisor.
   const branchAvailable = available.filter((v) => !v.supervisor);
   const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : globalBalance;
-  const branchesBudget = value(available.filter((v) => v.branch !== MAIN_POOL));
+  const branchesBudget = value(available.filter((v) => mainBranch(v.branch) !== MAIN_POOL));
 
   // Time-bound metrics use the selected period; budget metrics always show the live state.
   const since = periodStart(period);
