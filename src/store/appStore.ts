@@ -4,6 +4,8 @@ import {
   b2bToRow, clientToRow, db, linkToRow, loadAll, requestToRow, run, userPatch, userToRow, voucherToRow,
 } from "@/lib/cloudSync";
 
+import { logActivity } from "@/lib/activityLog";
+
 import {
   MAIN_POOL,
   isAvailable,
@@ -282,6 +284,7 @@ export const useAppStore = create<AppState>()(
     set((s) => ({ balance, vouchers: [...created, ...s.vouchers] }));
     if (created.length) run(db.from("vouchers").insert(created.map(voucherToRow)));
     run(db.from("app_settings").update({ balance }).eq("key", "main"));
+    logActivity(actorOf(get()), "הקצאת שוברים", `${branch}${supervisor ? ` (${supervisor})` : ""} · ${amount} ₪`);
   },
   assignToSupervisor: (branch, supervisor, amount) => {
     let left = amount;
@@ -297,6 +300,7 @@ export const useAppStore = create<AppState>()(
     });
     set({ vouchers });
     if (!changed.length) return;
+    logActivity(actorOf(get()), "הקצאה למפקח", `${supervisor} · ${changed.length * 100} ₪`);
     const nid = get().users.find((u) => fullName(u) === supervisor)?.id;
     void (async () => {
       let supervisorId: string | undefined;
@@ -325,6 +329,8 @@ export const useAppStore = create<AppState>()(
     });
     set({ vouchers });
     if (changed.length) run(db.from("vouchers").upsert(changed.map(voucherToRow)));
+    if (changed.length) logActivity(actorOf(get()), "מימוש שוברים (פז)", `${changed.length} שוברים`);
+    if (changed.length) logActivity(actorOf(get()), "מימוש שוברים (פז)", `${changed.length} שוברים`);
     return changed.length;
   },
   markSerialsRedeemed: (serials) => {
@@ -365,6 +371,7 @@ export const useAppStore = create<AppState>()(
     };
     set((s) => ({ requests: [row, ...s.requests] }));
     run(db.from("voucher_requests").insert(requestToRow(row)));
+    logActivity(actorOf(get()), "הגשת דרישת שוברים", `${row.branch} · ${row.amount} ₪`);
   },
   approveRequest: (id, amount, approver) => {
     const req = get().requests.find((r) => r.id === id);
@@ -376,26 +383,31 @@ export const useAppStore = create<AppState>()(
       ),
     }));
     run(db.from("voucher_requests").update({ status: "אושר", approved_amount: amount, approver }).eq("id", id));
+    logActivity(actorOf(get()), "אישור דרישה", `${req.requester} · ${amount} ₪`);
   },
   rejectRequest: (id, approver) => {
     set((s) => ({
       requests: s.requests.map((r) => (r.id === id ? { ...r, status: "נדחה" as const, approver } : r)),
     }));
     run(db.from("voucher_requests").update({ status: "נדחה", approver }).eq("id", id));
+    logActivity(actorOf(get()), "דחיית דרישה", get().requests.find((r) => r.id === id)?.requester);
   },
 
   users: [],
   addUser: (user) => {
     set((s) => ({ users: [user, ...s.users.filter((u) => u.id !== user.id)] }));
     run(db.from("app_users").upsert(userToRow(user)));
+    logActivity(actorOf(get()), "הוספת משתמש", fullName(user));
   },
   updateUser: (id, patch) => {
     set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) }));
     run(db.from("app_users").update(userPatch(patch)).eq("national_id", id));
+    logActivity(actorOf(get()), "עדכון משתמש", id);
   },
   removeUser: (id) => {
     set((s) => ({ users: s.users.filter((u) => u.id !== id) }));
     run(db.from("app_users").delete().eq("national_id", id));
+    logActivity(actorOf(get()), "מחיקת משתמש", id);
   },
   importUsers: (rows) => {
     const existing = new Set(get().users.map((u) => u.id));
@@ -626,6 +638,7 @@ export const useAppStore = create<AppState>()(
           run(db.from("voucher_codes").upsert(out.map((v) => ({ serial: v.serial, real_code: v.realCode }))));
       },
     );
+    logActivity(actorOf(get()), "הנפקת שובר לעובד", `קישור ${link.id} · ${link.total} ₪`);
     return link;
   },
 
@@ -672,3 +685,10 @@ export function useCurrentUser() {
 }
 
 export { MAIN_POOL };
+
+/** The person performing an action (signed-in user, else the role preview pick). */
+function actorOf(st: AppState) {
+  const mine = st.myNationalId ? st.users.find((u) => u.id === st.myNationalId) : undefined;
+  const u = mine ?? pickCurrentUser(st.users, st.role);
+  return { name: u ? fullName(u) : "", role: st.role };
+}
