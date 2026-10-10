@@ -44,7 +44,7 @@ export function ProducedLinks({ limit }: { limit?: number }) {
     try {
       await unlockFn({ data: { id } });
       useAppStore.setState((s) => ({ links: s.links.map((l) => (l.id === id ? { ...l, locked: false } : l)) }));
-      toast.success("הלינק שוחרר — העובד יכול לנסות שוב");
+      toast.success("מונה הניסיונות אופס והלינק פתוח");
     } catch (e) {
       toast.error((e as Error).message || "שחרור הלינק נכשל");
     } finally {
@@ -114,17 +114,15 @@ export function ProducedLinks({ limit }: { limit?: number }) {
                   >
                     <SquareArrowOutUpRight className="size-4" />
                   </a>
-                  {l.locked && canUnlock(l) ? (
-                    <button
-                      aria-label="שחרר נעילה"
-                      title="שחרר נעילה"
-                      disabled={busy === l.id}
-                      onClick={() => void unlock(l.id)}
-                      className="grid size-8 place-items-center rounded-md text-danger hover:bg-red-100 disabled:opacity-50"
-                    >
-                      <LockOpen className="size-4" />
-                    </button>
-                  ) : null}
+                  <button
+                    aria-label="שחרר נעילה ואפס ניסיונות"
+                    title={canUnlock(l) ? "שחרור נעילה / איפוס ניסיונות שגויים" : "רק מי שהפיק את השובר או אדמין"}
+                    disabled={busy === l.id || !canUnlock(l)}
+                    onClick={() => void unlock(l.id)}
+                    className={`grid size-8 place-items-center rounded-md disabled:cursor-not-allowed disabled:opacity-40 ${l.locked ? "text-danger hover:bg-red-100" : "text-primary hover:bg-blue-100"}`}
+                  >
+                    <LockOpen className="size-4" />
+                  </button>
                 </div>
               </TableCell>
             </TableRow>
