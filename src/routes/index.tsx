@@ -8,7 +8,8 @@ import { RequestDialog } from "@/components/requests/RequestDialog";
 import { PendingRequests } from "@/components/requests/PendingRequests";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
 import { Button, Card, Select, StatCard } from "@/design-system/delek-1ea111";
-import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
+import { fullName, MAIN_POOL, useAppStore, useCurrentUser } from "@/store/appStore";
+import { isAvailable, isIssued } from "@/components/dashboard/voucherData";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -60,32 +61,27 @@ function Dashboard() {
   const myBranch = me?.branch ?? "";
   const myName = me ? fullName(me) : "";
 
+  const authId = useAppStore((s) => s.authId);
   // Branch managers see their own branch; supervisors only what is assigned to them.
   const vouchers = isBranchManager
     ? allVouchers.filter((v) => v.branch === myBranch)
     : isSupervisor
-      ? allVouchers.filter((v) => v.supervisor === myName)
+      ? allVouchers.filter((v) => (authId && v.supervisorId === authId) || v.supervisor === myName)
       : allVouchers;
 
-  const branchAvailable = vouchers.filter((v) => v.status === "טרם שומש" && !v.supervisor);
-  const balance = isBranchManager
-    ? branchAvailable.reduce((t, v) => t + v.amount, 0)
-    : isSupervisor
-      ? vouchers.filter((v) => v.status === "טרם שומש").reduce((t, v) => t + v.amount, 0)
-      : globalBalance;
+  const value = (list: typeof vouchers) => list.reduce((t, v) => t + v.amount, 0);
+  const available = vouchers.filter(isAvailable);
+  // Branch-manager budget = branch vouchers not yet given to a supervisor.
+  const branchAvailable = available.filter((v) => !v.supervisor);
+  const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : globalBalance;
+  const branchesBudget = value(available.filter((v) => v.branch !== MAIN_POOL));
 
-  // Time-bound metrics use the selected period; wallet metrics always show the live state.
+  // Time-bound metrics use the selected period; budget metrics always show the live state.
   const since = periodStart(period);
-  const timed = since ? vouchers.filter((v) => v.updatedAt >= since) : vouchers;
-
-  const sum = (status: string) =>
-    timed.filter((v) => v.status === status).reduce((t, v) => t + v.amount, 0);
-  const claimed = sum("מומש סופית");
-  const allocated = sum("הוקצה לעובד");
-  const total = vouchers.reduce((t, v) => t + v.amount, 0);
-  const unusedValue = vouchers
-    .filter((v) => v.status === "טרם שומש")
-    .reduce((t, v) => t + v.amount, 0);
+  const issuedAll = vouchers.filter(isIssued);
+  const issued = since ? issuedAll.filter((v) => (v.deliveredAt ?? v.updatedAt) >= since) : issuedAll;
+  const issuedValue = value(issued);
+  const total = value(vouchers);
   /** Safe percentage: 0 when the denominator is empty or the result isn't finite. */
   const pct = (part: number, whole: number) => {
     if (!whole) return 0;
@@ -154,22 +150,47 @@ function Dashboard() {
       ) : null}
 
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <StatCard
-          label="תקציב לניצול"
-          value={`${balance.toLocaleString("he-IL")} ₪`}
-          caption={`מלאי שוברים: ${total.toLocaleString("he-IL")} ₪ · ${vouchers.length} שוברים`}
-          percent={pct(unusedValue, total)}
-          tone="accent"
-        />
-        <StatCard
-          label="שוברים נמסרו לעובד"
-          value={`${(claimed + allocated).toLocaleString("he-IL")} ₪`}
-          caption={periodLabels[period]}
-          percent={pct(claimed + allocated, total)}
-          tone="secondary"
-        />
-      </div>
+      {role === "admin" ? (
+        <div className="grid gap-5 sm:grid-cols-3">
+          <StatCard
+            label="יתרת תקציב מרכזי"
+            value={`${globalBalance.toLocaleString("he-IL")} ₪`}
+            caption="טרם הוקצה לסניפים"
+            percent={pct(globalBalance, globalBalance + branchesBudget + issuedValue)}
+          />
+          <StatCard
+            label="יתרת תקציב בסניפים"
+            value={`${branchesBudget.toLocaleString("he-IL")} ₪`}
+            caption="הוקצה לסניפים וטרם הונפק"
+            percent={pct(branchesBudget, globalBalance + branchesBudget + issuedValue)}
+            tone="accent"
+          />
+          <StatCard
+            label="סך שוברים שהונפקו"
+            value={`${issuedValue.toLocaleString("he-IL")} ₪`}
+            caption={`${issued.length} שוברים · ${periodLabels[period]}`}
+            percent={pct(issuedValue, total)}
+            tone="secondary"
+          />
+        </div>
+      ) : (
+        <div className="grid gap-5 sm:grid-cols-2">
+          <StatCard
+            label="יתרת תקציב לניצול"
+            value={`${balance.toLocaleString("he-IL")} ₪`}
+            caption={isBranchManager ? `סניף ${myBranch || "—"}` : "הוקצה אליי וטרם הונפק"}
+            percent={pct(balance, balance + issuedValue)}
+            tone="accent"
+          />
+          <StatCard
+            label="שוברים שהונפקו לעובדים"
+            value={`${issuedValue.toLocaleString("he-IL")} ₪`}
+            caption={`${issued.length} שוברים · ${periodLabels[period]}`}
+            percent={pct(issuedValue, balance + issuedValue)}
+            tone="secondary"
+          />
+        </div>
+      )}
 
       {role === "admin" ? <PendingRequests /> : null}
 
