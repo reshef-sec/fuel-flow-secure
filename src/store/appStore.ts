@@ -56,6 +56,8 @@ export interface ClientRecord {
   siteName: string;
   /** תקן — vehicle / manpower standard code of the site */
   standard?: string;
+  /** false once missing from the latest Excel import (kept for history). */
+  isActive?: boolean;
 }
 
 /** מאגר B2B — client billed per voucher. */
@@ -72,6 +74,7 @@ export interface B2BClientRecord {
   itemFamily?: string;
   accountStatus?: string;
   accountType?: string;
+  isActive?: boolean;
 }
 
 export type ReasonCategory = "B2B" | "Regular";
@@ -94,16 +97,17 @@ export interface WorkerLink {
   workerId?: string;
   phone?: string;
   signedAt?: string;
+  employeeName?: string;
+  branch?: string;
+  supervisorId?: string;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** Details of a worker voucher issued from the supervisor screen. */
-export interface WorkerIssuePayload {
+export interface WorkerIssueItem {
   amount: number;
   reason: string;
-  branch: string;
-  supervisor?: string;
   route: "b2b" | "regular";
   clientName: string;
   clientCode: string;
@@ -111,8 +115,14 @@ export interface WorkerIssuePayload {
   standard?: string;
   siteId?: string;
   siteName?: string;
+}
+
+export interface WorkerIssuePayload {
+  employeeName: string;
+  branch: string;
+  supervisor?: string;
   requester?: string;
-  approver?: string;
+  items: WorkerIssueItem[];
 }
 
 export interface VoucherRequest {
@@ -142,6 +152,10 @@ export function siteStandard(clients: ClientRecord[], clientId?: string, siteId?
 
 interface AppState {
   loaded: boolean;
+  /** Signed-in login account id and ת.ז */
+  authId: string | null;
+  myNationalId: string | null;
+  setIdentity: (authId: string | null, nationalId: string | null) => void;
   /** Loads every table from the cloud database. */
   loadFromCloud: () => Promise<void>;
   role: Role;
@@ -200,7 +214,7 @@ interface AppState {
   signLink: (id: string, workerId: string, phone: string) => void;
 
   /** Issues a voucher handed to an end worker, storing the resolved vehicle/client data. */
-  issueWorkerVoucher: (payload: WorkerIssuePayload) => WorkerLink;
+  issueWorkerVoucher: (payload: WorkerIssuePayload) => WorkerLink | { error: string };
 
   reasons: ReasonRecord[];
   addReason: (reason: ReasonRecord) => void;
@@ -218,6 +232,9 @@ export function storedRole(): Role | null {
 export const useAppStore = create<AppState>()(
   (set, get) => ({
   loaded: false,
+  authId: null,
+  myNationalId: null,
+  setIdentity: (authId, myNationalId) => set({ authId, myNationalId }),
   loadFromCloud: async () => {
     try {
       // Clean up the old browser-only copy; the cloud is the only source now.
@@ -226,7 +243,17 @@ export const useAppStore = create<AppState>()(
         window.localStorage.removeItem(ROLE_KEY);
       }
       const data = await loadAll();
+      // 3-month rule: unredeemed vouchers past their expiry become blocked.
+      const now = new Date().toISOString();
+      const expired: VoucherRecord[] = [];
+      data.vouchers = data.vouchers.map((v) => {
+        if (!v.expiresAt || v.expiresAt > now || v.status === "מומש סופית" || v.status === "חסום") return v;
+        const nv = { ...v, status: "חסום" as const, updatedAt: today() };
+        expired.push(nv);
+        return nv;
+      });
       set({ ...data, loaded: true });
+      if (expired.length) run(db.from("vouchers").upsert(expired.map(voucherToRow)));
     } catch (e) {
       set({ loaded: true });
       toast.error(`טעינת הנתונים מהענן נכשלה: ${(e as Error).message}`);
@@ -268,7 +295,22 @@ export const useAppStore = create<AppState>()(
       return nv;
     });
     set({ vouchers });
-    if (changed.length) run(db.from("vouchers").upsert(changed.map(voucherToRow)));
+    if (!changed.length) return;
+    const nid = get().users.find((u) => fullName(u) === supervisor)?.id;
+    void (async () => {
+      let supervisorId: string | undefined;
+      if (nid) {
+        try {
+          const { lookupAuthId } = await import("@/lib/accounts.functions");
+          supervisorId = (await lookupAuthId({ data: { nationalId: nid } })).id ?? undefined;
+        } catch {
+          /* tag stays empty; supervisor will not see these until fixed */
+        }
+      }
+      const tagged = changed.map((v) => ({ ...v, ...(supervisorId ? { supervisorId } : {}) }));
+      set((s) => ({ vouchers: s.vouchers.map((v) => tagged.find((t) => t.serial === v.serial) ?? v) }));
+      run(db.from("vouchers").upsert(tagged.map(voucherToRow)));
+    })();
   },
   markPazRedeemed: (count) => {
     let left = count;
