@@ -147,7 +147,7 @@ export function AuditPanel() {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((r) => (
+              paged.slice.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-semibold text-secondary">{r.user}</TableCell>
                   <TableCell>{r.role}</TableCell>
@@ -166,6 +166,7 @@ export function AuditPanel() {
             )}
           </TableBody>
         </Table>
+        <Pager {...paged} />
       </div>
     </Card>
   );
