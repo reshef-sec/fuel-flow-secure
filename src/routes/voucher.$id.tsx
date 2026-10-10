@@ -44,6 +44,7 @@ function VoucherWallet() {
   const [error, setError] = useState<string | null>(null);
   const [hasSignature, setHasSignature] = useState(false);
   const [consent, setConsent] = useState(false);
+  const [nameLocked, setNameLocked] = useState(false);
 
   useEffect(() => {
     if (!/^\d{4,12}$/.test(id)) {
@@ -51,7 +52,13 @@ function VoucherWallet() {
       return;
     }
     fetchStatus({ data: { id } })
-      .then((r) => setLink(r.exists ? { total: r.total, signed: r.signed } : null))
+      .then((r) => {
+        setLink(r.exists ? { total: r.total, signed: r.signed } : null);
+        if (r.exists && r.employeeName) {
+          setFullName(r.employeeName);
+          setNameLocked(true);
+        }
+      })
       .catch(() => setLink(null))
       .finally(() => setReady(true));
   }, [id, fetchStatus]);
@@ -110,6 +117,12 @@ function VoucherWallet() {
               <p className="text-center text-sm text-muted-foreground">
                 סה"כ {link.total.toLocaleString("he-IL")} ₪ · הזדהו כדי להמשיך
               </p>
+              {nameLocked ? (
+                <div className="rounded-lg border border-border bg-surface-muted px-4 py-3 text-center">
+                  <p className="text-xs text-muted-foreground">שם העובד</p>
+                  <p className="font-display text-lg font-extrabold text-secondary">{fullName}</p>
+                </div>
+              ) : (
               <FormField label="שם מלא">
                 <Input
                   aria-label="שם מלא"
@@ -120,6 +133,7 @@ function VoucherWallet() {
                   placeholder="שם פרטי ומשפחה"
                 />
               </FormField>
+              )}
               <FormField label="ת.ז.">
                 <Input
                   aria-label="ת.ז."
