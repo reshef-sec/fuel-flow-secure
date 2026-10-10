@@ -94,9 +94,6 @@ function Dashboard() {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-display text-lg font-extrabold text-secondary">תמונת מצב</p>
-          <p className="text-xs text-muted-foreground">
-            היתרה ומלאי השוברים מוצגים תמיד במצב עדכני · המימושים והחסומים לפי התקופה שנבחרה
-          </p>
         </div>
         <Select
           value={period}
