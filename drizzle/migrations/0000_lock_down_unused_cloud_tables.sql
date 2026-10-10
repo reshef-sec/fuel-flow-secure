@@ -1,0 +1,15 @@
+DROP POLICY IF EXISTS "Signed-in read" ON public.app_settings;
+DROP POLICY IF EXISTS "Signed-in read" ON public.app_users;
+DROP POLICY IF EXISTS "Signed-in read" ON public.b2b_clients;
+DROP POLICY IF EXISTS "Signed-in read" ON public.branches;
+DROP POLICY IF EXISTS "Signed-in read" ON public.issue_reasons;
+DROP POLICY IF EXISTS "Signed-in read" ON public.regular_clients;
+DROP POLICY IF EXISTS "Signed-in read" ON public.voucher_requests;
+DROP POLICY IF EXISTS "Signed-in write" ON public.voucher_requests;
+DROP POLICY IF EXISTS "Signed-in read" ON public.vouchers;
+DROP POLICY IF EXISTS "Signed-in write" ON public.vouchers;
+DROP POLICY IF EXISTS "Signed-in read" ON public.worker_links;
+DROP POLICY IF EXISTS "Signed-in write" ON public.worker_links;
+CREATE POLICY "Admin all" ON public.voucher_requests FOR ALL TO authenticated USING (public.has_role(auth.uid(),'admin')) WITH CHECK (public.has_role(auth.uid(),'admin'));
+CREATE POLICY "Admin all" ON public.vouchers FOR ALL TO authenticated USING (public.has_role(auth.uid(),'admin')) WITH CHECK (public.has_role(auth.uid(),'admin'));
+CREATE POLICY "Admin all" ON public.worker_links FOR ALL TO authenticated USING (public.has_role(auth.uid(),'admin')) WITH CHECK (public.has_role(auth.uid(),'admin'));
