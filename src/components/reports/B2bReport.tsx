@@ -58,18 +58,16 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
 
   const [view, setView] = useState<"detail" | "summary">("detail");
   const isAdmin = role === "admin";
-  const requesterOf = (v: VoucherRecord) =>
-    v.requester ?? branchList.find((b) => b.name === v.branch)?.manager ?? "—";
 
   const detailHeaders = [
     "סניף", "ערך כרטיס", 'מס"ד כרטיס', ...(isAdmin ? ["סיריאלי"] : []), "שם לקוח", "קוד לקוח", "שם חשבון", "תקן",
-    "שם עובד", "ת.ז", "טלפון", "תאריך מסירה", "סיבת הפקה", "דורש הקצאה", "מאשר הקצאה",
+    "שם עובד", "ת.ז", "טלפון", "תאריך מסירה", "סיבת הפקה",
   ];
   const detail = rows.map(({ v, value, code }) => [
     v.branch, `${value} ₪`, code, ...(isAdmin ? [v.realCode || "—"] : []), v.client ?? "—",
     v.clientCode ?? v.clientId ?? "—", v.accountName ?? v.siteName ?? "—", v.standard ?? v.standardName ?? "—",
     v.workerName ?? "—", v.workerId ?? "—", v.workerPhone ?? "—",
-    heDate.format(new Date(v.deliveredAt ?? v.updatedAt)), v.reason ?? "—", requesterOf(v), v.approver ?? "—",
+    heDate.format(new Date(v.deliveredAt ?? v.updatedAt)), v.reason ?? "—",
   ]);
 
   // One row per תקן for the filtered period.
