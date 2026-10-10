@@ -74,7 +74,7 @@ export function ClientsPanel() {
       }
       const { added, updated } = importClients(rows);
       setPage(0);
-      toast.success(`נוספו ${added.toLocaleString("he-IL")} אתרים, עודכנו ${updated.toLocaleString("he-IL")}`);
+      toast.success(`נוספו ${added.toLocaleString("he-IL")} אתרים, ${updated.toLocaleString("he-IL")} סומנו כלא פעילים`);
     } catch {
       toast.error("קריאת הקובץ נכשלה. יש לוודא שהקובץ תקין");
     }
@@ -208,7 +208,7 @@ export function ClientsPanel() {
               </TableRow>
             ) : (
               visible.map((c) => (
-                <TableRow key={`${c.clientId}-${c.siteId}`}>
+                <TableRow key={`${c.clientId}-${c.siteId}`} className={c.isActive === false ? "opacity-50" : undefined} title={c.isActive === false ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}>
                   <TableCell className="tabular-nums font-semibold">{c.clientId}</TableCell>
                   <TableCell>{c.clientName}</TableCell>
                   <TableCell className="tabular-nums">{c.siteId}</TableCell>
