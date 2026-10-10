@@ -56,6 +56,8 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
     });
   }, [vouchers, role, me?.branch, myName, filters]);
 
+  const [view, setView] = useState<"detail" | "summary">("detail");
+  const isAdmin = role === "admin";
 
   const detailHeaders = [
     "סניף", "ערך כרטיס", 'מס"ד כרטיס', ...(isAdmin ? ["סיריאלי"] : []), "שם לקוח", "קוד לקוח", "שם חשבון", "תקן",
