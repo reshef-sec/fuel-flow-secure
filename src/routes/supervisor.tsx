@@ -1,3 +1,4 @@
+import { publicVoucherUrl } from "@/lib/publicUrl";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -114,7 +115,7 @@ function SupervisorPage() {
         setError(created.error);
         return;
       }
-      setLink(`${window.location.origin}/voucher/${created.id}`);
+      setLink(publicVoucherUrl(created.id));
       setCopied(false);
       setEmployeeName("");
       setBlocks([newBlock()]);
