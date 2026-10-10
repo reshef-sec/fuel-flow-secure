@@ -14,7 +14,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/design-system/delek-1ea111";
-import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
+import { fullName, roleLabels, useAppStore, useCurrentUser } from "@/store/appStore";
 
 /** Admin-only queue of voucher requests awaiting approval. */
 export function PendingRequests() {
@@ -23,6 +23,11 @@ export function PendingRequests() {
   const approveRequest = useAppStore((s) => s.approveRequest);
   const rejectRequest = useAppStore((s) => s.rejectRequest);
   const me = useCurrentUser();
+  const users = useAppStore((s) => s.users);
+  const roleOf = (r: { requesterId: string; requester: string }) => {
+    const u = users.find((x) => x.id === r.requesterId) ?? users.find((x) => fullName(x) === r.requester);
+    return u ? u.title || roleLabels[u.role] : "—";
+  };
   const approver = me ? fullName(me) : "אדמין מרכזי";
 
   const [customId, setCustomId] = useState<string | null>(null);
@@ -62,6 +67,7 @@ export function PendingRequests() {
             <TableRow>
               <TableHeaderCell>דורש</TableHeaderCell>
               <TableHeaderCell>סניף</TableHeaderCell>
+              <TableHeaderCell>תפקיד</TableHeaderCell>
               <TableHeaderCell>סכום מבוקש</TableHeaderCell>
               <TableHeaderCell>סיבה</TableHeaderCell>
               <TableHeaderCell className="text-center">פעולות</TableHeaderCell>
@@ -70,7 +76,7 @@ export function PendingRequests() {
           <TableBody>
             {pending.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                   אין דרישות ממתינות לאישור
                 </TableCell>
               </TableRow>
@@ -79,6 +85,7 @@ export function PendingRequests() {
                 <TableRow key={r.id}>
                   <TableCell className="font-semibold">{r.requester}</TableCell>
                   <TableCell>{r.branch}</TableCell>
+                  <TableCell>{roleOf(r)}</TableCell>
                   <TableCell className="tabular-nums">
                     {r.amount.toLocaleString("he-IL")} ₪
                   </TableCell>

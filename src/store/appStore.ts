@@ -76,8 +76,8 @@ export interface B2BClientRecord {
 
 export type ReasonCategory = "B2B" | "Regular";
 export const reasonCategoryLabels: Record<ReasonCategory, string> = {
-  B2B: "חיוב לקוח",
-  Regular: "ללא חיוב",
+  B2B: "רכב עבודה",
+  Regular: "רכב פרטי",
 };
 export interface ReasonRecord {
   id?: string;

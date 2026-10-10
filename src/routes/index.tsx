@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Wallet, Ticket, CheckCircle2, Ban, FilePlus2, UserCheck } from "lucide-react";
+import { FilePlus2, UserCheck } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { VoucherTable } from "@/components/dashboard/VoucherTable";
@@ -82,7 +82,6 @@ function Dashboard() {
     timed.filter((v) => v.status === status).reduce((t, v) => t + v.amount, 0);
   const claimed = sum("מומש סופית");
   const allocated = sum("הוקצה לעובד");
-  const blocked = timed.filter((v) => v.status === "חסום").length;
   const total = vouchers.reduce((t, v) => t + v.amount, 0);
   const unusedValue = vouchers
     .filter((v) => v.status === "טרם שומש")
@@ -155,56 +154,21 @@ function Dashboard() {
       ) : null}
 
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2">
         <StatCard
-          label="יתרה זמינה לחלוקה"
+          label="תקציב לניצול"
           value={`${balance.toLocaleString("he-IL")} ₪`}
-          caption="ארנק וירטואלי"
-          percent={pct(balance, balance + total)}
-        />
-        <StatCard
-          label="שווי מלאי שוברים"
-          value={`${total.toLocaleString("he-IL")} ₪`}
-          caption="כלל השוברים במערכת"
+          caption={`מלאי שוברים: ${total.toLocaleString("he-IL")} ₪ · ${vouchers.length} שוברים`}
           percent={pct(unusedValue, total)}
           tone="accent"
         />
         <StatCard
-          label="שוברים שמומשו"
-          value={`${claimed.toLocaleString("he-IL")} ₪`}
+          label="שוברים נמסרו לעובד"
+          value={`${(claimed + allocated).toLocaleString("he-IL")} ₪`}
           caption={periodLabels[period]}
-          percent={pct(claimed, total)}
+          percent={pct(claimed + allocated, total)}
           tone="secondary"
         />
-        <StatCard
-          label="שוברים חסומים"
-          value={blocked}
-          caption={`ממתינים לבדיקה · ${periodLabels[period]}`}
-          percent={pct(blocked, timed.length)}
-        />
-      </div>
-
-      <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "תקציב", icon: Wallet, value: `${balance.toLocaleString("he-IL")} ₪` },
-          { label: "מלאי", icon: Ticket, value: `${vouchers.length} שוברים` },
-          { label: `מימושים · ${periodLabels[period]}`, icon: CheckCircle2, value: `${claimed.toLocaleString("he-IL")} ₪` },
-          { label: `הוקצה לעובדים · ${periodLabels[period]}`, icon: Ban, value: `${allocated.toLocaleString("he-IL")} ₪` },
-        ].map(({ label, icon: Icon, value }) => (
-          <Card key={label} padding="md" variant="outline" className="flex items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-md bg-blue-100 text-blue-700">
-              <Icon className="size-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate text-xs font-semibold text-muted-foreground">
-                {label}
-              </span>
-              <span className="block truncate text-sm font-bold tabular-nums text-secondary">
-                {value}
-              </span>
-            </span>
-          </Card>
-        ))}
       </div>
 
       {role === "admin" ? <PendingRequests /> : null}

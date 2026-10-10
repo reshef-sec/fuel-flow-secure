@@ -29,7 +29,7 @@ const headers = [
   "מאשר הקצאה",
 ];
 
-/** B2B billing report — one row per 100 ₪ code issued via the "בחיוב לקוח" route. */
+/** B2B billing report — one row per 100 ₪ code issued via the "ברכב עבודה" route. */
 export interface ReportFilterValues {
   from: string;
   to: string;
@@ -92,7 +92,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl font-extrabold text-secondary">דו"ח B2B</h2>
+          <h2 className="font-display text-xl font-extrabold text-secondary">דוח רכב עבודה</h2>
           <p className="text-sm text-muted-foreground">
             {rows.length} כרטיסים · סה"כ {total.toLocaleString("he-IL")} ₪
           </p>
@@ -101,7 +101,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
           variant="outline"
           onClick={() => {
             downloadCsv("b2b-report.csv", headers, flat);
-            toast.success('דו"ח B2B יוצא לאקסל');
+            toast.success('דוח רכב עבודה יוצא לאקסל');
           }}
         >
           <FileDown className="size-4" />
@@ -121,7 +121,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
             {flat.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={headers.length} className="py-10 text-center text-muted-foreground">
-                  אין שוברים שהופקו בחיוב לקוח
+                  אין שוברים שהופקו ברכב עבודה
                 </TableCell>
               </TableRow>
             ) : (

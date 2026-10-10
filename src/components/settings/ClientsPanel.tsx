@@ -126,7 +126,7 @@ export function ClientsPanel() {
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-xl font-extrabold text-secondary">
-          מאגר ללא חיוב לקוח
+          מאגר רכב פרטי
           <span className="ms-2 text-sm font-semibold text-muted-foreground">
             {filtered.length.toLocaleString("he-IL")} מתוך {clients.length.toLocaleString("he-IL")}
           </span>
