@@ -14,7 +14,7 @@ import {
   Menu,
   Bell,
   UserCircle2,
-  X, LogOut } from "lucide-react";
+  X, LogOut, History } from "lucide-react";
 
 import { Logo, Select } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
