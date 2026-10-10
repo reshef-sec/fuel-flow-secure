@@ -11,6 +11,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/design-system/delek-1ea111";
+import { Pager, usePaged } from "@/components/ui/Pager";
 import { downloadCsv, heDate } from "@/components/dashboard/statusVariant";
 import type { VoucherRecord } from "@/components/dashboard/voucherData";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
@@ -87,6 +88,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
 
   const headers = view === "detail" ? detailHeaders : summaryHeaders;
   const flat = view === "detail" ? detail : summary;
+  const paged = usePaged(flat);
   const total = rows.reduce((s, r) => s + r.value, 0);
 
   return (
@@ -141,7 +143,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
                 </TableCell>
               </TableRow>
             ) : (
-              flat.map((cells, i) => (
+              paged.slice.map((cells, i) => (
                 <TableRow key={i}>
                   {cells.map((c, j) => (
                     <TableCell key={j} className="whitespace-nowrap">
@@ -153,6 +155,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
             )}
           </TableBody>
         </Table>
+        <Pager {...paged} />
       </div>
     </section>
   );

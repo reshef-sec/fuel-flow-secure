@@ -103,6 +103,8 @@ export interface WorkerLink {
   employeeName?: string;
   branch?: string;
   supervisorId?: string;
+  /** Locked after 3 wrong ID/phone attempts. */
+  locked?: boolean;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);

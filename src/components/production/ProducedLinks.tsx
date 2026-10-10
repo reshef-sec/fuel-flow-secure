@@ -1,6 +1,9 @@
 import { publicVoucherUrl } from "@/lib/publicUrl";
-import { useMemo } from "react";
-import { Copy, SquareArrowOutUpRight } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Copy, LockOpen, SquareArrowOutUpRight } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { unlockWorkerLink } from "@/lib/workerLink.functions";
+import { Pager, usePaged } from "@/components/ui/Pager";
 import { toast } from "sonner";
 
 import {
@@ -32,6 +35,23 @@ export function ProducedLinks({ limit }: { limit?: number }) {
     return limit ? list.slice(0, limit) : list;
   }, [links, role, me?.branch, authId, limit]);
 
+  const paged = usePaged(rows);
+  const unlockFn = useServerFn(unlockWorkerLink);
+  const [busy, setBusy] = useState<string | null>(null);
+  const canUnlock = (l: { supervisorId?: string }) => role === "admin" || (!!authId && l.supervisorId === authId);
+  async function unlock(id: string) {
+    setBusy(id);
+    try {
+      await unlockFn({ data: { id } });
+      useAppStore.setState((s) => ({ links: s.links.map((l) => (l.id === id ? { ...l, locked: false } : l)) }));
+      toast.success("הלינק שוחרר — העובד יכול לנסות שוב");
+    } catch (e) {
+      toast.error((e as Error).message || "שחרור הלינק נכשל");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const clientsOf = (serials: string[]) => {
     const set = new Set(serials);
     return Array.from(new Set(vouchers.filter((v) => set.has(v.serial)).map((v) => v.client).filter(Boolean))).join(", ");
@@ -47,6 +67,7 @@ export function ProducedLinks({ limit }: { limit?: number }) {
   }
 
   return (
+    <>
     <Table>
       <TableHead>
         <TableRow>
@@ -66,14 +87,14 @@ export function ProducedLinks({ limit }: { limit?: number }) {
             </TableCell>
           </TableRow>
         ) : (
-          rows.map((l) => (
+          paged.slice.map((l) => (
             <TableRow key={l.id}>
               <TableCell className="tabular-nums whitespace-nowrap">{l.createdAt}</TableCell>
               <TableCell className="font-semibold">{l.employeeName ?? "—"}</TableCell>
               <TableCell className="text-muted-foreground">{clientsOf(l.serials) || "—"}</TableCell>
               <TableCell className="tabular-nums">{l.total.toLocaleString("he-IL")} ₪</TableCell>
               <TableCell>
-                <Badge variant={l.signedAt ? "success" : "info"}>{l.signedAt ? "נחתם" : "ממתין לחתימה"}</Badge>
+                {l.locked ? <Badge variant="danger">נעול</Badge> : <Badge variant={l.signedAt ? "success" : "info"}>{l.signedAt ? "נחתם" : "ממתין לחתימה"}</Badge>}
               </TableCell>
               <TableCell>
                 <div className="flex items-center justify-center gap-1">
@@ -93,6 +114,17 @@ export function ProducedLinks({ limit }: { limit?: number }) {
                   >
                     <SquareArrowOutUpRight className="size-4" />
                   </a>
+                  {l.locked && canUnlock(l) ? (
+                    <button
+                      aria-label="שחרר נעילה"
+                      title="שחרר נעילה"
+                      disabled={busy === l.id}
+                      onClick={() => void unlock(l.id)}
+                      className="grid size-8 place-items-center rounded-md text-danger hover:bg-red-100 disabled:opacity-50"
+                    >
+                      <LockOpen className="size-4" />
+                    </button>
+                  ) : null}
                 </div>
               </TableCell>
             </TableRow>
@@ -100,5 +132,7 @@ export function ProducedLinks({ limit }: { limit?: number }) {
         )}
       </TableBody>
     </Table>
+    {limit ? null : <Pager {...paged} />}
+    </>
   );
 }
