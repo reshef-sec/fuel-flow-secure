@@ -21,3 +21,9 @@
   }
 }
 
+
+@media print {
+  body:has(.signature-print) * { visibility: hidden; }
+  .signature-print, .signature-print * { visibility: visible; }
+  .signature-print { position: absolute; inset: 0; }
+}

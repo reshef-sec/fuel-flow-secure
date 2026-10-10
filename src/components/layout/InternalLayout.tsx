@@ -9,6 +9,7 @@ import {
   ScrollText,
   Settings,
   UserCheck,
+  PenLine,
 
   Menu,
   Bell,
@@ -28,6 +29,7 @@ const navItems = [
   { to: "/allocations", label: "הקצאות לסניפים", icon: Building2, roles: ["admin"] },
   { to: "/supervisor", label: "הפקת שוברי דלק", icon: UserCheck, roles: ["admin", "branch"] },
   { to: "/reports", label: "דוחות", icon: FileBarChart, roles: ["admin", "branch", "supervisor"] },
+  { to: "/signatures", label: "ארכיון חתימות", icon: PenLine, roles: ["admin", "branch"] },
   { to: "/settings", label: "הגדרות", icon: Settings, roles: ["admin"] },
 ] as const;
 

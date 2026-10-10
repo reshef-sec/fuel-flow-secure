@@ -37,6 +37,8 @@ function VoucherWallet() {
   const signFn = useServerFn(signWorkerLink);
 
   const [step, setStep] = useState<Step>("identify");
+  const [fullName, setFullName] = useState("");
+  const [signature, setSignature] = useState<string | null>(null);
   const [idNumber, setIdNumber] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +58,7 @@ function VoucherWallet() {
 
   async function identify(e: React.FormEvent) {
     e.preventDefault();
+    if (fullName.trim().length < 2) return setError("נא להזין שם מלא");
     if (!/^\d{9}$/.test(idNumber)) return setError("ת.ז חייבת להכיל 9 ספרות");
     if (!/^0\d{8,9}$/.test(phone)) return setError("מספר טלפון לא תקין (ספרות בלבד)");
     if (!link) return;
@@ -74,8 +77,10 @@ function VoucherWallet() {
 
   async function sign(e: React.FormEvent) {
     e.preventDefault();
-    if (!hasSignature || !consent) return setError("נדרשת חתימה ואישור קבלה");
-    const r = await signFn({ data: { id, workerId: idNumber, phone } });
+    if (!hasSignature || !signature || !consent) return setError("נדרשת חתימה ואישור קבלה");
+    const r = await signFn({
+      data: { id, workerId: idNumber, phone, fullName: fullName.trim(), signature },
+    });
     if (!r.ok) return setError("הלינק כבר נחתם על ידי עובד אחר");
     setCodes(r.codes);
     setError(null);
@@ -105,6 +110,16 @@ function VoucherWallet() {
               <p className="text-center text-sm text-muted-foreground">
                 סה"כ {link.total.toLocaleString("he-IL")} ₪ · הזדהו כדי להמשיך
               </p>
+              <FormField label="שם מלא">
+                <Input
+                  aria-label="שם מלא"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value.slice(0, 80))}
+                  required
+                  autoComplete="name"
+                  placeholder="שם פרטי ומשפחה"
+                />
+              </FormField>
               <FormField label="ת.ז.">
                 <Input
                   aria-label="ת.ז."
@@ -128,7 +143,7 @@ function VoucherWallet() {
                 />
               </FormField>
               {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
-              <Button type="submit" size="lg" block disabled={!idNumber || !phone}>
+              <Button type="submit" size="lg" block disabled={!fullName.trim() || !idNumber || !phone}>
                 <KeyRound className="size-5" />
                 המשך
               </Button>
@@ -137,7 +152,7 @@ function VoucherWallet() {
             <form onSubmit={sign} className="flex flex-col gap-5">
               <ClientOnly fallback={<div className="h-[186px] rounded-md border-2 border-dashed border-blue-300" />}>
                 <Suspense fallback={<div className="h-[186px] rounded-md border-2 border-dashed border-blue-300" />}>
-                  <SignatureField onChange={setHasSignature} />
+                  <SignatureField onChange={setHasSignature} onCapture={setSignature} />
                 </Suspense>
               </ClientOnly>
               <Checkbox
