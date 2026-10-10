@@ -35,9 +35,6 @@ export function ReasonsPanel() {
       <CardHeader>
         <CardTitle>סיבות הנפקה</CardTitle>
       </CardHeader>
-      <p className="text-sm text-muted-foreground">
-        כל סיבה משויכת לקטגוריה — "חיוב לקוח" (B2B) או "ללא חיוב" — ומוצגת בהתאם בהפקת השוברים.
-      </p>
 
       <form
         className="mt-5 flex flex-wrap gap-2"
