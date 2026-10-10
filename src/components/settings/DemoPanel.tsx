@@ -78,18 +78,8 @@ export function DemoPanel() {
     setConfirm(false);
     setBusy("reset");
     try {
-      const steps = [
-        db.from("vouchers").delete().neq("serial", ""),
-        db.from("voucher_requests").delete().neq("id", ""),
-        db.from("worker_links").delete().neq("id", ""),
-        db.from("branches").delete().like("id", "demo-%"),
-        db.from("issue_reasons").delete().in("name", ["נסיעה לאתר לקוח", "תדלוק רכב חברה"]),
-        db.from("app_settings").upsert({ key: "main", balance: 0 }),
-      ];
-      for (const p of steps) {
-        const { error } = await p;
-        if (error) throw error;
-      }
+      const { error } = await db.rpc("reset_demo_data");
+      if (error) throw error;
       await refresh();
       toast.success("הנתונים אופסו");
     } catch (e) {
@@ -106,7 +96,7 @@ export function DemoPanel() {
         <h2 className="font-display text-lg font-extrabold text-secondary">סביבת דמו</h2>
       </div>
       <p className="mb-5 text-sm text-muted-foreground">
-        הזנת נתונים לדוגמה (שוברים, הקצאות ודרישות) לצורך הדגמה, ואיפוס של נתוני התפעול. משתמשים ולקוחות אינם נמחקים.
+        הזנת נתונים לדוגמה (שוברים, הקצאות ודרישות) לצורך הדגמה, ואיפוס של נתוני התפעול. משתמשים, סניפים, לקוחות וסיבות הנפקה אינם נמחקים.
       </p>
       <div className="flex flex-wrap gap-3">
         <Button onClick={seed} loading={busy === "seed"} disabled={!!busy}>
@@ -120,7 +110,8 @@ export function DemoPanel() {
       {confirm ? (
         <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 grid place-items-center bg-navy-900/50 p-4">
           <div className="w-full max-w-sm rounded-lg bg-surface p-6 shadow-card">
-            <p className="mb-6 text-base font-bold text-secondary">האם את בטוחה שברצונך לאפס את הנתונים?</p>
+            <p className="mb-2 text-base font-bold text-secondary">האם את בטוחה שברצונך לאפס את הנתונים?</p>
+            <p className="mb-6 text-sm text-muted-foreground">פעולה זו תמחק את כל נתוני התפעול: שוברים, הקצאות, דרישות, קישורי עובדים, ארכיון חתימות ויומן פעילות. משתמשים, סניפים, מאגרי הלקוחות וסיבות ההנפקה יישמרו.</p>
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setConfirm(false)}>לא</Button>
               <Button variant="danger" onClick={reset}>כן</Button>
