@@ -1,13 +1,51 @@
-import { forwardRef } from "react";
+import { forwardRef, useCallback, useEffect, useRef } from "react";
 import { cn } from "../lib/utils";
 
-/** Scrollable wrapper + table surface for dense record lists. */
+const PRIORITY = /סכום|סטטוס|מצב|ערך|יתרה|₪/;
+
+/** Copies header labels onto each cell so rows can render as cards on mobile. */
+function labelCells(table: HTMLTableElement) {
+  const headers = Array.from(table.querySelectorAll("thead th")).map((th) => th.textContent?.trim() ?? "");
+  table.querySelectorAll("tbody tr").forEach((tr) => {
+    Array.from(tr.children).forEach((cell, i) => {
+      const td = cell as HTMLElement;
+      const label = td.hasAttribute("colspan") && Number(td.getAttribute("colspan")) > 1 ? "" : headers[i] ?? "";
+      if (td.dataset.label !== label) td.dataset.label = label;
+      const pri = label && PRIORITY.test(label) ? "1" : "";
+      if ((td.dataset.priority ?? "") !== pri) {
+        if (pri) td.dataset.priority = pri;
+        else delete td.dataset.priority;
+      }
+    });
+  });
+}
+
+/** Scrollable wrapper + table surface; rows become stacked cards below md. */
 export const Table = forwardRef<HTMLTableElement, React.TableHTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="w-full overflow-x-auto rounded-lg border border-slate-300 bg-surface">
-      <table ref={ref} className={cn("w-full border-collapse text-sm", className)} {...props} />
-    </div>
-  ),
+  ({ className, ...props }, ref) => {
+    const inner = useRef<HTMLTableElement | null>(null);
+    const setRef = useCallback(
+      (el: HTMLTableElement | null) => {
+        inner.current = el;
+        if (typeof ref === "function") ref(el);
+        else if (ref) ref.current = el;
+      },
+      [ref],
+    );
+    useEffect(() => {
+      const el = inner.current;
+      if (!el) return;
+      labelCells(el);
+      const obs = new MutationObserver(() => labelCells(el));
+      obs.observe(el, { childList: true, subtree: true, characterData: true });
+      return () => obs.disconnect();
+    }, []);
+    return (
+      <div className="responsive-table w-full rounded-lg md:overflow-x-auto md:border md:border-slate-300 md:bg-surface">
+        <table ref={setRef} className={cn("w-full border-collapse text-sm", className)} {...props} />
+      </div>
+    );
+  },
 );
 Table.displayName = "Table";
 

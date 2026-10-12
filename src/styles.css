@@ -22,6 +22,51 @@
 }
 
 
+/* Mobile: table rows become stacked cards */
+@media (max-width: 767.98px) {
+  .responsive-table table,
+  .responsive-table tbody { display: block; width: 100%; min-width: 0 !important; }
+  .responsive-table thead { display: none; }
+  .responsive-table tbody tr {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    background: var(--color-surface);
+    padding: 0.5rem 0.75rem;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  }
+  .responsive-table tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 0 !important;
+    border-bottom: 1px dashed var(--color-border) !important;
+    padding: 0.5rem 0 !important;
+    text-align: end;
+    white-space: normal !important;
+    word-break: break-word;
+    min-width: 0;
+  }
+  .responsive-table tbody td:last-child { border-bottom: 0 !important; }
+  .responsive-table tbody td[data-label]:not([data-label=""])::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    text-align: start;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: var(--color-muted-foreground);
+  }
+  .responsive-table tbody td[data-label=""] { justify-content: center; }
+  .responsive-table tbody td[data-priority] {
+    order: -1;
+    font-weight: 800;
+    font-size: 0.95rem;
+  }
+}
+
 @media print {
   body:has(.signature-print) * { visibility: hidden; }
   .signature-print, .signature-print * { visibility: visible; }
