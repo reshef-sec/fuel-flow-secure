@@ -75,8 +75,8 @@ export function InternalLayout({ title, children }: { title: string; children: R
           open ? "translate-x-0" : "translate-x-full",
         )}
       >
-        <div className="flex h-20 items-center justify-between gap-2 border-b border-border px-5">
-          <Logo size="md" />
+        <div className="flex h-24 items-center justify-between gap-2 border-b border-border px-5">
+          <Logo className="h-16 lg:h-20" />
           <button
             onClick={() => setOpen(false)}
             aria-label="סגור תפריט"

@@ -71,7 +71,7 @@ function LoginPage() {
         noValidate
       >
         <div className="flex flex-col items-center gap-2 text-center">
-          <Logo />
+          <Logo className="h-24 sm:h-28" />
           <h1 className="font-display text-xl font-extrabold text-secondary">
             {needsSetup ? "הגדרת מנהל ראשי" : "כניסה למערכת"}
           </h1>

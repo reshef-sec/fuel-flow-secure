@@ -196,7 +196,7 @@ function RecordDialog({ record, onClose }: { record: SignatureRecord; onClose: (
         <div className="space-y-6 p-8">
           <div className="flex items-center justify-between border-b-2 border-secondary pb-4">
             <h2 className="font-display text-2xl font-extrabold text-secondary">טופס תיעוד חתימת עובד</h2>
-            <Logo size="md" />
+            <Logo className="h-24 print:h-28" />
           </div>
           <dl className="grid grid-cols-2 overflow-hidden rounded-lg border border-slate-300">
             {fields.map(([k, v]) => (
