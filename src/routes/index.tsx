@@ -9,7 +9,7 @@ import { PendingRequests } from "@/components/requests/PendingRequests";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
 import { Button, Card, Select, StatCard } from "@/design-system/delek-1ea111";
 import { fullName, MAIN_POOL, useAppStore, useCurrentUser } from "@/store/appStore";
-import { BudgetUtilization } from "@/components/dashboard/BudgetUtilization";
+import { BudgetUtilization, SupervisorDistribution } from "@/components/dashboard/BudgetUtilization";
 import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
 
 export const Route = createFileRoute("/")({
@@ -110,27 +110,7 @@ function Dashboard() {
         </Select>
       </div>
 
-      {isBranchManager ? (
-        <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-muted-foreground">
-              היתרה הזמינה שלי · סניף {myBranch || "—"}
-            </p>
-            <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">
-              {balance.toLocaleString("he-IL")} ₪
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {branchAvailable.length} שוברים זמינים להקצאה למפקחי הסניף שלי
-            </p>
-          </div>
-          <Button onClick={() => setSupervisorOpen(true)}>
-            <UserCheck className="size-4" />
-            הקצאה למפקח
-          </Button>
-        </Card>
-      ) : null}
-
-      {me?.canRequest && !isSupervisor ? (
+      {me?.canRequest && !isSupervisor && !isBranchManager ? (
         <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="font-display text-lg font-extrabold text-secondary">
@@ -146,7 +126,6 @@ function Dashboard() {
           </Button>
         </Card>
       ) : null}
-
 
       {role === "admin" ? (
         <div className="grid gap-5 sm:grid-cols-3">
@@ -171,24 +150,49 @@ function Dashboard() {
             tone="secondary"
           />
         </div>
+      ) : isBranchManager ? (
+        <div className="grid gap-5 md:grid-cols-3">
+          <Card className="flex flex-col justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground">היתרה הזמינה שלי</p>
+              <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">{balance.toLocaleString("he-IL")} ₪</p>
+              <p className="text-xs text-muted-foreground">{branchAvailable.length} שוברים זמינים · סניף {myBranch || "—"}</p>
+            </div>
+            <Button size="sm" className="self-start" onClick={() => setSupervisorOpen(true)}>
+              <UserCheck className="size-4" />
+              הקצאה למפקח
+            </Button>
+          </Card>
+          <Card className="flex flex-col justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-muted-foreground">סך תקציב הסניף</p>
+              <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">{(balance + issuedValue).toLocaleString("he-IL")} ₪</p>
+              <p className="text-xs text-muted-foreground">הונפק + יתרה זמינה</p>
+            </div>
+            {me?.canRequest ? (
+              <Button size="sm" variant="outline" className="self-start" onClick={() => setRequestOpen(true)}>
+                <FilePlus2 className="size-4" />
+                הגשת דרישת שוברים
+              </Button>
+            ) : null}
+          </Card>
+          <StatCard
+            label="שוברים שהונפקו"
+            value={`${issuedValue.toLocaleString("he-IL")} ₪`}
+            caption={`${issued.length} שוברים · ${periodLabels[period]}`}
+            percent={pct(issuedValue, balance + issuedValue)}
+            tone="secondary"
+          />
+        </div>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2">
-          {isBranchManager ? (
-            <StatCard
-              label="סך תקציב הסניף"
-              value={`${(balance + issuedValue).toLocaleString("he-IL")} ₪`}
-              caption={`הונפק + יתרה זמינה · סניף ${myBranch || "—"}`}
-              tone="accent"
-            />
-          ) : (
-            <StatCard
-              label="יתרת תקציב לניצול"
-              value={`${balance.toLocaleString("he-IL")} ₪`}
-              caption="הוקצה אליי וטרם הונפק"
-              percent={pct(balance, balance + issuedValue)}
-              tone="accent"
-            />
-          )}
+          <StatCard
+            label="יתרת תקציב לניצול"
+            value={`${balance.toLocaleString("he-IL")} ₪`}
+            caption="הוקצה אליי וטרם הונפק"
+            percent={pct(balance, balance + issuedValue)}
+            tone="accent"
+          />
           <StatCard
             label="שוברים שהונפקו לעובדים"
             value={`${issuedValue.toLocaleString("he-IL")} ₪`}
@@ -198,6 +202,8 @@ function Dashboard() {
           />
         </div>
       )}
+
+      {isBranchManager ? <SupervisorDistribution vouchers={available} /> : null}
 
       <BudgetUtilization vouchers={allVouchers as never} since={since} role={role} myBranch={myBranch} periodLabel={periodLabels[period]} />
 
