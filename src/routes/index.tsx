@@ -173,13 +173,22 @@ function Dashboard() {
         </div>
       ) : (
         <div className="grid gap-5 sm:grid-cols-2">
-          <StatCard
-            label="יתרת תקציב לניצול"
-            value={`${balance.toLocaleString("he-IL")} ₪`}
-            caption={isBranchManager ? `סניף ${myBranch || "—"}` : "הוקצה אליי וטרם הונפק"}
-            percent={pct(balance, balance + issuedValue)}
-            tone="accent"
-          />
+          {isBranchManager ? (
+            <StatCard
+              label="סך תקציב הסניף"
+              value={`${(balance + issuedValue).toLocaleString("he-IL")} ₪`}
+              caption={`הונפק + יתרה זמינה · סניף ${myBranch || "—"}`}
+              tone="accent"
+            />
+          ) : (
+            <StatCard
+              label="יתרת תקציב לניצול"
+              value={`${balance.toLocaleString("he-IL")} ₪`}
+              caption="הוקצה אליי וטרם הונפק"
+              percent={pct(balance, balance + issuedValue)}
+              tone="accent"
+            />
+          )}
           <StatCard
             label="שוברים שהונפקו לעובדים"
             value={`${issuedValue.toLocaleString("he-IL")} ₪`}
