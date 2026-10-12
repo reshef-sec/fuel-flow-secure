@@ -32,6 +32,50 @@ function Tip({ active, payload, total }: { active?: boolean; payload?: { name: s
   );
 }
 
+const UNALLOCATED = "יתרה לא מוקצית בסניף";
+
+/** Branch available budget split by supervisor, plus the manager's unallocated part. */
+export function SupervisorDistribution({ vouchers }: { vouchers: { amount: number; supervisor?: string }[] }) {
+  const map = new Map<string, number>();
+  for (const v of vouchers) {
+    const k = v.supervisor?.trim() || UNALLOCATED;
+    map.set(k, (map.get(k) ?? 0) + v.amount);
+  }
+  const data: Slice[] = [...map.entries()].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value, branches: [name] }));
+  const total = data.reduce((t, s) => t + s.value, 0);
+  const color = (s: Slice, i: number) => (s.name === UNALLOCATED ? "var(--color-muted-foreground)" : PALETTE[i % (PALETTE.length - 1)]);
+  return (
+    <Card className="mt-5">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <p className="font-display text-lg font-extrabold text-secondary">התפלגות תקציב פנימית</p>
+        <p className="text-sm text-muted-foreground">סה"כ זמין · {ils(total)}</p>
+      </div>
+      {total === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">אין יתרה זמינה</p> : (
+        <div className="flex flex-col items-center gap-4 sm:flex-row">
+          <div className="h-48 w-full sm:w-64">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={data} dataKey="value" nameKey="name" innerRadius="60%" outerRadius="90%" paddingAngle={2}>
+                  {data.map((s, i) => <Cell key={s.name} fill={color(s, i)} />)}
+                </Pie>
+                <Tooltip content={<Tip total={total} />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <ul className="flex-1 space-y-1 text-sm">
+            {data.map((s, i) => (
+              <li key={s.name} className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-1.5"><span className="size-3 rounded-full" style={{ background: color(s, i) }} />{s.name}</span>
+                <span className="tabular-nums">{ils(s.value)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /** Budget per branch in the period = issued in period + still-available. */
 export function BudgetUtilization({ vouchers, since, role, myBranch, periodLabel }: {
   vouchers: V[]; since: string | null; role: Role; myBranch: string; periodLabel: string;
@@ -95,7 +139,7 @@ export function BudgetUtilization({ vouchers, since, role, myBranch, periodLabel
     </Card>
   );
 
-  if (role === "branch") return <div className="mt-5">{pool}</div>;
+  if (role === "branch") return null;
 
   return (
     <div className="mt-5 flex flex-col gap-5 lg:flex-row">
