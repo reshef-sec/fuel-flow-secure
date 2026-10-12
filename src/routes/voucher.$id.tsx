@@ -102,7 +102,7 @@ function VoucherWallet() {
     <div className="flex min-h-screen items-start justify-center bg-background px-4 py-8">
       <Card className="w-full max-w-md" padding="none" radius="xl">
         <div className="flex flex-col items-center gap-3 border-b border-border px-6 py-6">
-          <Logo size="lg" />
+          <Logo className="h-24 sm:h-28" />
           <div className="w-full rounded-md bg-mint-100 px-4 py-2 text-center">
             <h1 className="font-display text-lg font-extrabold text-secondary">
               {step === "wallet" ? "הארנק הדיגיטלי שלי" : "קבלת שוברי דלק"}

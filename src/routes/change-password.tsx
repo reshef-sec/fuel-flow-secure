@@ -55,7 +55,7 @@ function ChangePasswordPage() {
     <main className="grid min-h-screen place-items-center bg-background px-4 py-10">
       <form onSubmit={onSubmit} noValidate className="w-full max-w-sm space-y-5 rounded-xl border border-border bg-surface p-6 shadow-sm">
         <div className="flex flex-col items-center gap-2 text-center">
-          <Logo />
+          <Logo className="h-24 sm:h-28" />
           <KeyRound className="size-6 text-primary" />
           <h1 className="font-display text-xl font-extrabold text-secondary">עדכון סיסמה</h1>
           <p className="text-sm text-muted-foreground">יש לבחור סיסמה חדשה לפני הכניסה למערכת.</p>
