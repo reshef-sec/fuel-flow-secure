@@ -166,7 +166,7 @@ function Dashboard() {
           <Card className="flex flex-col justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-muted-foreground">סך תקציב הסניף</p>
-              <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">{(balance + issuedValue).toLocaleString("he-IL")} ₪</p>
+              <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">{(value(available) + issuedValue).toLocaleString("he-IL")} ₪</p>
               <p className="text-xs text-muted-foreground">הונפק + יתרה זמינה</p>
             </div>
             {me?.canRequest ? (
@@ -180,7 +180,7 @@ function Dashboard() {
             label="שוברים שהונפקו"
             value={`${issuedValue.toLocaleString("he-IL")} ₪`}
             caption={`${issued.length} שוברים · ${periodLabels[period]}`}
-            percent={pct(issuedValue, balance + issuedValue)}
+            percent={pct(issuedValue, value(available) + issuedValue)}
             tone="secondary"
           />
         </div>
@@ -203,7 +203,7 @@ function Dashboard() {
         </div>
       )}
 
-      {isBranchManager ? <SupervisorDistribution vouchers={available} /> : null}
+      {isBranchManager ? <SupervisorDistribution vouchers={available} issued={issuedValue} /> : null}
 
       <BudgetUtilization vouchers={allVouchers as never} since={since} role={role} myBranch={myBranch} periodLabel={periodLabels[period]} />
 

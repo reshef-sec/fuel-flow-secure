@@ -33,24 +33,25 @@ function Tip({ active, payload, total }: { active?: boolean; payload?: { name: s
 }
 
 const UNALLOCATED = "יתרה לא מוקצית בסניף";
+const ISSUED = "שוברים שהונפקו";
 
 /** Branch available budget split by supervisor, plus the manager's unallocated part. */
-export function SupervisorDistribution({ vouchers }: { vouchers: { amount: number; supervisor?: string }[] }) {
-  const map = new Map<string, number>();
+export function SupervisorDistribution({ vouchers, issued }: { vouchers: { amount: number; supervisor?: string }[]; issued: number }) {
+  const map = new Map<string, number>([[ISSUED, issued]]);
   for (const v of vouchers) {
-    const k = v.supervisor?.trim() || UNALLOCATED;
+    const k = v.supervisor?.trim() ? `יתרת מפקח ${v.supervisor.trim()}` : UNALLOCATED;
     map.set(k, (map.get(k) ?? 0) + v.amount);
   }
   const data: Slice[] = [...map.entries()].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).map(([name, value]) => ({ name, value, branches: [name] }));
   const total = data.reduce((t, s) => t + s.value, 0);
-  const color = (s: Slice, i: number) => (s.name === UNALLOCATED ? "var(--color-muted-foreground)" : PALETTE[i % (PALETTE.length - 1)]);
+  const color = (s: Slice, i: number) => (s.name === UNALLOCATED ? "var(--color-muted-foreground)" : s.name === ISSUED ? USED : PALETTE[i % (PALETTE.length - 1)]);
   return (
     <Card className="mt-5">
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <p className="font-display text-lg font-extrabold text-secondary">התפלגות תקציב פנימית</p>
-        <p className="text-sm text-muted-foreground">סה"כ זמין · {ils(total)}</p>
+        <p className="text-sm text-muted-foreground">סך תקציב הסניף · {ils(total)}</p>
       </div>
-      {total === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">אין יתרה זמינה</p> : (
+      {total === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">אין נתונים</p> : (
         <div className="flex flex-col items-center gap-4 sm:flex-row">
           <div className="h-48 w-full sm:w-64">
             <ResponsiveContainer>
