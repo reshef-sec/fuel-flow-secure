@@ -13,7 +13,8 @@ import { AuditPanel } from "@/components/settings/AuditPanel";
 import { B2bPanel } from "@/components/settings/B2bPanel";
 import { DemoPanel } from "@/components/settings/DemoPanel";
 import { useIsSuperAdmin } from "@/lib/superAdmin";
-import { FlaskConical } from "lucide-react";
+import { FlaskConical, UploadCloud } from "lucide-react";
+import { ImportPanel } from "@/components/settings/ImportPanel";
 
 
 export const Route = createFileRoute("/settings")({
@@ -28,10 +29,13 @@ export const Route = createFileRoute("/settings")({
       { property: "og:description", content: "סיבות הנפקה, סניפים, משתמשים ולקוחות." },
     ],
   }),
+  validateSearch: (s: Record<string, unknown>): { tab?: string } =>
+    typeof s.tab === "string" ? { tab: s.tab } : {},
   component: SettingsPage,
 });
 
 const tabs = [
+  { id: "import", label: "ייבוא וטעינת שוברים", icon: UploadCloud },
   { id: "reasons", label: "סיבות הנפקה", icon: ListChecks },
   { id: "branches", label: "ניהול סניפים", icon: Building2 },
   { id: "users", label: "ניהול משתמשים", icon: Users },
@@ -42,7 +46,7 @@ const tabs = [
 
 
 function SettingsPage() {
-  const [tab, setTab] = useState<string>("reasons");
+  const [tab, setTab] = useState<string>(Route.useSearch().tab ?? "reasons");
   const isSuper = useIsSuperAdmin();
   const items = isSuper ? [...tabs, { id: "demo", label: "סביבת דמו", icon: FlaskConical }] : tabs;
 
@@ -51,6 +55,7 @@ function SettingsPage() {
       <Tabs items={items} value={tab} onChange={setTab} />
       {isSuper && tab === "demo" ? <div className="mt-6"><DemoPanel /></div> : null}
       <div className="mt-6">
+        {tab === "import" ? <ImportPanel /> : null}
         {tab === "reasons" ? <ReasonsPanel /> : null}
         {tab === "branches" ? <BranchesPanel /> : null}
         {tab === "users" ? <UsersPanel /> : null}
