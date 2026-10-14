@@ -1,3 +1,4 @@
+import { Greeting } from "@/components/dashboard/Greeting";
 import { FuelBreakdown } from "@/components/fuel/fuel";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -93,6 +94,7 @@ function Dashboard() {
 
   return (
     <InternalLayout title="דשבורד ניהול שוברים">
+      <Greeting />
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-display text-lg font-extrabold text-secondary">תמונת מצב</p>
