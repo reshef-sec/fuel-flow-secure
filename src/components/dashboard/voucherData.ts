@@ -1,3 +1,5 @@
+import type { FuelType } from "@/components/fuel/fuel";
+
 export type VoucherStatus = "מומש סופית" | "טרם שומש" | "חסום" | "הוקצה לעובד";
 
 export const MAIN_POOL = "מאגר ראשי";
@@ -7,6 +9,8 @@ export interface VoucherRecord {
   /** Real code printed on the voucher */
   realCode: string;
   amount: number;
+  /** סוג דלק — "בנזין" | "סולר" (default בנזין) */
+  fuelType?: FuelType;
   /** "מאגר ראשי" or a branch name */
   branch: string;
   /** Supervisor currently holding the voucher, if any */

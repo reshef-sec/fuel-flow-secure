@@ -1,5 +1,5 @@
 import { FormField, Input } from "@/design-system/delek-1ea111";
-import { cn } from "@/lib/utils";
+import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 
 export type FuelType = "בנזין" | "סולר";
 export const FUEL_TYPES: FuelType[] = ["בנזין", "סולר"];
