@@ -26,7 +26,6 @@ import { roleLabels, storedRole, useAppStore, type Role } from "@/store/appStore
 
 const navItems = [
   { to: "/", label: "דשבורד", icon: LayoutDashboard, roles: ["admin", "branch", "supervisor"] },
-  { to: "/vouchers", label: "מאגר שוברים", icon: Ticket, roles: ["admin"] },
   { to: "/allocations", label: "הקצאות לסניפים", icon: Building2, roles: ["admin"] },
   { to: "/supervisor", label: "הפקת שוברי דלק", icon: UserCheck, roles: ["admin", "branch", "supervisor"] },
   { to: "/produced", label: "שוברים שהופקו", icon: History, roles: ["admin", "branch", "supervisor"] },
