@@ -343,8 +343,8 @@ function ClientBlock({
         <FormField label="סוג דלק">
           <Select aria-label="בחר סוג דלק" value={block.fuelType} onChange={(e) => onChange({ fuelType: e.target.value as FuelType })}>
             <option value="">בחר סוג דלק…</option>
-            <option value="בנזין">⛽ בנזין 95</option>
-            <option value="סולר">🚚 סולר</option>
+            <option value="בנזין">בנזין 95</option>
+            <option value="סולר">סולר</option>
           </Select>
         </FormField>
         <FormField label="סכום (₪)" hint="בכפולות של 50 ₪">
