@@ -46,7 +46,7 @@ const tabs = [
 
 
 function SettingsPage() {
-  const [tab, setTab] = useState<string>(Route.useSearch().tab ?? "reasons");
+  const [tab, setTab] = useState<string>(Route.useSearch().tab ?? "import");
   const isSuper = useIsSuperAdmin();
   const items = isSuper ? [...tabs, { id: "demo", label: "סביבת דמו", icon: FlaskConical }] : tabs;
 
