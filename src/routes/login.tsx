@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { Button, FormField, Input, Logo } from "@/design-system/delek-1ea111";
 import { supabase } from "@/lib/supabaseClient";
-import { bootstrapAdmin, getSetupStatus } from "@/lib/backend";
+import { activateAccount, bootstrapAdmin, getSetupStatus } from "@/lib/backend";
 import { phoneToLoginEmail } from "@/lib/phoneLogin";
 
 export const Route = createFileRoute("/login")({
@@ -51,10 +51,18 @@ function LoginPage() {
         await bootstrap({ data: { phone, nationalId: password, fullName, branch: "" } });
         toast.success("חשבון מנהל ראשי נוצר");
       }
-      const { error: err } = await supabase.auth.signInWithPassword({
-        email: phoneToLoginEmail(phone),
-        password,
-      });
+      // Clear any stale session left in this browser before trying again.
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      try {
+        Object.keys(localStorage).filter((k) => k.startsWith("sb-") && k.endsWith("-auth-token"))
+          .forEach((k) => localStorage.removeItem(k));
+      } catch { /* storage unavailable */ }
+      const signIn = () => supabase.auth.signInWithPassword({ email: phoneToLoginEmail(phone), password });
+      let { error: err } = await signIn();
+      // First sign-in of an existing user: create their login (password = ID) and retry once.
+      if (err && /^\d{9}$/.test(password) && (await activateAccount(phone, password))) {
+        ({ error: err } = await signIn());
+      }
       if (err) throw new Error("מספר נייד או סיסמה שגויים");
       logActivity({ name: phone, role: "" }, "כניסה למערכת", phone);
     } catch (err) {

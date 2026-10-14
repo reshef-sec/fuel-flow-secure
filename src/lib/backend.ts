@@ -96,6 +96,12 @@ async function accounts(action: string, payload: Record<string, unknown>) {
 const norm = (d: AccountInput) => ({ ...d, phone: normalizePhone(d.phone) });
 
 export const bootstrapAdmin = ({ data }: Args<Omit<AccountInput, "role">>) => accounts("bootstrap", norm(data));
+export async function activateAccount(phone: string, nationalId: string) {
+  try {
+    const r = await accounts("activate", { phone: normalizePhone(phone), nationalId });
+    return Boolean(r?.ok);
+  } catch { return false; }
+}
 export const syncAccount = ({ data }: Args<AccountInput>) => accounts("sync", norm(data));
 export const resetAccountPassword = ({ data }: Args<AccountInput>) => accounts("reset", norm(data));
 export const deleteAccount = ({ data }: Args<{ nationalId: string }>) => accounts("delete", data);
