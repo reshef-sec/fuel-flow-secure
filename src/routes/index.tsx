@@ -75,8 +75,9 @@ function Dashboard() {
   const value = (list: typeof vouchers) => list.reduce((t, v) => t + v.amount, 0);
   const available = vouchers.filter(isAvailable);
   // Branch-manager budget = branch vouchers not yet given to a supervisor.
+  const centralPool = available.filter((v) => mainBranch(v.branch) === MAIN_POOL && !v.supervisor);
   const branchAvailable = available.filter((v) => !v.supervisor);
-  const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : globalBalance;
+  const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : value(centralPool);
   const branchesBudget = value(available.filter((v) => mainBranch(v.branch) !== MAIN_POOL));
 
   // Time-bound metrics use the selected period; budget metrics always show the live state.
@@ -213,7 +214,7 @@ function Dashboard() {
             פירוט יתרה זמינה לפי סוג דלק{role === "admin" ? " (מאגר מרכזי)" : ""}
           </p>
           <FuelBreakdown
-            list={role === "admin" ? available.filter((v) => mainBranch(v.branch) === MAIN_POOL && !v.supervisor) : available}
+            list={role === "admin" ? centralPool : available}
             className="mt-1 text-sm"
           />
         </Card>
