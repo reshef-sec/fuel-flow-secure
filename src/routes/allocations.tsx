@@ -7,6 +7,7 @@ import { NoAccess } from "@/components/layout/NoAccess";
 import { AllocationDialog } from "@/components/dashboard/AllocationDialog";
 import { Badge, Button, Card } from "@/design-system/delek-1ea111";
 import { useAppStore } from "@/store/appStore";
+import { FuelBreakdown } from "@/components/fuel/fuel";
 
 export const Route = createFileRoute("/allocations")({
   head: () => ({
@@ -45,6 +46,7 @@ function AllocationsPage() {
       ...b,
       stock: rows.length,
       availableCount: available.length,
+      availableList: available,
       balance: available.reduce((sum, v) => sum + v.amount, 0),
       allocated: rows.filter((v) => v.status === "הוקצה לעובד").length,
     };
@@ -100,6 +102,7 @@ function AllocationsPage() {
                     <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
                       {b.balance.toLocaleString("he-IL")} ₪
                     </p>
+                    <FuelBreakdown list={b.availableList} className="mt-1 text-[11px]" />
                   </div>
                 </div>
 
