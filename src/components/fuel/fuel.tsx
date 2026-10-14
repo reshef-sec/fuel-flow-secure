@@ -1,3 +1,4 @@
+import { Fuel } from "lucide-react";
 import { FormField, Input } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 
@@ -15,6 +16,16 @@ export function parseFuelType(raw: unknown): FuelType {
 export const fuelOf = (v: { fuelType?: FuelType }): FuelType => v.fuelType ?? DEFAULT_FUEL;
 export const fuelLabel = (f: FuelType) => (f === "בנזין" ? "בנזין 95" : "סולר");
 
+/** Unified Lucide fuel icon: green for petrol, amber for diesel. */
+export function FuelIcon({ fuel, className }: { fuel?: FuelType; className?: string }) {
+  return (
+    <Fuel
+      aria-hidden
+      className={cn("size-3.5 shrink-0", (fuel ?? DEFAULT_FUEL) === "בנזין" ? "text-success" : "text-warning", className)}
+    />
+  );
+}
+
 /** Green badge for petrol, blue for diesel. */
 export function FuelBadge({ fuel, size = "sm" }: { fuel?: FuelType; size?: "sm" | "lg" }) {
   const f = fuel ?? DEFAULT_FUEL;
@@ -25,10 +36,10 @@ export function FuelBadge({ fuel, size = "sm" }: { fuel?: FuelType; size?: "sm" 
         size === "lg" ? "px-4 py-1.5 text-lg" : "px-2.5 py-0.5 text-xs",
         f === "בנזין"
           ? "border-success/30 bg-success/10 text-success"
-          : "border-primary/30 bg-primary/10 text-primary",
+          : "border-warning/40 bg-warning/10 text-warning",
       )}
     >
-      <span aria-hidden>{f === "בנזין" ? "🟢" : "🔵"}</span>
+      <FuelIcon fuel={f} className={size === "lg" ? "size-5" : undefined} />
       {fuelLabel(f)}
     </span>
   );
@@ -41,7 +52,7 @@ export function fuelTotals(list: { amount: number; fuelType?: FuelType }[]) {
   return t;
 }
 
-/** "⛽ בנזין: ₪X | 🚚 סולר: ₪Y" breakdown line. */
+/** "בנזין: ₪X | סולר: ₪Y" breakdown line with fuel icons. */
 export function FuelBreakdown({
   list,
   className,
@@ -51,9 +62,10 @@ export function FuelBreakdown({
 }) {
   const t = fuelTotals(list);
   return (
-    <p className={cn("text-xs font-semibold text-muted-foreground tabular-nums", className)}>
-      ⛽ בנזין: ₪{t["בנזין"].toLocaleString("he-IL")} <span className="mx-1">|</span> 🚚 סולר: ₪
-      {t["סולר"].toLocaleString("he-IL")}
+    <p className={cn("flex flex-wrap items-center text-xs font-semibold text-muted-foreground tabular-nums", className)}>
+      <span className="inline-flex items-center gap-1"><FuelIcon fuel="בנזין" />בנזין: ₪{t["בנזין"].toLocaleString("he-IL")}</span>
+      <span className="mx-1.5">|</span>
+      <span className="inline-flex items-center gap-1"><FuelIcon fuel="סולר" />סולר: ₪{t["סולר"].toLocaleString("he-IL")}</span>
     </p>
   );
 }
@@ -76,7 +88,7 @@ export function FuelSplitFields({
         {FUEL_TYPES.map((f) => (
           <FormField
             key={f}
-            label={`${f === "בנזין" ? "⛽ בנזין 95" : "🚚 סולר"} (₪)`}
+            label={<span className="inline-flex items-center gap-1.5"><FuelIcon fuel={f} className="size-4" />{fuelLabel(f)} (₪)</span>}
             hint={
               available
                 ? `זמין: ${available[f].toLocaleString("he-IL")} ₪ · בכפולות של 50 ₪`
