@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Moon, Sparkles, Sun } from "lucide-react";
 
-import { useCurrentUser } from "@/store/appStore";
+import { useAuthContext } from "@/lib/auth-context";
 
 /** Current hour in Israel (Asia/Jerusalem), 0–23. */
 function israelHour() {
@@ -17,7 +17,8 @@ function slot(h: number) {
 }
 
 export function Greeting() {
-  const me = useCurrentUser();
+  // Always the signed-in account, never a role-preview user.
+  const { profile } = useAuthContext();
   // Computed after mount so server and browser render the same markup.
   const [hour, setHour] = useState<number | null>(null);
   useEffect(() => {
@@ -27,7 +28,7 @@ export function Greeting() {
   }, []);
   if (hour === null) return <div className="mb-5 h-[60px]" aria-hidden />;
   const g = slot(hour);
-  const name = me?.firstName?.trim() || "";
+  const name = (profile?.full_name ?? "").trim().split(/\s+/)[0] ?? "";
 
   return (
     <div className="mb-5">
