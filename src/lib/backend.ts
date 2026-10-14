@@ -83,7 +83,18 @@ export async function getSetupStatus() {
 type AccountInput = { phone: string; nationalId: string; fullName?: string; branch?: string; role?: string };
 
 async function accounts(action: string, payload: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke("admin-accounts", { body: { action, ...payload } });
+  // Always send the signed-in user's token explicitly (the client may otherwise fall back to the public key).
+  const { data: s } = await supabase.auth.getSession();
+  let token = s.session?.access_token;
+  if (!token && action === "change_password") {
+    const { data: r } = await supabase.auth.refreshSession();
+    token = r.session?.access_token;
+    if (!token) throw new Error("פג תוקף ההתחברות — יש להתחבר מחדש");
+  }
+  const { data, error } = await supabase.functions.invoke("admin-accounts", {
+    body: { action, ...payload },
+    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+  });
   if (error) {
     let msg = error.message;
     try { msg = (await (error as any).context?.json())?.error ?? msg; } catch { /* keep */ }
