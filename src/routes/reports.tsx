@@ -1,3 +1,4 @@
+import { FuelBadge } from "@/components/fuel/fuel";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { FileDown, Filter, Fuel, Printer, RotateCcw, Table2 } from "lucide-react";
@@ -102,6 +103,7 @@ function ReportsPage() {
   const headers = [
     "מספר כרטיס",
     "סכום",
+    "סוג דלק",
     "שויך ל",
     "לקוח",
     "שם עובד",
@@ -114,6 +116,7 @@ function ReportsPage() {
   const cells = rows.map((v) => [
     v.serial,
     `${v.amount.toLocaleString("he-IL")} ₪`,
+    v.fuelType ?? "בנזין",
     formatAssignment(v),
     v.client ?? "—",
     v.workerName ?? "—",
@@ -124,6 +127,7 @@ function ReportsPage() {
     heDate.format(new Date(v.updatedAt)),
   ]);
   const statusCol = headers.indexOf("סטטוס");
+  const fuelCol = headers.indexOf("סוג דלק");
 
   function exportExcel() {
     downloadCsv("non-billing-report.csv", headers, cells);
@@ -308,6 +312,8 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
                       <TableCell key={j} className="whitespace-nowrap">
                         {j === statusCol ? (
                           <Badge variant={statusVariant[v.status]} size="md">{v.status}</Badge>
+                        ) : j === fuelCol ? (
+                          <FuelBadge fuel={v.fuelType} />
                         ) : (
                           c
                         )}

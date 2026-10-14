@@ -1,3 +1,4 @@
+import { FuelBadge } from "@/components/fuel/fuel";
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 
@@ -131,6 +132,7 @@ export function AuditPanel() {
               <TableHeaderCell>תפקיד</TableHeaderCell>
               <TableHeaderCell>פעולה</TableHeaderCell>
               <TableHeaderCell>יעד</TableHeaderCell>
+              <TableHeaderCell>סוג דלק</TableHeaderCell>
               <TableHeaderCell>תאריך ושעה</TableHeaderCell>
               <TableHeaderCell>כתובת IP</TableHeaderCell>
             </TableRow>
@@ -157,6 +159,9 @@ export function AuditPanel() {
                     </Badge>
                   </TableCell>
                   <TableCell>{r.target}</TableCell>
+                  <TableCell>
+                    {/סולר/.test(r.target ?? "") ? <FuelBadge fuel="סולר" /> : /בנזין/.test(r.target ?? "") ? <FuelBadge fuel="בנזין" /> : "—"}
+                  </TableCell>
                   <TableCell className="tabular-nums">{r.at}</TableCell>
                   <TableCell className="tabular-nums" dir="ltr">
                     {r.ip}
