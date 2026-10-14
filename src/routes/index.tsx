@@ -52,7 +52,6 @@ function periodStart(period: Period): string | null {
 
 function Dashboard() {
   const allVouchers = useAppStore((s) => s.vouchers);
-  const globalBalance = useAppStore((s) => s.balance);
   const role = useAppStore((s) => s.role);
   const me = useCurrentUser();
   const [requestOpen, setRequestOpen] = useState(false);
@@ -75,8 +74,9 @@ function Dashboard() {
   const value = (list: typeof vouchers) => list.reduce((t, v) => t + v.amount, 0);
   const available = vouchers.filter(isAvailable);
   // Branch-manager budget = branch vouchers not yet given to a supervisor.
+  const centralPool = available.filter((v) => mainBranch(v.branch) === MAIN_POOL && !v.supervisor);
   const branchAvailable = available.filter((v) => !v.supervisor);
-  const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : globalBalance;
+  const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : value(centralPool);
   const branchesBudget = value(available.filter((v) => mainBranch(v.branch) !== MAIN_POOL));
 
   // Time-bound metrics use the selected period; budget metrics always show the live state.
@@ -134,15 +134,15 @@ function Dashboard() {
         <div className="grid gap-5 sm:grid-cols-3">
           <StatCard
             label="יתרת תקציב מרכזי"
-            value={`${globalBalance.toLocaleString("he-IL")} ₪`}
+            value={`${balance.toLocaleString("he-IL")} ₪`}
             caption="טרם הוקצה לסניפים"
-            percent={pct(globalBalance, globalBalance + branchesBudget + issuedValue)}
+            percent={pct(balance, balance + branchesBudget + issuedValue)}
           />
           <StatCard
             label="יתרת תקציב בסניפים"
             value={`${branchesBudget.toLocaleString("he-IL")} ₪`}
             caption="הוקצה לסניפים וטרם הונפק"
-            percent={pct(branchesBudget, globalBalance + branchesBudget + issuedValue)}
+            percent={pct(branchesBudget, balance + branchesBudget + issuedValue)}
             tone="accent"
           />
           <StatCard
@@ -213,7 +213,7 @@ function Dashboard() {
             פירוט יתרה זמינה לפי סוג דלק{role === "admin" ? " (מאגר מרכזי)" : ""}
           </p>
           <FuelBreakdown
-            list={role === "admin" ? available.filter((v) => mainBranch(v.branch) === MAIN_POOL && !v.supervisor) : available}
+            list={role === "admin" ? centralPool : available}
             className="mt-1 text-sm"
           />
         </Card>
