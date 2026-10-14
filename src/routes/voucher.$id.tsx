@@ -1,3 +1,4 @@
+import { FuelBadge } from "@/components/fuel/fuel";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { createFileRoute, ClientOnly } from "@tanstack/react-router";
 import { Copy, KeyRound, ShieldCheck, Wallet } from "lucide-react";
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/voucher/$id")({
 
 type Step = "identify" | "sign" | "wallet";
 
-type Code = { serial: string; realCode: string; amount: number };
+type Code = { serial: string; realCode: string; amount: number; fuelType?: "בנזין" | "סולר" };
 
 function VoucherWallet() {
   const { id } = Route.useParams();
@@ -204,8 +205,9 @@ function VoucherWallet() {
                   key={v.serial}
                   className="flex items-center justify-between gap-3 rounded-xl border-2 border-dashed border-primary bg-blue-100/60 px-4 py-3"
                 >
-                  <div>
-                    <p className="text-xs text-muted-foreground">{v.amount} ₪</p>
+                  <div className="space-y-1.5">
+                    <FuelBadge fuel={v.fuelType} size="lg" />
+                    <p className="text-xs text-muted-foreground">{v.amount} ₪ · מותר לתדלוק {v.fuelType === "סולר" ? "סולר" : "בנזין 95"} בלבד</p>
                     <p dir="ltr" className="font-display text-lg font-extrabold tracking-wider text-secondary">
                       {v.realCode}
                     </p>
