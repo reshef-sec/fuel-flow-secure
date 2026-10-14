@@ -67,7 +67,7 @@ function LoginPage() {
     <main className="grid min-h-screen place-items-center bg-background px-4 py-10">
       <form
         onSubmit={onSubmit}
-        className="w-full max-w-sm space-y-5 rounded-xl border border-border bg-surface p-6 shadow-sm"
+        className="w-full max-w-sm space-y-5 rounded-xl border border-border bg-surface p-6 shadow-card"
         noValidate
       >
         <div className="flex flex-col items-center gap-2 text-center">
@@ -120,7 +120,7 @@ function LoginPage() {
 
         {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
 
-        <Button type="submit" className="w-full" disabled={busy}>
+        <Button type="submit" block disabled={busy}>
           {busy ? "מתחבר…" : needsSetup ? "צור מנהל והתחבר" : "כניסה"}
         </Button>
       </form>

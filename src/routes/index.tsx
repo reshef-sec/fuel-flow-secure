@@ -100,7 +100,7 @@ function Dashboard() {
           value={period}
           onChange={(e) => setPeriod(e.target.value as Period)}
           aria-label="טווח זמן"
-          className="h-10 w-auto text-sm font-semibold"
+          className="w-auto font-semibold"
         >
           {(Object.keys(periodLabels) as Period[]).map((p) => (
             <option key={p} value={p}>

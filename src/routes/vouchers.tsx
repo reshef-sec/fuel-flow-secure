@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
-import { downloadCsv, heDate, statusVariant } from "@/components/dashboard/statusVariant";
+import { downloadCsv, statusVariant } from "@/components/dashboard/statusVariant";
 import {
   MAIN_POOL,
   formatAssignment,
@@ -44,16 +44,17 @@ export const Route = createFileRoute("/vouchers")({
 });
 
 const templateColumns = [
-  { name: 'מס"ד', example: "019949" },
-  { name: "סיריאלי", example: "RB-4417-9902" },
-  { name: "סכום", example: "150" },
-  { name: "תאריך הזנה", example: "2026-09-01" },
+  { name: "מספר כרטיס", example: "019949" },
+  { name: "קוד", example: "••••••" },
+  { name: "ערך", example: "100" },
+  { name: "סוג", example: "דלק" },
+  { name: "תוקף", example: "2027-12-31" },
 ];
 
 function VouchersPage() {
   const [dragging, setDragging] = useState(false);
   const [pazDragging, setPazDragging] = useState(false);
-  const [imported, setImported] = useState<VoucherRecord[]>([]);
+  const [imported, setImported] = useState<(VoucherRecord & { cardType?: string; validUntil?: string })[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const pazInputRef = useRef<HTMLInputElement>(null);
   const importVouchers = useAppStore((s) => s.importVouchers);
@@ -71,7 +72,7 @@ function VouchersPage() {
       return;
     }
     try {
-      const raw = stripHeader(await parseSheetFile(file), "מס");
+      const raw = stripHeader(await parseSheetFile(file), "כרטיס");
       const serials = raw.map((r) => String(r[0] ?? "").trim()).filter(Boolean);
       if (serials.length === 0) {
         toast.error("לא נמצאו מספרי שוברים בקובץ ההיזון החוזר");
@@ -82,7 +83,7 @@ function VouchersPage() {
         toast.info("מספרי השוברים בקובץ לא נמצאו במאגר או שכבר מומשו");
         return;
       }
-      toast.success(`היזון חוזר נטען · ${updated} שוברים עודכנו ל"מומש סופית"`);
+      toast.success(`היזון חוזר נטען · ${updated} שוברים עודכנו ל"מומש"`);
     } catch {
       toast.error("קריאת הקובץ נכשלה. יש לוודא שהקובץ תקין");
     }
@@ -106,9 +107,9 @@ function VouchersPage() {
       return;
     }
     try {
-      const raw = stripHeader(await parseSheetFile(file), "מס");
+      const raw = stripHeader(await parseSheetFile(file), "כרטיס");
       const today = new Date().toISOString().slice(0, 10);
-      const rows: VoucherRecord[] = raw
+      const rows = raw
         .filter((r) => (r[0] ?? "").length > 0)
         .map((r) => ({
           serial: String(r[0] ?? "").trim(),
@@ -116,14 +117,16 @@ function VouchersPage() {
           amount: Number(String(r[2] ?? "").replace(/[^\d.]/g, "")) || 0,
           branch: MAIN_POOL,
           status: "טרם שומש" as const,
-          updatedAt: String(r[3] ?? "").trim() || today,
+          updatedAt: today,
+          cardType: String(r[3] ?? "").trim(),
+          validUntil: String(r[4] ?? "").trim(),
         }));
       if (rows.length === 0) {
         toast.error("לא נמצאו שורות תקינות בקובץ. יש להשתמש בתבנית האקסל");
         return;
       }
-      setImported(rows);
-      importVouchers(rows);
+      importVouchers(rows.map(({ cardType: _t, validUntil: _v, ...v }) => v));
+      setImported(rows.map((v) => ({ ...v, realCode: "" })));
       toast.success(`הקובץ "${file.name}" נטען · ${rows.length} שוברים נוספו למאגר`);
     } catch {
       toast.error("קריאת הקובץ נכשלה. יש לוודא שהקובץ תקין");
@@ -244,7 +247,7 @@ function VouchersPage() {
             גרור לכאן את קובץ ההיזון החוזר מפז
           </p>
           <p className="text-sm text-muted-foreground">
-            נתמכים קבצי xlsx, xls ו-CSV · הקובץ מזוהה לפי מספר סיריאלי
+            נתמכים קבצי xlsx, xls ו-CSV · הקובץ מזוהה לפי מספר כרטיס (עמודה A)
           </p>
           <Button type="button" variant="outline" onClick={() => pazInputRef.current?.click()}>
             <FileSpreadsheet className="size-4" />
@@ -268,12 +271,12 @@ function VouchersPage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableHeaderCell>מס"ד</TableHeaderCell>
-                <TableHeaderCell>סיריאלי</TableHeaderCell>
-                <TableHeaderCell>סכום</TableHeaderCell>
+                <TableHeaderCell>מספר כרטיס</TableHeaderCell>
+                <TableHeaderCell>ערך</TableHeaderCell>
+                <TableHeaderCell>סוג</TableHeaderCell>
+                <TableHeaderCell>תוקף</TableHeaderCell>
                 <TableHeaderCell>שויך ל</TableHeaderCell>
                 <TableHeaderCell>סטטוס</TableHeaderCell>
-                <TableHeaderCell>תאריך הזנה</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -287,20 +290,16 @@ function VouchersPage() {
                 imported.map((v) => (
                   <TableRow key={v.serial}>
                     <TableCell className="font-semibold tabular-nums">{v.serial}</TableCell>
-                    <TableCell dir="ltr" className="text-start tabular-nums">
-                      {v.realCode}
-                    </TableCell>
                     <TableCell className="tabular-nums">
                       {v.amount.toLocaleString("he-IL")} ₪
                     </TableCell>
+                    <TableCell>{v.cardType || "—"}</TableCell>
+                    <TableCell className="tabular-nums">{v.validUntil || "—"}</TableCell>
                     <TableCell>{formatAssignment(v)}</TableCell>
                     <TableCell>
                       <Badge variant={statusVariant[v.status]} size="md">
                         {v.status}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">
-                      {heDate.format(new Date(v.updatedAt))}
                     </TableCell>
                   </TableRow>
                 ))
