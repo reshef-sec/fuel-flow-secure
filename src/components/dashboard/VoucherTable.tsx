@@ -56,7 +56,7 @@ export function VoucherTable({
   const columns = useMemo(
     () => [
       columnHelper.accessor("serial", {
-        header: 'מס"ד',
+        header: "מספר כרטיס",
         cell: (info) => <span className="font-semibold tabular-nums">{info.getValue()}</span>,
       }),
       columnHelper.accessor("amount", {
@@ -100,8 +100,7 @@ export function VoucherTable({
       const v = row.original;
       return (
         v.serial.toLowerCase().includes(q) ||
-        formatAssignment(v).toLowerCase().includes(q) ||
-        v.realCode.toLowerCase().includes(q)
+        formatAssignment(v).toLowerCase().includes(q)
       );
     },
     getCoreRowModel: getCoreRowModel(),
@@ -122,7 +121,7 @@ export function VoucherTable({
         r.original.status,
         r.original.updatedAt,
       ]);
-    downloadCsv("vouchers.csv", ['מס"ד', "סכום", "שויך ל", "סטטוס", "תאריך עדכון"], rows);
+    downloadCsv("vouchers.csv", ["מספר כרטיס", "סכום", "שויך ל", "סטטוס", "תאריך עדכון"], rows);
     toast.success("הייצוא לאקסל הושלם בהצלחה");
   }
 
@@ -143,8 +142,8 @@ export function VoucherTable({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder='חיפוש לפי מס"ד או שיוך'
-              aria-label='חיפוש לפי מס"ד או שיוך'
+              placeholder="חיפוש לפי מספר כרטיס או שיוך"
+              aria-label="חיפוש לפי מספר כרטיס או שיוך"
               className="pe-9"
             />
           </div>

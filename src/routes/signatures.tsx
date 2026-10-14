@@ -59,8 +59,6 @@ function SignaturesPage() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<SignatureRecord | null>(null);
 
-  const vouchers = useAppStore((s) => s.vouchers);
-  const codeOf = useMemo(() => new Map(vouchers.map((v) => [v.serial, v.realCode])), [vouchers]);
 
   useEffect(() => {
     // The database only returns rows the viewer may see (own branch / own records).
@@ -106,7 +104,7 @@ function SignaturesPage() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="חיפוש לפי שם, ת.ז, טלפון או מס״ד"
+              placeholder="חיפוש לפי שם, ת.ז, טלפון או מספר כרטיס"
               className="ps-9"
             />
           </div>
@@ -127,15 +125,14 @@ function SignaturesPage() {
                   <TableHeaderCell>ת.ז</TableHeaderCell>
                   <TableHeaderCell>טלפון</TableHeaderCell>
                   <TableHeaderCell>סכום השוברים</TableHeaderCell>
-                  <TableHeaderCell>מס"ד שוברים</TableHeaderCell>
-                  {role === "admin" ? <TableHeaderCell>סיריאלי</TableHeaderCell> : null}
+                  <TableHeaderCell>מספרי כרטיסים</TableHeaderCell>
                   <TableHeaderCell className="text-center">טופס</TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={role === "admin" ? 8 : 7} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                       אין חתימות בארכיון
                     </TableCell>
                   </TableRow>
@@ -148,11 +145,6 @@ function SignaturesPage() {
                       <TableCell dir="ltr" className="text-end">{r.phone}</TableCell>
                       <TableCell>{r.total_amount.toLocaleString("he-IL")} ₪</TableCell>
                       <TableCell className="max-w-xs truncate">{r.serials.join(", ")}</TableCell>
-                      {role === "admin" ? (
-                        <TableCell dir="ltr" className="max-w-xs truncate text-start">
-                          {r.serials.map((x) => codeOf.get(x) || "—").join(", ")}
-                        </TableCell>
-                      ) : null}
                       <TableCell className="text-center">
                         <Button size="sm" variant="ghost" aria-label="צפייה בטופס">
                           <Eye className="size-4" />
@@ -207,7 +199,7 @@ function RecordDialog({ record, onClose }: { record: SignatureRecord; onClose: (
             ))}
           </dl>
           <div>
-            <p className="mb-2 text-sm font-semibold text-foreground">מס"ד שוברים</p>
+            <p className="mb-2 text-sm font-semibold text-foreground">מספרי כרטיסים</p>
             <div className="flex flex-wrap gap-2">
               {record.serials.map((s) => (
                 <span key={s} className="rounded-sm border border-border bg-surface-muted px-2 py-1 text-sm">

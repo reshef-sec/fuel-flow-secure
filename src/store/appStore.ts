@@ -628,7 +628,7 @@ export const useAppStore = create<AppState>()(
         }
         run(db.from("worker_links").insert(linkToRow(link)));
         if (st.role === "admin")
-          run(db.from("voucher_codes").upsert(out.map((v) => ({ serial: v.serial, real_code: v.realCode }))));
+          { const fresh = out.filter((v) => v.realCode).map((v) => ({ serial: v.serial, real_code: v.realCode })); if (fresh.length) run(db.from("voucher_codes").upsert(fresh)); }
       },
     );
     logActivity(actorOf(get()), "הנפקת שובר לעובד", `קישור ${link.id} · ${link.total} ₪`);

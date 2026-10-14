@@ -39,7 +39,7 @@ export const voucherToRow = (v: VoucherRecord) => ({
 });
 const rowToVoucher = (r: Row, codes: Map<string, string>): VoucherRecord => {
   const v: Row = {
-    serial: r.serial, realCode: codes.get(String(r.serial)) ?? (r.real_code || ""), amount: r.amount, branch: r.branch, status: r.status,
+    serial: r.serial, realCode: codes.get(String(r.serial)) ?? "", amount: r.amount, branch: r.branch, status: r.status,
     updatedAt: r.updated_on, supervisor: s(r.supervisor), client: s(r.client), requester: s(r.requester),
     approver: s(r.approver), clientId: s(r.client_id), siteId: s(r.site_id), siteName: s(r.site_name),
     reason: s(r.issue_reason) ?? s(r.reason), workerName: s(r.employee_name) ?? s(r.worker_name),
@@ -115,8 +115,8 @@ export async function loadAll() {
     all("voucher_requests", "created_at"), all("worker_links", "created_at"), all("app_settings"),
   ]);
   // Real codes are admin-only; other roles get an access error and see none.
-  const codeRows = await all("voucher_codes").catch(() => [] as Row[]);
-  const codes = new Map(codeRows.map((r) => [String(r.serial), String(r.real_code)]));
+  // Redemption codes are never loaded into the staff app; only the employee page reads them server-side.
+  const codes = new Map<string, string>();
   return {
     branchList: branches.map((r) => ({ id: String(r.id), name: String(r.name), manager: String(r.manager), city: String(r.city) })) as BranchRecord[],
     reasons: reasons.map((r) => ({ id: String(r.id), name: String(r.name), category: r.category === "B2B" ? "B2B" : "Regular" })) as ReasonRecord[],

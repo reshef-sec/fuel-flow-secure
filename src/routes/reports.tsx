@@ -98,10 +98,9 @@ function ReportsPage() {
   const paged = usePaged(rows);
   const total = rows.reduce((sum, v) => sum + v.amount, 0);
   const isAdmin = role === "admin";
-  // Real serial numbers are shown to admins only; others see the internal מס"ד.
+  // Redemption codes are never shown in staff reports.
   const headers = [
-    'מס"ד',
-    ...(isAdmin ? ["סיריאלי"] : []),
+    "מספר כרטיס",
     "סכום",
     "שויך ל",
     "לקוח",
@@ -114,7 +113,6 @@ function ReportsPage() {
   ];
   const cells = rows.map((v) => [
     v.serial,
-    ...(isAdmin ? [v.realCode || "—"] : []),
     `${v.amount.toLocaleString("he-IL")} ₪`,
     formatAssignment(v),
     v.client ?? "—",
