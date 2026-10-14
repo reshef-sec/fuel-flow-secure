@@ -1,6 +1,4 @@
 import { createStart } from "@tanstack/react-start";
-import { attachExternalAuth } from "@/lib/externalAuth";
 
-export const startInstance = createStart(() => ({
-  functionMiddleware: [attachExternalAuth],
-}));
+// No app-server logic: all backend work runs in the database (Netlify-compatible).
+export const startInstance = createStart(() => ({}));
