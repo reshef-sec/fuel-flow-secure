@@ -680,6 +680,9 @@ export function useCurrentUser() {
 export { MAIN_POOL };
 
 /** The person performing an action (signed-in user, else the role preview pick). */
+/** Who is acting right now, for the activity log. */
+export const currentActor = () => actorOf(useAppStore.getState());
+
 function actorOf(st: AppState) {
   const mine = st.myNationalId ? st.users.find((u) => u.id === st.myNationalId) : undefined;
   const u = mine ?? pickCurrentUser(st.users, st.role);

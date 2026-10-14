@@ -2,6 +2,8 @@ import { publicVoucherUrl } from "@/lib/publicUrl";
 import { useMemo, useState } from "react";
 import { Copy, LockOpen, SquareArrowOutUpRight } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
+import { logActivity } from "@/lib/activityLog";
+import { currentActor } from "@/store/appStore";
 import { unlockWorkerLink } from "@/lib/workerLink.functions";
 import { Pager, usePaged } from "@/components/ui/Pager";
 import { toast } from "sonner";
@@ -44,6 +46,7 @@ export function ProducedLinks({ limit }: { limit?: number }) {
     try {
       await unlockFn({ data: { id } });
       useAppStore.setState((s) => ({ links: s.links.map((l) => (l.id === id ? { ...l, locked: false } : l)) }));
+      logActivity(currentActor(), "שחרור לינק נעול", `קישור ${id}`);
       toast.success("מונה הניסיונות אופס והלינק פתוח");
     } catch (e) {
       toast.error((e as Error).message || "שחרור הלינק נכשל");
