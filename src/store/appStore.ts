@@ -136,6 +136,17 @@ function pickExact<T extends { amount: number }>(list: T[], amount: number): T[]
   return go(0, amount, 0) ? res : null;
 }
 
+/** "100 ₪ (15 שוברים), 50 ₪ (2 שוברים)" — stock grouped by face value. */
+function groupStock(list: { amount: number }[]) {
+  if (!list.length) return "אין שוברים זמינים";
+  const m = new Map<number, number>();
+  for (const v of list) m.set(v.amount, (m.get(v.amount) ?? 0) + 1);
+  return [...m.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([amt, n]) => `${amt.toLocaleString("he-IL")} ₪ (${n} ${n === 1 ? "שובר" : "שוברים"})`)
+    .join(", ");
+}
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** Details of a worker voucher issued from the supervisor screen. */
@@ -607,7 +618,7 @@ export const useAppStore = create<AppState>()(
         const haveSum = have.reduce((t, v) => t + v.amount, 0);
         if (need > haveSum)
           return {
-            error: `אין במלאי שובר ${f} בסכום המבוקש. המלאי הזמין כעת מסוג זה הוא: ₪${haveSum.toLocaleString("he-IL")} (${have.length} שוברים).`,
+            error: `אין במלאי שובר ${f} בסכום המבוקש. המלאי הזמין כעת בסוג דלק זה: ${groupStock(have)}.`,
           };
       }
     }
@@ -622,7 +633,7 @@ export const useAppStore = create<AppState>()(
       const pick = pickExact(list, it.amount);
       if (!pick)
         return {
-          error: `אין במלאי שילוב שוברי ${it.fuelType} שמגיע בדיוק ל-₪${it.amount.toLocaleString("he-IL")}. המלאי הזמין: ${list.map((v) => `₪${v.amount}`).join(", ") || "—"}.`,
+          error: `אין במלאי שילוב שוברי ${it.fuelType} שמגיע בדיוק ל-₪${it.amount.toLocaleString("he-IL")}. המלאי הזמין כעת בסוג דלק זה: ${groupStock(list)}.`,
         };
       const ids = new Set(pick.map((v) => v.serial));
       byFuel.set(it.fuelType, list.filter((v) => !ids.has(v.serial)));
