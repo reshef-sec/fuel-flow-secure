@@ -52,7 +52,6 @@ function periodStart(period: Period): string | null {
 
 function Dashboard() {
   const allVouchers = useAppStore((s) => s.vouchers);
-  const globalBalance = useAppStore((s) => s.balance);
   const role = useAppStore((s) => s.role);
   const me = useCurrentUser();
   const [requestOpen, setRequestOpen] = useState(false);
@@ -135,15 +134,15 @@ function Dashboard() {
         <div className="grid gap-5 sm:grid-cols-3">
           <StatCard
             label="יתרת תקציב מרכזי"
-            value={`${globalBalance.toLocaleString("he-IL")} ₪`}
+            value={`${balance.toLocaleString("he-IL")} ₪`}
             caption="טרם הוקצה לסניפים"
-            percent={pct(globalBalance, globalBalance + branchesBudget + issuedValue)}
+            percent={pct(balance, balance + branchesBudget + issuedValue)}
           />
           <StatCard
             label="יתרת תקציב בסניפים"
             value={`${branchesBudget.toLocaleString("he-IL")} ₪`}
             caption="הוקצה לסניפים וטרם הונפק"
-            percent={pct(branchesBudget, globalBalance + branchesBudget + issuedValue)}
+            percent={pct(branchesBudget, balance + branchesBudget + issuedValue)}
             tone="accent"
           />
           <StatCard
