@@ -200,14 +200,26 @@ function VoucherWallet() {
                 <Wallet className="size-4 text-primary" />
                 {codes.length} קודים פעילים · {link.total.toLocaleString("he-IL")} ₪
               </p>
+              {(() => {
+                const b = codes.filter((c) => c.fuelType !== "סולר").length;
+                const d = codes.length - b;
+                return b && d ? (
+                  <p className="text-center text-xs font-bold text-muted-foreground">
+                    {b} בנזין <span className="mx-1">|</span> {d} סולר
+                  </p>
+                ) : null;
+              })()}
               {codes.map((v) => (
                 <div
                   key={v.serial}
                   className="flex items-center justify-between gap-3 rounded-xl border-2 border-dashed border-primary bg-blue-100/60 px-4 py-3"
                 >
                   <div className="space-y-1.5">
-                    <FuelBadge fuel={v.fuelType} size="lg" />
-                    <p className="text-xs text-muted-foreground">{v.amount} ₪ · מותר לתדלוק {v.fuelType === "סולר" ? "סולר" : "בנזין 95"} בלבד</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <FuelBadge fuel={v.fuelType} size="lg" />
+                      <span className="font-display text-lg font-extrabold tabular-nums text-secondary">{v.amount} ₪</span>
+                    </div>
+                    <p className="text-xs font-semibold text-muted-foreground">מותר לתדלוק {v.fuelType === "סולר" ? "סולר" : "בנזין 95"} בלבד</p>
                     <p dir="ltr" className="font-display text-lg font-extrabold tracking-wider text-secondary">
                       {v.realCode}
                     </p>
