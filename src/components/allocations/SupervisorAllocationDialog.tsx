@@ -6,7 +6,7 @@ import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
 import { FuelBreakdown, FuelSplitFields, emptySplit, fuelOf, readSplit, type FuelType } from "@/components/fuel/fuel";
 import { isAvailable } from "@/components/dashboard/voucherData";
-import { fullName, useAppStore } from "@/store/appStore";
+import { fullName, groupStock, pickExact, useAppStore } from "@/store/appStore";
 
 export function SupervisorAllocationDialog({
   open,
@@ -47,8 +47,11 @@ export function SupervisorAllocationDialog({
     if (typeof parsed === "string") return setError(parsed);
     const numeric = parsed["בנזין"] + parsed["סולר"];
     for (const f of ["בנזין", "סולר"] as const)
-      if (parsed[f] > avail[f])
-        return setError(`אין מספיק מלאי ${f} בסניף: זמינים ${avail[f].toLocaleString("he-IL")} ₪`);
+      if (parsed[f]) {
+        const stock = free.filter((v) => fuelOf(v) === f);
+        if (!pickExact(stock, parsed[f]))
+          return setError(`אין במלאי שוברי ${f} בסכום זה. המלאי הזמין כעת בסוג דלק זה: ${groupStock(stock)}.`);
+      }
     if (numeric > branchBalance) {
       setError("הסכום גבוה מהיתרה הזמינה בסניף");
       return;

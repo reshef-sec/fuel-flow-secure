@@ -116,7 +116,7 @@ const denominations = (amount: number) => {
 };
 
 /** Picks vouchers summing exactly to amount (largest first, with a small backtrack). */
-function pickExact<T extends { amount: number }>(list: T[], amount: number): T[] | null {
+export function pickExact<T extends { amount: number }>(list: T[], amount: number): T[] | null {
   const sorted = [...list].sort((a, b) => b.amount - a.amount);
   const res: T[] = [];
   const go = (i: number, left: number, depth: number): boolean => {
@@ -137,7 +137,7 @@ function pickExact<T extends { amount: number }>(list: T[], amount: number): T[]
 }
 
 /** "100 ₪ (15 שוברים), 50 ₪ (2 שוברים)" — stock grouped by face value. */
-function groupStock(list: { amount: number }[]) {
+export function groupStock(list: { amount: number }[]) {
   if (!list.length) return "אין שוברים זמינים";
   const m = new Map<number, number>();
   for (const v of list) m.set(v.amount, (m.get(v.amount) ?? 0) + 1);
