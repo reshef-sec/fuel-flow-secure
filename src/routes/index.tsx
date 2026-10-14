@@ -210,9 +210,12 @@ function Dashboard() {
       {!isBranchManager ? (
         <Card className="py-3">
           <p className="text-sm font-semibold text-muted-foreground">
-            פירוט יתרה זמינה לפי סוג דלק{role === "admin" ? " (כל המלאי הזמין)" : ""}
+            פירוט יתרה זמינה לפי סוג דלק{role === "admin" ? " (מאגר מרכזי)" : ""}
           </p>
-          <FuelBreakdown list={available} className="mt-1 text-sm" />
+          <FuelBreakdown
+            list={role === "admin" ? available.filter((v) => mainBranch(v.branch) === MAIN_POOL && !v.supervisor) : available}
+            className="mt-1 text-sm"
+          />
         </Card>
       ) : null}
 
