@@ -79,15 +79,15 @@ export function FuelSplitFields({
             label={`${f === "בנזין" ? "⛽ בנזין 95" : "🚚 סולר"} (₪)`}
             hint={
               available
-                ? `זמין: ${available[f].toLocaleString("he-IL")} ₪ · בכפולות של 100`
-                : "בכפולות של 100 ₪"
+                ? `זמין: ${available[f].toLocaleString("he-IL")} ₪ · בכפולות של 50 ₪`
+                : "בכפולות של 50 ₪"
             }
           >
             <Input
               aria-label={`סכום ${f}`}
               type="number"
               min={0}
-              step={100}
+              step={50}
               inputMode="numeric"
               value={values[f]}
               onChange={(e) => onChange({ ...values, [f]: e.target.value })}
@@ -112,7 +112,7 @@ export function readSplit(values: Record<FuelType, string>): string | Record<Fue
   const out = { "בנזין": Number(values["בנזין"]) || 0, "סולר": Number(values["סולר"]) || 0 };
   if (out["בנזין"] < 0 || out["סולר"] < 0) return "סכום לא תקין";
   if (out["בנזין"] + out["סולר"] <= 0) return "יש להזין סכום לפחות לסוג דלק אחד";
-  if (out["בנזין"] % 100 || out["סולר"] % 100) return "הסכומים חייבים להיות בכפולות של 100 ₪";
+  if (out["בנזין"] % 50 || out["סולר"] % 50) return "הסכומים חייבים להיות בכפולות של 50 ₪";
   return out;
 }
 
