@@ -4,6 +4,8 @@ import { toast } from "sonner";
 
 import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
+import { FuelBreakdown, FuelSplitFields, emptySplit, fuelOf, readSplit, type FuelType } from "@/components/fuel/fuel";
+import { isAvailable } from "@/components/dashboard/voucherData";
 import { fullName, useAppStore } from "@/store/appStore";
 
 export function SupervisorAllocationDialog({
@@ -19,33 +21,34 @@ export function SupervisorAllocationDialog({
 }) {
   const users = useAppStore((s) => s.users);
   const assignToSupervisor = useAppStore((s) => s.assignToSupervisor);
+  const allVouchers = useAppStore((s) => s.vouchers);
+  const free = allVouchers.filter((v) => v.branch === branch && !v.supervisor && isAvailable(v) && v.status === "טרם שומש");
+  const avail = { "בנזין": 0, "סולר": 0 } as Record<FuelType, number>;
+  for (const v of free) avail[fuelOf(v)] += v.amount;
 
   const supervisors = users.filter((u) => u.role === "supervisor" && u.branch.trim() === branch.trim());
   const [supervisor, setSupervisor] = useState("");
-  const [amount, setAmount] = useState("");
+  const [split, setSplit] = useState(emptySplit);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setSupervisor("");
-    setAmount("");
+    setSplit(emptySplit());
     setError(null);
     setLoading(false);
   }, [open]);
 
-  const numeric = Number(amount);
-
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!supervisor || !numeric) {
-      setError("יש לבחור מפקח ולהזין סכום");
-      return;
-    }
-    if (numeric % 100 !== 0) {
-      setError("הסכום חייב להיות בכפולות של 100 ₪");
-      return;
-    }
+    const parsed = readSplit(split);
+    if (!supervisor) return setError("יש לבחור מפקח");
+    if (typeof parsed === "string") return setError(parsed);
+    const numeric = parsed["בנזין"] + parsed["סולר"];
+    for (const f of ["בנזין", "סולר"] as const)
+      if (parsed[f] > avail[f])
+        return setError(`אין מספיק מלאי ${f} בסניף: זמינים ${avail[f].toLocaleString("he-IL")} ₪`);
     if (numeric > branchBalance) {
       setError("הסכום גבוה מהיתרה הזמינה בסניף");
       return;
@@ -54,7 +57,7 @@ export function SupervisorAllocationDialog({
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      assignToSupervisor(branch, supervisor, numeric);
+      for (const f of ["בנזין", "סולר"] as const) if (parsed[f]) assignToSupervisor(branch, supervisor, parsed[f], f);
       onClose();
       toast.success(`הועברו ${numeric.toLocaleString("he-IL")} ₪ ל${supervisor}`);
     }, 1000);
@@ -74,6 +77,7 @@ export function SupervisorAllocationDialog({
             <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
               {branchBalance.toLocaleString("he-IL")} ₪
             </p>
+            <FuelBreakdown list={free} />
           </div>
         </div>
 
@@ -97,19 +101,7 @@ export function SupervisorAllocationDialog({
           ) : null}
         </FormField>
 
-        <FormField label="סכום להעברה (₪)" hint="בכפולות של 100 ₪ בלבד">
-          <Input
-            aria-label="סכום להעברה"
-            type="number"
-            min={100}
-            step={100}
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="500"
-            className="tabular-nums"
-          />
-        </FormField>
+        <FuelSplitFields values={split} onChange={setSplit} available={avail} />
 
         {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
 

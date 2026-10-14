@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
+import { FuelSplitFields, emptySplit, readSplit } from "@/components/fuel/fuel";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
 export function AllocationDialog({
@@ -34,30 +35,24 @@ export function AllocationDialog({
       })),
   ];
   const [target, setTarget] = useState("");
-  const [amount, setAmount] = useState("");
+  const [split, setSplit] = useState(emptySplit);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setTarget(presetTarget ?? "");
-    setAmount("");
+    setSplit(emptySplit());
     setError(null);
     setLoading(false);
   }, [open, presetTarget]);
 
-  const numeric = Number(amount);
-
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!target || !numeric) {
-      setError("יש לבחור יעד ולהזין סכום");
-      return;
-    }
-    if (numeric % 100 !== 0) {
-      setError("הסכום חייב להיות בכפולות של 100 ₪");
-      return;
-    }
+    const parsed = readSplit(split);
+    if (!target) return setError("יש לבחור יעד הקצאה");
+    if (typeof parsed === "string") return setError(parsed);
+    const numeric = parsed["בנזין"] + parsed["סולר"];
     if (numeric > balance) {
       setError("הסכום גבוה מהיתרה הזמינה לחלוקה");
       return;
@@ -67,9 +62,9 @@ export function AllocationDialog({
     setTimeout(() => {
       setLoading(false);
       const picked = targets.find((t) => t.value === target);
-      allocate(picked?.branch ?? target, picked?.supervisor, numeric, {
-        approver: me ? fullName(me) : "אדמין מרכזי",
-      });
+      const approver = me ? fullName(me) : "אדמין מרכזי";
+      for (const f of ["בנזין", "סולר"] as const)
+        if (parsed[f]) allocate(picked?.branch ?? target, picked?.supervisor, parsed[f], { approver, fuelType: f });
       onClose();
       toast.success("ההקצאה בוצעה בהצלחה והיתרה עודכנה");
     }, 1000);
@@ -106,20 +101,7 @@ export function AllocationDialog({
           </Select>
         </FormField>
 
-        <FormField label="סכום להקצאה (₪)" hint="בכפולות של 100 ₪ בלבד">
-          <Input
-            id="alloc-amount"
-            aria-label="סכום להקצאה"
-            type="number"
-            min={100}
-            step={100}
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="1,000"
-            className="tabular-nums"
-          />
-        </FormField>
+        <FuelSplitFields values={split} onChange={setSplit} />
 
         {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
 

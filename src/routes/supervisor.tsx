@@ -1,3 +1,4 @@
+import type { FuelType } from "@/components/fuel/fuel";
 import { publicVoucherUrl } from "@/lib/publicUrl";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -64,11 +65,12 @@ interface Block {
   regular: ClientRecord | null;
   amount: string;
   reason: string;
+  fuelType: FuelType | "";
 }
 
 let blockSeq = 1;
 const newBlock = (mode: Mode = "b2b"): Block => ({
-  key: blockSeq++, mode, search: "", b2b: null, regular: null, amount: "", reason: "",
+  key: blockSeq++, mode, search: "", b2b: null, regular: null, amount: "", reason: "", fuelType: "",
 });
 
 function SupervisorPage() {
@@ -95,10 +97,12 @@ function SupervisorPage() {
       const sel = b.mode === "b2b" ? b.b2b : b.regular;
       if (!sel || !n || !b.reason) return setError(`לקוח ${i + 1}: יש לבחור לקוח, למלא סכום ולבחור סיבה`);
       if (n % 100 !== 0) return setError(`לקוח ${i + 1}: הסכום חייב להיות בכפולות של 100 ₪`);
+      if (!b.fuelType) return setError(`לקוח ${i + 1}: יש לבחור סוג דלק`);
+      const fuelType = b.fuelType;
       items.push(
         b.mode === "b2b" && b.b2b
-          ? { amount: n, reason: b.reason, route: "b2b", clientName: b.b2b.clientName, clientCode: b.b2b.clientCode, accountName: b.b2b.accountName, standard: b.b2b.standard }
-          : { amount: n, reason: b.reason, route: "regular", clientName: b.regular!.clientName, clientCode: b.regular!.clientId, siteId: b.regular!.siteId, siteName: b.regular!.siteName, ...(b.regular!.standard ? { standard: b.regular!.standard } : {}) },
+          ? { amount: n, fuelType, reason: b.reason, route: "b2b", clientName: b.b2b.clientName, clientCode: b.b2b.clientCode, accountName: b.b2b.accountName, standard: b.b2b.standard }
+          : { amount: n, fuelType, reason: b.reason, route: "regular", clientName: b.regular!.clientName, clientCode: b.regular!.clientId, siteId: b.regular!.siteId, siteName: b.regular!.siteName, ...(b.regular!.standard ? { standard: b.regular!.standard } : {}) },
       );
     }
     setError(null);
@@ -335,7 +339,14 @@ function ClientBlock({
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <FormField label="סוג דלק">
+          <Select aria-label="בחר סוג דלק" value={block.fuelType} onChange={(e) => onChange({ fuelType: e.target.value as FuelType })}>
+            <option value="">בחר סוג דלק…</option>
+            <option value="בנזין">⛽ בנזין 95</option>
+            <option value="סולר">🚚 סולר</option>
+          </Select>
+        </FormField>
         <FormField label="סכום (₪)" hint="בכפולות של 100 ₪">
           <Input aria-label="סכום" type="number" min={100} step={100} inputMode="numeric" value={block.amount} onChange={(e) => onChange({ amount: e.target.value })} placeholder="300" className="tabular-nums" />
         </FormField>
