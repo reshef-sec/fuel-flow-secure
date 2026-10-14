@@ -1,3 +1,4 @@
+import { logActivity } from "@/lib/activityLog";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Lock, Smartphone } from "lucide-react";
@@ -56,6 +57,7 @@ function LoginPage() {
         password,
       });
       if (err) throw new Error("מספר נייד או סיסמה שגויים");
+      logActivity({ name: phone, role: "" }, "כניסה למערכת", phone);
     } catch (err) {
       setError(err instanceof Error ? err.message : "הכניסה נכשלה");
     } finally {

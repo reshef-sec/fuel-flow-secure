@@ -48,7 +48,8 @@ interface SignatureRecord {
 const fmt = (iso: string) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("he-IL", { dateStyle: "short", timeStyle: "short" });
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 };
 
 function SignaturesPage() {
@@ -212,6 +213,9 @@ function RecordDialog({ record, onClose }: { record: SignatureRecord; onClose: (
             <p className="mb-2 text-sm font-semibold text-foreground">חתימת העובד</p>
             <div className="rounded-lg border border-slate-300 bg-surface p-3">
               <img src={record.signature} alt={`חתימת ${record.full_name}`} className="mx-auto max-h-40" />
+              <p className="mt-3 border-t border-slate-200 pt-2 text-center text-sm font-semibold text-foreground">
+                נחתם בתאריך ובשעה: <span dir="ltr" className="tabular-nums">{fmt(record.created_at)}</span>
+              </p>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
