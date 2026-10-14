@@ -1,3 +1,4 @@
+import { FuelBadge } from "@/components/fuel/fuel";
 import { useMemo, useState } from "react";
 import {
   createColumnHelper,
@@ -65,6 +66,11 @@ export function VoucherTable({
           <span className="tabular-nums">{info.getValue().toLocaleString("he-IL")} ₪</span>
         ),
       }),
+      columnHelper.accessor((row) => row.fuelType ?? "בנזין", {
+        id: "fuelType",
+        header: "סוג דלק",
+        cell: (info) => <FuelBadge fuel={info.row.original.fuelType} />,
+      }),
       columnHelper.accessor((row) => formatAssignment(row), {
         id: "assignedTo",
         header: "שויך ל",
@@ -117,11 +123,12 @@ export function VoucherTable({
       .rows.map((r) => [
         r.original.serial,
         r.original.amount,
+        r.original.fuelType ?? "בנזין",
         formatAssignment(r.original),
         r.original.status,
         r.original.updatedAt,
       ]);
-    downloadCsv("vouchers.csv", ["מספר כרטיס", "סכום", "שויך ל", "סטטוס", "תאריך עדכון"], rows);
+    downloadCsv("vouchers.csv", ["מספר כרטיס", "סכום", "סוג דלק", "שויך ל", "סטטוס", "תאריך עדכון"], rows);
     toast.success("הייצוא לאקסל הושלם בהצלחה");
   }
 

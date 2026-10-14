@@ -25,7 +25,7 @@ export function run(p: PromiseLike<{ error: { message: string } | null }>) {
 
 /* ---------- mappers ---------- */
 export const voucherToRow = (v: VoucherRecord) => ({
-  serial: v.serial, real_code: "", amount: v.amount, branch: v.branch,
+  serial: v.serial, real_code: "", amount: v.amount, fuel_type: v.fuelType ?? "בנזין", branch: v.branch,
   supervisor: v.supervisor ?? null, client: v.client ?? null, status: v.status, updated_on: v.updatedAt,
   requester: v.requester ?? null, approver: v.approver ?? null, client_id: v.clientId ?? null,
   site_id: v.siteId ?? null, site_name: v.siteName ?? null, reason: v.reason ?? null,
@@ -40,6 +40,7 @@ export const voucherToRow = (v: VoucherRecord) => ({
 const rowToVoucher = (r: Row, codes: Map<string, string>): VoucherRecord => {
   const v: Row = {
     serial: r.serial, realCode: codes.get(String(r.serial)) ?? "", amount: r.amount, branch: r.branch, status: r.status,
+    fuelType: r.fuel_type === "סולר" ? "סולר" : "בנזין",
     updatedAt: r.updated_on, supervisor: s(r.supervisor), client: s(r.client), requester: s(r.requester),
     approver: s(r.approver), clientId: s(r.client_id), siteId: s(r.site_id), siteName: s(r.site_name),
     reason: s(r.issue_reason) ?? s(r.reason), workerName: s(r.employee_name) ?? s(r.worker_name),
@@ -87,6 +88,7 @@ export const requestToRow = (r: VoucherRequest) => ({
   id: r.id, requester: r.requester, requester_id: r.requesterId, branch: r.branch, amount: r.amount,
   reason: r.reason, created_on: r.createdAt, status: r.status,
   approved_amount: r.approvedAmount ?? null, approver: r.approver ?? null,
+  benzine_amount: r.benzineAmount ?? null, diesel_amount: r.dieselAmount ?? null,
 });
 export const linkToRow = (l: WorkerLink) => ({
   id: l.id, total: l.total, serials: l.serials, created_on: l.createdAt,
@@ -141,6 +143,9 @@ export async function loadAll() {
       amount: Number(r.amount), reason: String(r.reason), createdAt: String(r.created_on),
       status: r.status as VoucherRequest["status"],
       approvedAmount: r.approved_amount == null ? undefined : Number(r.approved_amount), approver: s(r.approver),
+      ...(r.benzine_amount != null || r.diesel_amount != null
+        ? { benzineAmount: Number(r.benzine_amount ?? 0), dieselAmount: Number(r.diesel_amount ?? 0) }
+        : {}),
     })).reverse() as VoucherRequest[],
     links: links.map((r) => ({
       id: String(r.id), total: Number(r.total), serials: (r.serials as string[]) ?? [], createdAt: String(r.created_on),

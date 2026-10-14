@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import { Button, FormField, Input, Textarea } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
+import { FuelSplitFields, emptySplit, readSplit } from "@/components/fuel/fuel";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
 /** Lets an authorized user submit a voucher request for admin approval. */
@@ -10,29 +11,23 @@ export function RequestDialog({ open, onClose }: { open: boolean; onClose: () =>
   const addRequest = useAppStore((s) => s.addRequest);
   const me = useCurrentUser();
 
-  const [amount, setAmount] = useState("");
+  const [split, setSplit] = useState(emptySplit);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setAmount("");
+    setSplit(emptySplit());
     setReason("");
     setError(null);
   }, [open]);
 
-  const numeric = Number(amount);
-
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!numeric || !reason.trim()) {
-      setError("יש להזין סכום ולבחור סיבה");
-      return;
-    }
-    if (numeric % 100 !== 0) {
-      setError("הסכום חייב להיות בכפולות של 100 ₪");
-      return;
-    }
+    const parsed = readSplit(split);
+    if (typeof parsed === "string") return setError(parsed);
+    if (!reason.trim()) return setError("יש למלא את סיבת הדרישה");
+    const numeric = parsed["בנזין"] + parsed["סולר"];
     if (!me) {
       setError("לא נמצא משתמש מחובר");
       return;
@@ -43,6 +38,8 @@ export function RequestDialog({ open, onClose }: { open: boolean; onClose: () =>
       requesterId: me.id,
       branch: me.branch,
       amount: numeric,
+      benzineAmount: parsed["בנזין"],
+      dieselAmount: parsed["סולר"],
       reason: reason.trim(),
     });
     onClose();
@@ -57,19 +54,7 @@ export function RequestDialog({ open, onClose }: { open: boolean; onClose: () =>
           <p className="text-muted-foreground">סניף {me?.branch ?? "—"}</p>
         </div>
 
-        <FormField label="סכום מבוקש (₪)" hint="בכפולות של 100 ₪ בלבד">
-          <Input
-            type="number"
-            min={100}
-            step={100}
-            inputMode="numeric"
-            aria-label="סכום מבוקש"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="1,000"
-            className="tabular-nums"
-          />
-        </FormField>
+        <FuelSplitFields values={split} onChange={setSplit} />
 
         <FormField label="סיבת הדרישה">
           <Textarea

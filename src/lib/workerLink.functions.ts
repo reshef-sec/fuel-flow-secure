@@ -23,18 +23,18 @@ const signSchema = identSchema.extend({
   signature: z.string().startsWith("data:image/png;base64,").max(800_000),
 });
 
-type Code = { serial: string; realCode: string; amount: number };
+type Code = { serial: string; realCode: string; amount: number; fuelType: "בנזין" | "סולר" };
 
 async function codesFor(serials: string[]): Promise<Code[]> {
   const supabaseAdmin = (await import("@/lib/supabaseAdmin.server")).getAdmin();
   const sb = supabaseAdmin as any;
-  const { data } = await sb.from("vouchers").select("serial, real_code, amount, status, expires_at").in("serial", serials);
+  const { data } = await sb.from("vouchers").select("*").in("serial", serials);
   const { data: codeRows } = await sb.from("voucher_codes").select("serial, real_code").in("serial", serials);
   const real = new Map(((codeRows ?? []) as { serial: string; real_code: string }[]).map((r) => [r.serial, r.real_code]));
   // Blocked codes are hidden from the employee. Vouchers never expire.
   return ((data ?? []) as Record<string, any>[])
     .filter((r) => r.status !== "חסום")
-    .map((r) => ({ serial: r.serial, realCode: real.get(r.serial) || r.real_code, amount: r.amount }));
+    .map((r) => ({ serial: r.serial, realCode: real.get(r.serial) || r.real_code, amount: r.amount, fuelType: r.fuel_type === "סולר" ? ("סולר" as const) : ("בנזין" as const) }));
 }
 
 /** Public: whether the link exists and was already signed (no codes). */

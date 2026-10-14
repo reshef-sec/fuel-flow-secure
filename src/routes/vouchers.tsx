@@ -1,3 +1,4 @@
+import { FuelBadge, parseFuelType } from "@/components/fuel/fuel";
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { FileDown, FileSpreadsheet, RefreshCcw, UploadCloud } from "lucide-react";
@@ -47,7 +48,7 @@ const templateColumns = [
   { name: "מספר כרטיס", example: "019949" },
   { name: "קוד", example: "••••••" },
   { name: "ערך", example: "100" },
-  { name: "סוג", example: "דלק" },
+  { name: "סוג", example: "בנזין 95 / סולר" },
   { name: "תוקף", example: "2027-12-31" },
 ];
 
@@ -118,6 +119,7 @@ function VouchersPage() {
           branch: MAIN_POOL,
           status: "טרם שומש" as const,
           updatedAt: today,
+          fuelType: parseFuelType(r[3]),
           cardType: String(r[3] ?? "").trim(),
           validUntil: String(r[4] ?? "").trim(),
         }));
@@ -273,7 +275,7 @@ function VouchersPage() {
               <TableRow>
                 <TableHeaderCell>מספר כרטיס</TableHeaderCell>
                 <TableHeaderCell>ערך</TableHeaderCell>
-                <TableHeaderCell>סוג</TableHeaderCell>
+                <TableHeaderCell>סוג דלק</TableHeaderCell>
                 <TableHeaderCell>תוקף</TableHeaderCell>
                 <TableHeaderCell>שויך ל</TableHeaderCell>
                 <TableHeaderCell>סטטוס</TableHeaderCell>
@@ -293,7 +295,7 @@ function VouchersPage() {
                     <TableCell className="tabular-nums">
                       {v.amount.toLocaleString("he-IL")} ₪
                     </TableCell>
-                    <TableCell>{v.cardType || "—"}</TableCell>
+                    <TableCell><FuelBadge fuel={v.fuelType} /></TableCell>
                     <TableCell className="tabular-nums">{v.validUntil || "—"}</TableCell>
                     <TableCell>{formatAssignment(v)}</TableCell>
                     <TableCell>

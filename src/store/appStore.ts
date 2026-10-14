@@ -1,3 +1,4 @@
+import { FUEL_TYPES, fuelOf, type FuelType } from "@/components/fuel/fuel";
 import { create } from "zustand";
 import { toast } from "sonner";
 import {
@@ -112,6 +113,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 /** Details of a worker voucher issued from the supervisor screen. */
 export interface WorkerIssueItem {
   amount: number;
+  fuelType: FuelType;
   reason: string;
   route: "b2b" | "regular";
   clientName: string;
@@ -141,12 +143,16 @@ export interface VoucherRequest {
   status: "ממתין לאישור" | "אושר" | "נדחה";
   approvedAmount?: number;
   approver?: string;
+  /** Requested split by fuel type (sums to amount). */
+  benzineAmount?: number;
+  dieselAmount?: number;
 }
 
 /** Metadata attached to created vouchers for audit tracking. */
 export interface AllocationMeta {
   requester?: string;
   approver?: string;
+  fuelType?: FuelType;
 }
 
 /** תקן for a given client + site, or "—" when unknown. */
@@ -180,7 +186,7 @@ interface AppState {
   /** Approves a request (full or custom amount) and allocates to the requester branch. */
   approveRequest: (id: string, amount: number, approver: string) => void;
   rejectRequest: (id: string, approver: string) => void;
-  assignToSupervisor: (branch: string, supervisor: string, amount: number) => void;
+  assignToSupervisor: (branch: string, supervisor: string, amount: number, fuelType?: FuelType) => void;
   markPazRedeemed: (count: number) => number;
   /** Marks vouchers redeemed by serial numbers from the Paz feedback file. */
   markSerialsRedeemed: (serials: string[]) => number;
@@ -266,6 +272,7 @@ export const useAppStore = create<AppState>()(
       serial: String(Math.floor(100000 + Math.random() * 899999) + i),
       realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
       amount: 100,
+      fuelType: meta?.fuelType ?? "בנזין",
       branch,
       ...(supervisor ? { supervisor } : {}),
       status: "טרם שומש" as const,
@@ -277,14 +284,15 @@ export const useAppStore = create<AppState>()(
     set((s) => ({ balance, vouchers: [...created, ...s.vouchers] }));
     if (created.length) run(db.from("vouchers").insert(created.map(voucherToRow)));
     run(db.from("app_settings").update({ balance }).eq("key", "main"));
-    logActivity(actorOf(get()), "הקצאת שוברים", `${branch}${supervisor ? ` (${supervisor})` : ""} · ${amount} ₪`);
+    logActivity(actorOf(get()), "הקצאת שוברים", `${branch}${supervisor ? ` (${supervisor})` : ""} · ${meta?.fuelType ?? "בנזין"} · ${amount} ₪`);
   },
-  assignToSupervisor: (branch, supervisor, amount) => {
+  assignToSupervisor: (branch, supervisor, amount, fuelType) => {
     let left = amount;
     const changed: VoucherRecord[] = [];
     const vouchers = get().vouchers.map((v) => {
       if (left <= 0) return v;
       if (v.branch !== branch || v.supervisor || v.status !== "טרם שומש") return v;
+      if (fuelType && fuelOf(v) !== fuelType) return v;
       if (v.amount > left) return v;
       left -= v.amount;
       const nv = { ...v, supervisor, updatedAt: today() };
@@ -293,7 +301,7 @@ export const useAppStore = create<AppState>()(
     });
     set({ vouchers });
     if (!changed.length) return;
-    logActivity(actorOf(get()), "הקצאה למפקח", `${supervisor} · ${changed.length * 100} ₪`);
+    logActivity(actorOf(get()), "הקצאה למפקח", `${supervisor} · ${fuelType ?? "בנזין"} · ${changed.length * 100} ₪`);
     const nid = get().users.find((u) => fullName(u) === supervisor)?.id;
     void (async () => {
       let supervisorId: string | undefined;
@@ -369,7 +377,17 @@ export const useAppStore = create<AppState>()(
   approveRequest: (id, amount, approver) => {
     const req = get().requests.find((r) => r.id === id);
     if (!req) return;
-    get().allocate(req.branch, undefined, amount, { requester: req.requester, approver });
+    const asked = (req.benzineAmount ?? 0) + (req.dieselAmount ?? 0);
+    if (asked > 0) {
+      // Keep the requested fuel split; scale down proportionally if approving less.
+      let diesel = Math.round(((req.dieselAmount ?? 0) * Math.min(amount, asked)) / asked / 100) * 100;
+      if (amount > asked) diesel = req.dieselAmount ?? 0;
+      const benzine = Math.max(0, amount - diesel);
+      if (benzine) get().allocate(req.branch, undefined, benzine, { requester: req.requester, approver, fuelType: "בנזין" });
+      if (diesel) get().allocate(req.branch, undefined, diesel, { requester: req.requester, approver, fuelType: "סולר" });
+    } else {
+      get().allocate(req.branch, undefined, amount, { requester: req.requester, approver });
+    }
     set((s) => ({
       requests: s.requests.map((r) =>
         r.id === id ? { ...r, status: "אושר" as const, approvedAmount: amount, approver } : r,
@@ -555,8 +573,19 @@ export const useAppStore = create<AppState>()(
               v.branch === p.branch &&
               (st.role === "supervisor" ? v.supervisor === p.supervisor : true),
           );
-    if (st.role !== "admin" && pool.length < needed)
-      return { error: `אין מספיק יתרה: נדרשים ${needed * 100} ₪, זמינים ${pool.length * 100} ₪` };
+    // Smart stock check per fuel type.
+    const byFuel = new Map<FuelType, VoucherRecord[]>(FUEL_TYPES.map((f) => [f, pool.filter((v) => fuelOf(v) === f)]));
+    if (st.role !== "admin") {
+      for (const f of FUEL_TYPES) {
+        const need = p.items.filter((it) => it.fuelType === f).reduce((t, it) => t + it.amount, 0);
+        const have = byFuel.get(f)!;
+        const haveSum = have.reduce((t, v) => t + v.amount, 0);
+        if (need > haveSum)
+          return {
+            error: `אין במלאי שובר ${f} בסכום המבוקש. המלאי הזמין כעת מסוג זה הוא: ₪${haveSum.toLocaleString("he-IL")} (${have.length} שוברים).`,
+          };
+      }
+    }
     const issuedAt = new Date().toISOString();
     const exp = new Date();
     exp.setMonth(exp.getMonth() + 3);
@@ -567,11 +596,13 @@ export const useAppStore = create<AppState>()(
     for (const it of p.items) {
       const count = Math.max(1, Math.floor(it.amount / 100));
       for (let i = 0; i < count; i++) {
-        const src = pool[used++];
+        const src = byFuel.get(it.fuelType)!.shift();
+        used++;
         const seed: VoucherRecord = src ?? {
           serial: String(base++),
           realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
           amount: 100,
+          fuelType: it.fuelType,
           branch: p.branch,
           status: "טרם שומש",
           updatedAt: today(),

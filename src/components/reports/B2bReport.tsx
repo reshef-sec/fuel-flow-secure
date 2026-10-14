@@ -1,3 +1,4 @@
+import { FuelBadge } from "@/components/fuel/fuel";
 import { useMemo, useState } from "react";
 import { FileDown } from "lucide-react";
 import { toast } from "sonner";
@@ -61,11 +62,11 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
   const isAdmin = role === "admin";
 
   const detailHeaders = [
-    "סניף", "ערך כרטיס", "מספר כרטיס", "שם לקוח", "קוד לקוח", "שם חשבון", "תקן",
+    "סניף", "ערך כרטיס", "סוג דלק", "מספר כרטיס", "שם לקוח", "קוד לקוח", "שם חשבון", "תקן",
     "שם עובד", "ת.ז", "טלפון", "תאריך מסירה", "סיבת הפקה",
   ];
   const detail = rows.map(({ v, value, code }) => [
-    v.branch, `${value} ₪`, code, v.client ?? "—",
+    v.branch, `${value} ₪`, v.fuelType ?? "בנזין", code, v.client ?? "—",
     v.clientCode ?? v.clientId ?? "—", v.accountName ?? v.siteName ?? "—", v.standard ?? v.standardName ?? "—",
     v.workerName ?? "—", v.workerId ?? "—", v.workerPhone ?? "—",
     heDate.format(new Date(v.deliveredAt ?? v.updatedAt)), v.reason ?? "—",
@@ -147,7 +148,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
                 <TableRow key={i}>
                   {cells.map((c, j) => (
                     <TableCell key={j} className="whitespace-nowrap">
-                      {c}
+                      {view === "detail" && j === 2 ? <FuelBadge fuel={c === "סולר" ? "סולר" : "בנזין"} /> : c}
                     </TableCell>
                   ))}
                 </TableRow>

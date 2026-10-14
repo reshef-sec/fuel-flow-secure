@@ -1,3 +1,4 @@
+import { FuelBadge, fuelOf } from "@/components/fuel/fuel";
 import { publicVoucherUrl } from "@/lib/publicUrl";
 import { useMemo, useState } from "react";
 import { Copy, LockOpen, SquareArrowOutUpRight } from "lucide-react";
@@ -55,6 +56,11 @@ export function ProducedLinks({ limit }: { limit?: number }) {
     }
   }
 
+  const fuelsOf = (serials: string[]) => {
+    const set = new Set(serials);
+    const fs = new Set(vouchers.filter((v) => set.has(v.serial)).map((v) => fuelOf(v)));
+    return fs.size ? [...fs] : (["בנזין"] as const);
+  };
   const clientsOf = (serials: string[]) => {
     const set = new Set(serials);
     return Array.from(new Set(vouchers.filter((v) => set.has(v.serial)).map((v) => v.client).filter(Boolean))).join(", ");
@@ -78,6 +84,7 @@ export function ProducedLinks({ limit }: { limit?: number }) {
           <TableHeaderCell>שם עובד</TableHeaderCell>
           <TableHeaderCell>לקוחות</TableHeaderCell>
           <TableHeaderCell>סכום</TableHeaderCell>
+          <TableHeaderCell>סוג דלק</TableHeaderCell>
           <TableHeaderCell>סטטוס</TableHeaderCell>
           <TableHeaderCell className="text-center">לינק</TableHeaderCell>
         </TableRow>
@@ -85,7 +92,7 @@ export function ProducedLinks({ limit }: { limit?: number }) {
       <TableBody>
         {rows.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+            <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
               עדיין לא הופקו שוברים
             </TableCell>
           </TableRow>
@@ -96,6 +103,11 @@ export function ProducedLinks({ limit }: { limit?: number }) {
               <TableCell className="font-semibold">{l.employeeName ?? "—"}</TableCell>
               <TableCell className="text-muted-foreground">{clientsOf(l.serials) || "—"}</TableCell>
               <TableCell className="tabular-nums">{l.total.toLocaleString("he-IL")} ₪</TableCell>
+              <TableCell>
+                <span className="flex flex-wrap gap-1">
+                  {fuelsOf(l.serials).map((f) => <FuelBadge key={f} fuel={f} />)}
+                </span>
+              </TableCell>
               <TableCell>
                 {l.locked ? <Badge variant="danger">נעול</Badge> : <Badge variant={l.signedAt ? "success" : "info"}>{l.signedAt ? "נחתם" : "ממתין לחתימה"}</Badge>}
               </TableCell>

@@ -1,3 +1,4 @@
+import { FuelBreakdown } from "@/components/fuel/fuel";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { FilePlus2, UserCheck } from "lucide-react";
@@ -157,6 +158,7 @@ function Dashboard() {
               <p className="text-sm font-semibold text-muted-foreground">היתרה הזמינה שלי</p>
               <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">{balance.toLocaleString("he-IL")} ₪</p>
               <p className="text-xs text-muted-foreground">{branchAvailable.length} שוברים זמינים · סניף {myBranch || "—"}</p>
+              <FuelBreakdown list={branchAvailable} className="mt-1" />
             </div>
             <Button size="sm" className="self-start" onClick={() => setSupervisorOpen(true)}>
               <UserCheck className="size-4" />
@@ -202,6 +204,15 @@ function Dashboard() {
           />
         </div>
       )}
+
+      {!isBranchManager ? (
+        <Card className="py-3">
+          <p className="text-sm font-semibold text-muted-foreground">
+            פירוט יתרה זמינה לפי סוג דלק{role === "admin" ? " (כל המלאי הזמין)" : ""}
+          </p>
+          <FuelBreakdown list={available} className="mt-1 text-sm" />
+        </Card>
+      ) : null}
 
       {isBranchManager ? <SupervisorDistribution vouchers={available} issued={issuedValue} /> : null}
 
