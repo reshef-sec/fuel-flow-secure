@@ -344,7 +344,7 @@ export const useAppStore = create<AppState>()(
       let supervisorId: string | undefined;
       if (nid) {
         try {
-          const { lookupAuthId } = await import("@/lib/accounts.functions");
+          const { lookupAuthId } = await import("@/lib/backend");
           supervisorId = (await lookupAuthId({ data: { nationalId: nid } })).id ?? undefined;
         } catch {
           /* tag stays empty; supervisor will not see these until fixed */

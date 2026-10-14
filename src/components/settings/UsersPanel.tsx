@@ -17,8 +17,7 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { useServerFn } from "@tanstack/react-start";
-import { deleteAccount, resetAccountPassword, syncAccount } from "@/lib/accounts.functions";
+import { deleteAccount, resetAccountPassword, syncAccount } from "@/lib/backend";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
 
@@ -50,9 +49,9 @@ export function UsersPanel() {
   const role = useAppStore((s) => s.role);
   const isAdmin = role === "admin";
   const fileRef = useRef<HTMLInputElement>(null);
-  const resetFn = useServerFn(resetAccountPassword);
-  const syncFn = useServerFn(syncAccount);
-  const deleteFn = useServerFn(deleteAccount);
+  const resetFn = resetAccountPassword;
+  const syncFn = syncAccount;
+  const deleteFn = deleteAccount;
   const accountData = (u: UserRecord) => ({
     phone: u.phone,
     nationalId: u.id,

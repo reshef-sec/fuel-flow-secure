@@ -2,10 +2,9 @@ import { FuelBadge, fuelOf } from "@/components/fuel/fuel";
 import { publicVoucherUrl } from "@/lib/publicUrl";
 import { useMemo, useState } from "react";
 import { Copy, LockOpen, SquareArrowOutUpRight } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
 import { logActivity } from "@/lib/activityLog";
 import { currentActor } from "@/store/appStore";
-import { unlockWorkerLink } from "@/lib/workerLink.functions";
+import { unlockWorkerLink } from "@/lib/backend";
 import { Pager, usePaged } from "@/components/ui/Pager";
 import { toast } from "sonner";
 
@@ -39,7 +38,7 @@ export function ProducedLinks({ limit }: { limit?: number }) {
   }, [links, role, me?.branch, authId, limit]);
 
   const paged = usePaged(rows);
-  const unlockFn = useServerFn(unlockWorkerLink);
+  const unlockFn = unlockWorkerLink;
   const [busy, setBusy] = useState<string | null>(null);
   const canUnlock = (l: { supervisorId?: string }) => role === "admin" || (!!authId && l.supervisorId === authId);
   async function unlock(id: string) {
