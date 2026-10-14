@@ -11,7 +11,9 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig(({ command, mode }) => {
   // Cloudflare Workers plugin only on build (produces the worker output);
   // the workerd runtime isn't available for the dev server.
-  const useCloudflare = command === "build";
+  // Netlify builds produce a static single-page app instead.
+  const isNetlify = Boolean(process.env.NETLIFY || process.env.STATIC_SPA);
+  const useCloudflare = command === "build" && !isNetlify;
 
   return {
     server: {
@@ -28,7 +30,11 @@ export default defineConfig(({ command, mode }) => {
       mockupPreviewPlugin(),
       tsConfigPaths({ projects: ["./tsconfig.json"] }),
       ...(useCloudflare ? [cloudflare({ viteEnvironment: { name: "ssr" } })] : []),
-      tanstackStart(),
+      tanstackStart(
+        isNetlify
+          ? { spa: { enabled: true, prerender: { outputPath: "/index.html", crawlLinks: false } } }
+          : undefined,
+      ),
       viteReact(),
       ...(mode === "development" ? [componentTagger()] : []),
     ],

@@ -5,8 +5,7 @@ import { Copy, KeyRound, ShieldCheck, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, Card, Checkbox, FormField, Input, Logo } from "@/design-system/delek-1ea111";
-import { useServerFn } from "@tanstack/react-start";
-import { getWorkerLinkStatus, openWorkerWallet, signWorkerLink } from "@/lib/workerLink.functions";
+import { getWorkerLinkStatus, openWorkerWallet, signWorkerLink } from "@/lib/backend";
 
 const SignatureField = lazy(() => import("@/components/worker/SignatureField"));
 
@@ -34,9 +33,9 @@ function VoucherWallet() {
   const [link, setLink] = useState<{ total: number; signed: boolean } | null>(null);
   const [blocked, setBlocked] = useState<"locked" | "expired" | null>(null);
   const [codes, setCodes] = useState<Code[]>([]);
-  const fetchStatus = useServerFn(getWorkerLinkStatus);
-  const openWallet = useServerFn(openWorkerWallet);
-  const signFn = useServerFn(signWorkerLink);
+  const fetchStatus = getWorkerLinkStatus;
+  const openWallet = openWorkerWallet;
+  const signFn = signWorkerLink;
 
   const [step, setStep] = useState<Step>("identify");
   const [fullName, setFullName] = useState("");

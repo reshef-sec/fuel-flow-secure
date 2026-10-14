@@ -2,12 +2,11 @@ import { logActivity } from "@/lib/activityLog";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Lock, Smartphone } from "lucide-react";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { Button, FormField, Input, Logo } from "@/design-system/delek-1ea111";
 import { supabase } from "@/lib/supabaseClient";
-import { bootstrapAdmin, getSetupStatus } from "@/lib/accounts.functions";
+import { bootstrapAdmin, getSetupStatus } from "@/lib/backend";
 import { phoneToLoginEmail } from "@/lib/phoneLogin";
 
 export const Route = createFileRoute("/login")({
@@ -25,8 +24,8 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const status = useServerFn(getSetupStatus);
-  const bootstrap = useServerFn(bootstrapAdmin);
+  const status = getSetupStatus;
+  const bootstrap = bootstrapAdmin;
   const [needsSetup, setNeedsSetup] = useState(false);
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");

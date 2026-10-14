@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+  publish = "dist/client"
+
+[build.environment]
+  STATIC_SPA = "true"
+  VITE_STATIC_SPA = "true"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

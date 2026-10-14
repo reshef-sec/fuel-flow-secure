@@ -1,11 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, FormField, Input, Logo } from "@/design-system/delek-1ea111";
-import { completePasswordChange } from "@/lib/accounts.functions";
+import { completePasswordChange } from "@/lib/backend";
 import { useAuthContext } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/change-password")({
@@ -23,7 +22,7 @@ export const Route = createFileRoute("/change-password")({
 });
 
 function ChangePasswordPage() {
-  const save = useServerFn(completePasswordChange);
+  const save = completePasswordChange;
   const { refresh, session } = useAuthContext();
   const navigate = useNavigate();
   const [pw, setPw] = useState("");
