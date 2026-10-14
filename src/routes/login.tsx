@@ -57,12 +57,9 @@ function LoginPage() {
         Object.keys(localStorage).filter((k) => k.startsWith("sb-") && k.endsWith("-auth-token"))
           .forEach((k) => localStorage.removeItem(k));
       } catch { /* storage unavailable */ }
-      const signIn = () => supabase.auth.signInWithPassword({ email: phoneToLoginEmail(phone), password });
-      let { error: err } = await signIn();
-      // First sign-in of an existing user: create their login (password = ID) and retry once.
-      if (err && /^\d{9}$/.test(password) && (await activateAccount(phone, password))) {
-        ({ error: err } = await signIn());
-      }
+      // Activate first (creates/repairs the login for first-time users); never blocks sign-in.
+      if (/^\d{9}$/.test(password)) await activateAccount(phone, password);
+      const { error: err } = await supabase.auth.signInWithPassword({ email: phoneToLoginEmail(phone), password });
       if (err) throw new Error("מספר נייד או סיסמה שגויים");
       logActivity({ name: phone, role: "" }, "כניסה למערכת", phone);
     } catch (err) {
