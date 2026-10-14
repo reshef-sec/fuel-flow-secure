@@ -36,8 +36,8 @@ export function PendingRequests() {
   const pending = requests.filter((r) => r.status === "ממתין לאישור");
 
   function approve(id: string, amount: number) {
-    if (amount % 100 !== 0 || amount <= 0) {
-      toast.error("הסכום חייב להיות בכפולות של 100 ₪");
+    if (amount % 50 !== 0 || amount <= 0) {
+      toast.error("הסכום חייב להיות בכפולות של 50 ₪");
       return;
     }
     if (amount > balance) {
@@ -100,8 +100,8 @@ export function PendingRequests() {
                         <span className="flex items-center gap-2">
                           <Input
                             type="number"
-                            min={100}
-                            step={100}
+                            min={50}
+                            step={50}
                             aria-label="סכום מאושר"
                             value={customAmount}
                             onChange={(e) => setCustomAmount(e.target.value)}

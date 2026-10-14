@@ -92,7 +92,7 @@ export interface ReasonRecord {
   category: ReasonCategory;
 }
 
-/** One-time worker link holding several 100 ₪ codes. */
+/** One-time worker link holding several 50/100 ₪ codes. */
 export interface WorkerLink {
   id: string;
   total: number;
@@ -106,6 +106,34 @@ export interface WorkerLink {
   supervisorId?: string;
   /** Locked after 3 wrong ID/phone attempts. */
   locked?: boolean;
+}
+
+/** Splits an amount into 100 ₪ units plus one 50 ₪ unit for the remainder. */
+const denominations = (amount: number) => {
+  const out = Array<number>(Math.floor(amount / 100)).fill(100);
+  if (amount % 100 >= 50) out.push(50);
+  return out;
+};
+
+/** Picks vouchers summing exactly to amount (largest first, with a small backtrack). */
+function pickExact<T extends { amount: number }>(list: T[], amount: number): T[] | null {
+  const sorted = [...list].sort((a, b) => b.amount - a.amount);
+  const res: T[] = [];
+  const go = (i: number, left: number, depth: number): boolean => {
+    if (left === 0) return true;
+    if (i >= sorted.length || depth > 2000) return false;
+    const v = sorted[i]!;
+    if (v.amount <= left) {
+      res.push(v);
+      if (go(i + 1, left - v.amount, depth + 1)) return true;
+      res.pop();
+    }
+    // skip voucher only if the next one has a different value (avoid duplicate branches)
+    let j = i + 1;
+    while (j < sorted.length && sorted[j]!.amount === v.amount) j++;
+    return go(j, left, depth + 1);
+  };
+  return go(0, amount, 0) ? res : null;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -267,11 +295,10 @@ export const useAppStore = create<AppState>()(
   balance: 0,
   vouchers: [],
   allocate: (branch, supervisor, amount, meta) => {
-    const count = Math.floor(amount / 100);
-    const created: VoucherRecord[] = Array.from({ length: count }, (_, i) => ({
+    const created: VoucherRecord[] = denominations(amount).map((value, i) => ({
       serial: String(Math.floor(100000 + Math.random() * 899999) + i),
       realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
-      amount: 100,
+      amount: value,
       fuelType: meta?.fuelType ?? "בנזין",
       branch,
       ...(supervisor ? { supervisor } : {}),
@@ -287,21 +314,20 @@ export const useAppStore = create<AppState>()(
     logActivity(actorOf(get()), "הקצאת שוברים", `${branch}${supervisor ? ` (${supervisor})` : ""} · ${meta?.fuelType ?? "בנזין"} · ${amount} ₪`);
   },
   assignToSupervisor: (branch, supervisor, amount, fuelType) => {
-    let left = amount;
+    const candidates = get().vouchers.filter(
+      (v) => v.branch === branch && !v.supervisor && v.status === "טרם שומש" && (!fuelType || fuelOf(v) === fuelType),
+    );
+    const picked = new Set((pickExact(candidates, amount) ?? []).map((v) => v.serial));
     const changed: VoucherRecord[] = [];
     const vouchers = get().vouchers.map((v) => {
-      if (left <= 0) return v;
-      if (v.branch !== branch || v.supervisor || v.status !== "טרם שומש") return v;
-      if (fuelType && fuelOf(v) !== fuelType) return v;
-      if (v.amount > left) return v;
-      left -= v.amount;
+      if (!picked.has(v.serial)) return v;
       const nv = { ...v, supervisor, updatedAt: today() };
       changed.push(nv);
       return nv;
     });
     set({ vouchers });
     if (!changed.length) return;
-    logActivity(actorOf(get()), "הקצאה למפקח", `${supervisor} · ${fuelType ?? "בנזין"} · ${changed.length * 100} ₪`);
+    logActivity(actorOf(get()), "הקצאה למפקח", `${supervisor} · ${fuelType ?? "בנזין"} · ${changed.reduce((t, v) => t + v.amount, 0)} ₪`);
     const nid = get().users.find((u) => fullName(u) === supervisor)?.id;
     void (async () => {
       let supervisorId: string | undefined;
@@ -380,7 +406,7 @@ export const useAppStore = create<AppState>()(
     const asked = (req.benzineAmount ?? 0) + (req.dieselAmount ?? 0);
     if (asked > 0) {
       // Keep the requested fuel split; scale down proportionally if approving less.
-      let diesel = Math.round(((req.dieselAmount ?? 0) * Math.min(amount, asked)) / asked / 100) * 100;
+      let diesel = Math.round(((req.dieselAmount ?? 0) * Math.min(amount, asked)) / asked / 50) * 50;
       if (amount > asked) diesel = req.dieselAmount ?? 0;
       const benzine = Math.max(0, amount - diesel);
       if (benzine) get().allocate(req.branch, undefined, benzine, { requester: req.requester, approver, fuelType: "בנזין" });
@@ -562,7 +588,6 @@ export const useAppStore = create<AppState>()(
   issueWorkerVoucher: (p) => {
     const st = get();
     const linkId = String(Math.floor(10000000 + Math.random() * 89999999));
-    const needed = p.items.reduce((t, it) => t + Math.max(1, Math.floor(it.amount / 100)), 0);
     // Branch managers and supervisors hand out budget they already hold.
     const pool =
       st.role === "admin"
@@ -586,22 +611,37 @@ export const useAppStore = create<AppState>()(
           };
       }
     }
+    // Choose exact vouchers per item (supports 50 ₪ and 100 ₪ denominations).
+    const chosen: VoucherRecord[][] = [];
+    for (const it of p.items) {
+      if (st.role === "admin") {
+        chosen.push([]);
+        continue;
+      }
+      const list = byFuel.get(it.fuelType)!;
+      const pick = pickExact(list, it.amount);
+      if (!pick)
+        return {
+          error: `אין במלאי שילוב שוברי ${it.fuelType} שמגיע בדיוק ל-₪${it.amount.toLocaleString("he-IL")}. המלאי הזמין: ${list.map((v) => `₪${v.amount}`).join(", ") || "—"}.`,
+        };
+      const ids = new Set(pick.map((v) => v.serial));
+      byFuel.set(it.fuelType, list.filter((v) => !ids.has(v.serial)));
+      chosen.push(pick);
+    }
     const issuedAt = new Date().toISOString();
     const exp = new Date();
     exp.setMonth(exp.getMonth() + 3);
     const expiresAt = exp.toISOString();
-    let used = 0;
     let base = Math.floor(700000 + Math.random() * 290000);
     const out: VoucherRecord[] = [];
-    for (const it of p.items) {
-      const count = Math.max(1, Math.floor(it.amount / 100));
-      for (let i = 0; i < count; i++) {
-        const src = byFuel.get(it.fuelType)!.shift();
-        used++;
+    for (const [idx, it] of p.items.entries()) {
+      const units = st.role === "admin" ? denominations(it.amount) : chosen[idx]!.map((v) => v.amount);
+      for (const [i, value] of units.entries()) {
+        const src = chosen[idx]![i];
         const seed: VoucherRecord = src ?? {
           serial: String(base++),
           realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
-          amount: 100,
+          amount: value,
           fuelType: it.fuelType,
           branch: p.branch,
           status: "טרם שומש",

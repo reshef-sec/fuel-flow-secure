@@ -96,7 +96,7 @@ function SupervisorPage() {
       const n = Number(b.amount);
       const sel = b.mode === "b2b" ? b.b2b : b.regular;
       if (!sel || !n || !b.reason) return setError(`לקוח ${i + 1}: יש לבחור לקוח, למלא סכום ולבחור סיבה`);
-      if (n % 100 !== 0) return setError(`לקוח ${i + 1}: הסכום חייב להיות בכפולות של 100 ₪`);
+      if (n % 50 !== 0) return setError(`לקוח ${i + 1}: הסכום חייב להיות בכפולות של 50 ₪`);
       if (!b.fuelType) return setError(`לקוח ${i + 1}: יש לבחור סוג דלק`);
       const fuelType = b.fuelType;
       items.push(
@@ -347,8 +347,8 @@ function ClientBlock({
             <option value="סולר">🚚 סולר</option>
           </Select>
         </FormField>
-        <FormField label="סכום (₪)" hint="בכפולות של 100 ₪">
-          <Input aria-label="סכום" type="number" min={100} step={100} inputMode="numeric" value={block.amount} onChange={(e) => onChange({ amount: e.target.value })} placeholder="300" className="tabular-nums" />
+        <FormField label="סכום (₪)" hint="בכפולות של 50 ₪">
+          <Input aria-label="סכום" type="number" min={50} step={50} inputMode="numeric" value={block.amount} onChange={(e) => onChange({ amount: e.target.value })} placeholder="300" className="tabular-nums" />
         </FormField>
         <FormField label="סיבת הנפקה">
           <Select aria-label="בחר סיבת הנפקה" value={block.reason} onChange={(e) => onChange({ reason: e.target.value })}>
