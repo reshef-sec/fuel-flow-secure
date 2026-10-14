@@ -83,18 +83,23 @@ export async function getSetupStatus() {
 type AccountInput = { phone: string; nationalId: string; fullName?: string; branch?: string; role?: string };
 
 async function accounts(action: string, payload: Record<string, unknown>) {
-  // Always send the signed-in user's token explicitly (the client may otherwise fall back to the public key).
-  const { data: s } = await supabase.auth.getSession();
-  let token = s.session?.access_token;
-  if (!token && action === "change_password") {
-    const { data: r } = await supabase.auth.refreshSession();
-    token = r.session?.access_token;
-    if (!token) throw new Error("פג תוקף ההתחברות — יש להתחבר מחדש");
-  }
-  const { data, error } = await supabase.functions.invoke("admin-accounts", {
+  const call = (token?: string) => supabase.functions.invoke("admin-accounts", {
     body: { action, ...payload },
     ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
   });
+  // Validate the stored session with the server (a stale token would be rejected with 401).
+  const { data: u } = await supabase.auth.getUser();
+  let token = u.user ? (await supabase.auth.getSession()).data.session?.access_token : undefined;
+  if (!token) token = (await supabase.auth.refreshSession()).data.session?.access_token;
+  let { data, error } = await call(token);
+  if (error && (error as any).context?.status === 401 && action !== "bootstrap" && action !== "activate") {
+    token = (await supabase.auth.refreshSession()).data.session?.access_token;
+    if (!token) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+      throw new Error("פג תוקף ההתחברות — יש להתחבר מחדש");
+    }
+    ({ data, error } = await call(token));
+  }
   if (error) {
     let msg = error.message;
     try { msg = (await (error as any).context?.json())?.error ?? msg; } catch { /* keep */ }
