@@ -157,4 +157,9 @@ export async function loadAll() {
   };
 }
 
+/** Reload physical stock before issuing, without reading redemption codes. */
+export async function loadIssuanceStock(): Promise<VoucherRecord[]> {
+  return (await all("vouchers", "serial")).map(r => rowToVoucher(r, new Map()));
+}
+
 export { db };
