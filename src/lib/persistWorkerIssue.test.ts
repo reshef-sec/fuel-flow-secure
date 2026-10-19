@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "node:test";
+import assert from "node:assert/strict";
 import { persistWorkerIssue } from "./persistWorkerIssue";
 
 describe("employee link persistence", () => {
@@ -8,20 +9,20 @@ describe("employee link persistence", () => {
       async () => { calls.push("vouchers"); return { error: null }; },
       async () => { calls.push("link"); return { error: null }; },
     );
-    expect(calls).toEqual(["vouchers", "link"]);
+    assert.deepEqual(calls, ["vouchers", "link"]);
   });
   test("rejects a failed link write rather than publishing an invalid link", async () => {
-    await expect(persistWorkerIssue(
+    await assert.rejects(persistWorkerIssue(
       async () => ({ error: null }),
       async () => ({ error: { message: "link insert failed" } }),
-    )).rejects.toThrow("link insert failed");
+    ), /link insert failed/);
   });
   test("does not save a link when the vouchers fail", async () => {
     let saved = false;
-    await expect(persistWorkerIssue(
+    await assert.rejects(persistWorkerIssue(
       async () => ({ error: { message: "voucher write failed" } }),
       async () => { saved = true; return { error: null }; },
-    )).rejects.toThrow("voucher write failed");
-    expect(saved).toBe(false);
+    ), /voucher write failed/);
+    assert.equal(saved, false);
   });
 });
