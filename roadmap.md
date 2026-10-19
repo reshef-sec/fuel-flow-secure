@@ -1,4 +1,5 @@
 # Roadmap — master system update
+- [ ] Provide secure get_central_inventory_summary SQL and connect dashboard/allocation totals directly to it, refreshing after saved transfers.
 - [x] Synchronize allocation totals and fuel breakdown with dashboard physical inventory; refresh stock before allocation and test limits (11 tests passed).
 - [ ] Verify central allocation while signed in to the external application (blocker: no available authenticated browser session).
 - [x] Provide safe voucher_codes permission SQL for the external database.
