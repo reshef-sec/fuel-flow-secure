@@ -50,6 +50,8 @@ export const Route = createFileRoute("/supervisor")({
       },
       { property: "og:title", content: "הפקת שוברי דלק | רשף ביטחון" },
       { property: "og:description", content: "הפקת לינק שוברי דלק לעובד לרכב עבודה או רכב פרטי." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: SupervisorPage,
@@ -88,7 +90,7 @@ function SupervisorPage() {
   const patch = (key: number, p: Partial<Block>) =>
     setBlocks((bs) => bs.map((b) => (b.key === key ? { ...b, ...p } : b)));
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (employeeName.trim().length < 2) return setError("יש למלא שם עובד");
     const items: WorkerIssueItem[] = [];
@@ -107,9 +109,8 @@ function SupervisorPage() {
     }
     setError(null);
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const created = issueWorkerVoucher({
+    try {
+      const created = await issueWorkerVoucher({
         employeeName: employeeName.trim(),
         branch: me?.branch || "הנהלה",
         ...(me ? { supervisor: fullName(me), requester: fullName(me) } : {}),
@@ -124,7 +125,11 @@ function SupervisorPage() {
       setEmployeeName("");
       setBlocks([newBlock()]);
       toast.success(`הופקו ${created.serials.length} קודים בלינק אחד`);
-    }, 600);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "הפקת הלינק נכשלה");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function copyLink() {
