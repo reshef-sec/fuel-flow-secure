@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AllocationsRouteImport } from './routes/allocations'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
+import { Route as IssueVoucherRouteImport } from './routes/issue-voucher'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ProducedRouteImport } from './routes/produced'
 import { Route as ReportsRouteImport } from './routes/reports'
@@ -38,6 +39,11 @@ const AllocationsRoute = AllocationsRouteImport.update({
 const ChangePasswordRoute = ChangePasswordRouteImport.update({
   id: '/change-password',
   path: '/change-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IssueVoucherRoute = IssueVoucherRouteImport.update({
+  id: '/issue-voucher',
+  path: '/issue-voucher',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/allocations': typeof AllocationsRoute
   '/change-password': typeof ChangePasswordRoute
+  '/issue-voucher': typeof IssueVoucherRoute
   '/login': typeof LoginRoute
   '/produced': typeof ProducedRoute
   '/reports': typeof ReportsRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/allocations': typeof AllocationsRoute
   '/change-password': typeof ChangePasswordRoute
+  '/issue-voucher': typeof IssueVoucherRoute
   '/login': typeof LoginRoute
   '/produced': typeof ProducedRoute
   '/reports': typeof ReportsRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/allocations': typeof AllocationsRoute
   '/change-password': typeof ChangePasswordRoute
+  '/issue-voucher': typeof IssueVoucherRoute
   '/login': typeof LoginRoute
   '/produced': typeof ProducedRoute
   '/reports': typeof ReportsRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/'
     | '/allocations'
     | '/change-password'
+    | '/issue-voucher'
     | '/login'
     | '/produced'
     | '/reports'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/'
     | '/allocations'
     | '/change-password'
+    | '/issue-voucher'
     | '/login'
     | '/produced'
     | '/reports'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/'
     | '/allocations'
     | '/change-password'
+    | '/issue-voucher'
     | '/login'
     | '/produced'
     | '/reports'
@@ -213,6 +225,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AllocationsRoute: typeof AllocationsRoute
   ChangePasswordRoute: typeof ChangePasswordRoute
+  IssueVoucherRoute: typeof IssueVoucherRoute
   LoginRoute: typeof LoginRoute
   ProducedRoute: typeof ProducedRoute
   ReportsRoute: typeof ReportsRoute
@@ -247,6 +260,13 @@ declare module '@tanstack/react-router' {
       path: '/change-password'
       fullPath: '/change-password'
       preLoaderRoute: typeof ChangePasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/issue-voucher': {
+      id: '/issue-voucher'
+      path: '/issue-voucher'
+      fullPath: '/issue-voucher'
+      preLoaderRoute: typeof IssueVoucherRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -351,6 +371,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AllocationsRoute: AllocationsRoute,
   ChangePasswordRoute: ChangePasswordRoute,
+  IssueVoucherRoute: IssueVoucherRoute,
   LoginRoute: LoginRoute,
   ProducedRoute: ProducedRoute,
   ReportsRoute: ReportsRoute,
