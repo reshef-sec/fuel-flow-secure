@@ -20,6 +20,7 @@ import { MAIN_POOL, formatAssignment } from "@/components/dashboard/voucherData"
 import { FuelBadge, parseFuelType } from "@/components/fuel/fuel";
 import { Pager, usePaged } from "@/components/ui/Pager";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
+import { validateStockSheet } from "@/lib/validateStockSheet";
 import { useAppStore } from "@/store/appStore";
 
 const templateColumns = [
