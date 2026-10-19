@@ -18,6 +18,8 @@ export const Route = createFileRoute("/voucher/$id")({
       { property: "og:title", content: "ארנק שוברי דלק | רשף ביטחון" },
       { property: "og:description", content: "זיהוי, חתימה דיגיטלית והצגת קודי שוברי הדלק שלך." },
       { name: "robots", content: "noindex" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: VoucherWallet,

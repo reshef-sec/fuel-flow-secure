@@ -16,6 +16,8 @@ export const Route = createFileRoute("/worker/$token")({
         property: "og:description",
         content: "לינק חד פעמי לעובד לקבלת שובר דלק בחתימה דיגיטלית.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: WorkerForm,

@@ -19,6 +19,8 @@ export const Route = createFileRoute("/allocations")({
       },
       { property: "og:title", content: "הקצאות לסניפים | רשף ביטחון" },
       { property: "og:description", content: "יתרות סניפים והקצאת שוברים למפקחים." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AllocationsPage,

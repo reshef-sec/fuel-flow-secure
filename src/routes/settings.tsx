@@ -27,6 +27,8 @@ export const Route = createFileRoute("/settings")({
       },
       { property: "og:title", content: "הגדרות מערכת | רשף ביטחון" },
       { property: "og:description", content: "סיבות הנפקה, סניפים, משתמשים ולקוחות." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   validateSearch: (s: Record<string, unknown>): { tab?: string } =>

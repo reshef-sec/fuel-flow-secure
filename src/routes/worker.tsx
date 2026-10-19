@@ -41,6 +41,8 @@ export const Route = createFileRoute("/worker")({
         property: "og:description",
         content: "מלאו ת.ז וטלפון, חתמו על המסך וקבלו את שובר הדלק.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: WorkerForm,
