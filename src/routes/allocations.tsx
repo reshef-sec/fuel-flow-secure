@@ -32,7 +32,7 @@ function AllocationsPage() {
   const branchList = useAppStore((s) => s.branchList);
   const vouchers = useAppStore((s) => s.vouchers);
   const role = useAppStore((s) => s.role);
-  const { summary, error: inventoryError, refresh } = useCentralInventorySummary(role === "admin");
+  const { summary, totalAvailableBalance, error: inventoryError, refresh } = useCentralInventorySummary(role === "admin");
   useLiveInventory(role === "admin");
   const [allocOpen, setAllocOpen] = useState(false);
   const [presetBranch, setPresetBranch] = useState<string | undefined>(undefined);
@@ -64,7 +64,7 @@ function AllocationsPage() {
         <p className="text-sm text-muted-foreground">
           יתרה זמינה לחלוקה:{" "}
           <span className="font-bold tabular-nums text-secondary">
-            {summary ? `₪${summary.total_available_amount.toLocaleString("he-IL")}` : "—"}
+            {totalAvailableBalance !== null ? `₪${totalAvailableBalance.toLocaleString("he-IL")}` : "—"}
           </span>
         </p>
         {summary ? <FuelBreakdown totals={{ "בנזין": summary.gasoline_amount, "סולר": summary.diesel_amount }} className="mt-2" /> : <p className="mt-2 text-sm text-danger">{inventoryError ?? "טוען יתרת מלאי…"}</p>}

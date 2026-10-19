@@ -59,7 +59,6 @@ export function DemoPanel() {
           { id: "demo-req-1", requester: "דנה לוי", requester_id: "", branch: "מרכז", amount: 500, reason: "תגבור משמרות", created_on: new Date().toISOString().slice(0, 10), status: "ממתין לאישור" },
           { id: "demo-req-2", requester: "יוסי כהן", requester_id: "", branch: "צפון", amount: 300, reason: "אירוע חריג", created_on: new Date().toISOString().slice(0, 10), status: "ממתין לאישור" },
         ]),
-        db.from("app_settings").upsert({ key: "main", balance: 15000 }),
       ];
       for (const p of steps) {
         const { error } = await p;
