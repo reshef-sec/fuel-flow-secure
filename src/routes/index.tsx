@@ -16,6 +16,7 @@ import { BudgetUtilization, SupervisorDistribution } from "@/components/dashboar
 import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
 import { centralPoolOf } from "@/lib/centralInventory";
 import { useLiveInventory } from "@/lib/useLiveInventory";
+import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -59,6 +60,7 @@ function Dashboard() {
   const allVouchers = useAppStore((s) => s.vouchers);
   const role = useAppStore((s) => s.role);
   useLiveInventory(role === "admin");
+  const { summary, error: inventoryError } = useCentralInventorySummary(role === "admin");
   const me = useCurrentUser();
   const [requestOpen, setRequestOpen] = useState(false);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
@@ -82,7 +84,7 @@ function Dashboard() {
   // Branch-manager budget = branch vouchers not yet given to a supervisor.
   const centralPool = centralPoolOf(vouchers);
   const branchAvailable = available.filter((v) => !v.supervisor);
-  const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : value(centralPool);
+  const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : summary?.total_available_amount ?? 0;
   const branchesBudget = value(available.filter((v) => mainBranch(v.branch) !== MAIN_POOL));
 
   // Time-bound metrics use the selected period; budget metrics always show the live state.
@@ -140,7 +142,7 @@ function Dashboard() {
         <div className="grid gap-5 sm:grid-cols-3">
           <StatCard
             label="יתרת תקציב מרכזי"
-            value={`${balance.toLocaleString("he-IL")} ₪`}
+            value={summary ? `${balance.toLocaleString("he-IL")} ₪` : "—"}
             caption="טרם הוקצה לסניפים"
             percent={pct(balance, balance + branchesBudget + issuedValue)}
           />
@@ -218,10 +220,11 @@ function Dashboard() {
           <p className="text-sm font-semibold text-muted-foreground">
             פירוט יתרה זמינה לפי סוג דלק{role === "admin" ? " (מאגר מרכזי)" : ""}
           </p>
-          <FuelBreakdown
-            list={role === "admin" ? centralPool : available}
-            className="mt-1 text-sm"
-          />
+          {role === "admin" ? summary ? (
+            <FuelBreakdown totals={{ "בנזין": summary.gasoline_amount, "סולר": summary.diesel_amount }} className="mt-1 text-sm" />
+          ) : <p className="mt-1 text-sm text-danger">{inventoryError ?? "טוען יתרת מלאי…"}</p> : (
+            <FuelBreakdown list={available} className="mt-1 text-sm" />
+          )}
         </Card>
       ) : null}
 

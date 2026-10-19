@@ -55,15 +55,17 @@ export function fuelTotals(list: { amount: number; fuelType?: FuelType }[]) {
 /** "בנזין: ₪X | סולר: ₪Y" breakdown line with fuel icons. */
 export function FuelBreakdown({
   list,
+  totals,
   className,
 }: {
-  list: { amount: number; fuelType?: FuelType }[];
+  list?: { amount: number; fuelType?: FuelType }[];
+  totals?: Record<FuelType, number>;
   className?: string;
 }) {
-  const t = fuelTotals(list);
+  const t = totals ?? fuelTotals(list ?? []);
   return (
     <p className={cn("flex flex-wrap items-center text-xs font-semibold text-muted-foreground tabular-nums", className)}>
-      <span className="inline-flex items-center gap-1"><FuelIcon fuel="בנזין" />בנזין: ₪{t["בנזין"].toLocaleString("he-IL")}</span>
+      <span className="inline-flex items-center gap-1"><FuelIcon fuel="בנזין" />בנזין 95: ₪{t["בנזין"].toLocaleString("he-IL")}</span>
       <span className="mx-1.5">|</span>
       <span className="inline-flex items-center gap-1"><FuelIcon fuel="סולר" />סולר: ₪{t["סולר"].toLocaleString("he-IL")}</span>
     </p>

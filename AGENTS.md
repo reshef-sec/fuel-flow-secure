@@ -1,4 +1,4 @@
 - No createServerFn/app-server code: backend logic lives in external-DB security-definer RPCs (src/lib/backend.ts) and the admin-accounts DB function, because the app must also deploy as a static Netlify SPA (STATIC_SPA build flag in vite.config.ts).
 - Employee issuance must await voucher and worker-link persistence before publishing the link or updating local success state, so unsaved links cannot be shared.
 - Employee issuance reloads physical stock for every role; imports use the admin-guarded store_voucher_codes RPC so confidential code columns need no client SELECT grant.
-- Dashboard and central allocation share the centralInventory selector; visible inventory refreshes periodically and on focus, and allocation rechecks fresh stock before transfer so saved budget settings cannot determine inventory limits.
+- Dashboard and central allocation totals use the shared get_central_inventory_summary database RPC, refresh on entry/focus/interval and after successful writes, and never fall back to saved budgets or client sums; exact voucher selection still checks physical stock and awaits transfer persistence.
