@@ -1,4 +1,6 @@
 # Roadmap — master system update
+- [ ] Provide safe voucher_codes permission SQL for the external database (user executes it).
+- [ ] Validate live physical stock and enforce petrol 50 / diesel 100 issuance steps.
 - [x] Recover the newly issued missing employee link and await persistence before displaying issuance success.
 - [x] Stage 1: renames, dashboard, role column in requests
 - [x] Stage 2: report columns, work-vehicle detailed/summary, admin-only serials
