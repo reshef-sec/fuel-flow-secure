@@ -8,6 +8,8 @@ import {
 import { logActivity } from "@/lib/activityLog";
 import { persistWorkerIssue } from "@/lib/persistWorkerIssue";
 import { fuelStockError, issuanceAmountError } from "@/lib/issuanceInventory";
+import { centralPoolOf, centralFuelLimitError } from "@/lib/centralInventory";
+export { centralPoolOf } from "@/lib/centralInventory";
 
 import {
   MAIN_POOL,
@@ -118,13 +120,11 @@ const denominations = (amount: number) => {
 };
 
 /** Central-pool vouchers still available for allocation. */
-export const centralPoolOf = <T extends VoucherRecord>(list: T[], fuel?: "בנזין" | "סולר") =>
-  list.filter(
-    (v) => v.branch === MAIN_POOL && !v.supervisor && v.status === "טרם שומש" && (!fuel || fuelOf(v) === fuel),
-  );
 
 /** Returns an error when the central pool can't cover the requested split exactly; null when it can. */
 export function poolShortage(split: Record<"בנזין" | "סולר", number>, vouchers: VoucherRecord[]): string | null {
+  const limitError = centralFuelLimitError(split, vouchers);
+  if (limitError) return limitError;
   for (const f of ["בנזין", "סולר"] as const) {
     if (!split[f]) continue;
     const pool = centralPoolOf(vouchers, f);
@@ -328,9 +328,9 @@ export const useAppStore = create<AppState>()(
   allocate: (branch, supervisor, amount, meta) => {
     // Moves real vouchers out of the central pool; never creates nominal stock.
     const fuel = meta?.fuelType ?? "בנזין";
-    const pool = get().vouchers.filter(
-      (v) => v.branch === MAIN_POOL && !v.supervisor && v.status === "טרם שומש" && fuelOf(v) === fuel,
-    );
+    const limitError = centralFuelLimitError({ "בנזין": fuel === "בנזין" ? amount : 0, "סולר": fuel === "סולר" ? amount : 0 }, get().vouchers);
+    if (limitError) return limitError;
+    const pool = centralPoolOf(get().vouchers, fuel);
     if (!pool.length) return "אין מלאי זמין עבור סוג דלק זה במאגר המרכזי";
     const pick = pickExact(pool, amount);
     if (!pick) return `אין במאגר המרכזי שילוב שוברי ${fuel} בסכום ${amount.toLocaleString("he-IL")} ₪. המלאי הזמין: ${groupStock(pool)}.`;

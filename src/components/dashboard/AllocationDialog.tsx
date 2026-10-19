@@ -4,7 +4,9 @@ import { toast } from "sonner";
 
 import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { FuelSplitFields, emptySplit, fuelTotals, readSplit } from "@/components/fuel/fuel";
+import { FuelBreakdown, FuelSplitFields, emptySplit, fuelTotals, readSplit } from "@/components/fuel/fuel";
+import { loadIssuanceStock } from "@/lib/cloudSync";
+import { useLiveInventory } from "@/lib/useLiveInventory";
 import { centralPoolOf, fullName, poolShortage, useAppStore, useCurrentUser } from "@/store/appStore";
 
 export function AllocationDialog({
@@ -25,6 +27,7 @@ export function AllocationDialog({
   const branchList = useAppStore((s) => s.branchList);
   const users = useAppStore((s) => s.users);
   const me = useCurrentUser();
+  useLiveInventory(open);
 
   const targets: { value: string; label: string; branch: string; supervisor?: string }[] = [
     ...branchList.map((b) => ({ value: b.name, label: b.name, branch: b.name })),
@@ -50,31 +53,32 @@ export function AllocationDialog({
     setLoading(false);
   }, [open, presetTarget]);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = readSplit(split);
     if (!target) return setError("יש לבחור יעד הקצאה");
     if (typeof parsed === "string") return setError(parsed);
-    const shortage = poolShortage(parsed, vouchers);
-    if (shortage) {
-      setError(shortage);
-      toast.error(shortage);
-      return;
-    }
     setError(null);
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const stock = await loadIssuanceStock();
+      useAppStore.setState({ vouchers: stock });
+      const shortage = poolShortage(parsed, stock);
+      if (shortage) { setError(shortage); toast.error(shortage); return; }
       const picked = targets.find((t) => t.value === target);
       const approver = me ? fullName(me) : "אדמין מרכזי";
       for (const f of ["בנזין", "סולר"] as const)
         if (parsed[f]) {
           const err = allocate(picked?.branch ?? target, picked?.supervisor, parsed[f], { approver, fuelType: f });
-          if (err) return void toast.error(err);
+          if (err) { setError(err); toast.error(err); return; }
         }
       onClose();
       toast.success("ההקצאה בוצעה בהצלחה והיתרה עודכנה");
-    }, 400);
+    } catch {
+      const message = "בדיקת המלאי נכשלה — ההקצאה לא בוצעה. יש לנסות שוב";
+      setError(message);
+      toast.error(message);
+    } finally { setLoading(false); }
   }
 
   return (
@@ -89,6 +93,7 @@ export function AllocationDialog({
             <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
               {balance.toLocaleString("he-IL")} ₪
             </p>
+            <FuelBreakdown list={pool} className="mt-1" />
           </div>
         </div>
 

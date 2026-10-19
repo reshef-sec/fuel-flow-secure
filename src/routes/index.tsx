@@ -14,6 +14,8 @@ import { Button, Card, Select, StatCard } from "@/design-system/delek-1ea111";
 import { fullName, MAIN_POOL, useAppStore, useCurrentUser } from "@/store/appStore";
 import { BudgetUtilization, SupervisorDistribution } from "@/components/dashboard/BudgetUtilization";
 import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
+import { centralPoolOf } from "@/lib/centralInventory";
+import { useLiveInventory } from "@/lib/useLiveInventory";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -56,6 +58,7 @@ function periodStart(period: Period): string | null {
 function Dashboard() {
   const allVouchers = useAppStore((s) => s.vouchers);
   const role = useAppStore((s) => s.role);
+  useLiveInventory(role === "admin");
   const me = useCurrentUser();
   const [requestOpen, setRequestOpen] = useState(false);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
@@ -77,7 +80,7 @@ function Dashboard() {
   const value = (list: typeof vouchers) => list.reduce((t, v) => t + v.amount, 0);
   const available = vouchers.filter(isAvailable);
   // Branch-manager budget = branch vouchers not yet given to a supervisor.
-  const centralPool = available.filter((v) => mainBranch(v.branch) === MAIN_POOL && !v.supervisor);
+  const centralPool = centralPoolOf(vouchers);
   const branchAvailable = available.filter((v) => !v.supervisor);
   const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : value(centralPool);
   const branchesBudget = value(available.filter((v) => mainBranch(v.branch) !== MAIN_POOL));
