@@ -1,5 +1,5 @@
 # Roadmap — master system update
-- [ ] Remove the nominal demo balance and bind both screens to the shared totalAvailableBalance; verify refresh after allocation.
+- [x] Remove the nominal demo balance and bind both screens and the dialog to the shared totalAvailableBalance; refresh after each saved fuel transfer (15 tests passed; authenticated end-to-end check remains blocked below).
 - [x] Provide secure get_central_inventory_summary SQL and connect dashboard/allocation totals directly to it, refreshing after saved transfers (14 tests passed).
 - [x] User reports get_central_inventory_summary installed in the external database.
 - [x] Keep allocation totals in page-local RPC state and explicitly refresh the header after saved allocation; ignore stale responses.
