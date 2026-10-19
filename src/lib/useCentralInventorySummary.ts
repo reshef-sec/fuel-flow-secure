@@ -1,37 +1,43 @@
-import { useEffect } from "react";
-import { create } from "zustand";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchCentralInventorySummary, type CentralInventorySummary } from "./centralInventorySummary";
 
-const useSummary = create<{
-  summary: CentralInventorySummary | null;
-  error: string | null;
-}>()(() => ({ summary: null, error: null }));
-
-export async function refreshCentralInventorySummary() {
-  try {
-    const summary = await fetchCentralInventorySummary();
-    useSummary.setState({ summary, error: null });
-    return summary;
-  } catch (error) {
-    useSummary.setState({ summary: null, error: error instanceof Error ? error.message : "טעינת המלאי נכשלה" });
-    throw error;
-  }
-}
-
 export function useCentralInventorySummary(active = true) {
-  const state = useSummary();
+  const [summary, setSummary] = useState<CentralInventorySummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const requestId = useRef(0);
+  const refresh = useCallback(async () => {
+    const id = ++requestId.current;
+    try {
+      const result = await fetchCentralInventorySummary();
+      if (id === requestId.current) {
+        setSummary(result);
+        setError(null);
+      }
+      return result;
+    } catch (error) {
+      if (id === requestId.current) {
+        setSummary(null);
+        setError(error instanceof Error ? error.message : "טעינת המלאי נכשלה");
+      }
+      throw error;
+    }
+  }, []);
+
   useEffect(() => {
     if (!active) return;
-    const refresh = () => { void refreshCentralInventorySummary().catch(() => {}); };
-    refresh();
-    const interval = window.setInterval(refresh, 15000);
-    window.addEventListener("focus", refresh);
-    window.addEventListener("central-inventory-changed", refresh);
+    setSummary(null);
+    setError(null);
+    const reload = () => { void refresh().catch(() => {}); };
+    reload();
+    const interval = window.setInterval(reload, 15000);
+    window.addEventListener("focus", reload);
+    window.addEventListener("central-inventory-changed", reload);
     return () => {
+      requestId.current++;
       window.clearInterval(interval);
-      window.removeEventListener("focus", refresh);
-      window.removeEventListener("central-inventory-changed", refresh);
+      window.removeEventListener("focus", reload);
+      window.removeEventListener("central-inventory-changed", reload);
     };
-  }, [active]);
-  return state;
+  }, [active, refresh]);
+  return { summary, error, refresh };
 }

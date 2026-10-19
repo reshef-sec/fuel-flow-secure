@@ -8,19 +8,21 @@ import { FuelBreakdown, FuelSplitFields, emptySplit, readSplit } from "@/compone
 import { loadIssuanceStock } from "@/lib/cloudSync";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { fullName, poolShortage, useAppStore, useCurrentUser } from "@/store/appStore";
-import { useCentralInventorySummary, refreshCentralInventorySummary } from "@/lib/useCentralInventorySummary";
+import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 
 export function AllocationDialog({
   open,
   onClose,
   presetTarget,
+  onAllocated,
 }: {
   open: boolean;
   onClose: () => void;
   /** Pre-selected branch name, used by the quick-allocate action on branch cards. */
   presetTarget?: string;
+  onAllocated?: () => Promise<unknown>;
 }) {
-  const { summary, error: inventoryError } = useCentralInventorySummary(open);
+  const { summary, error: inventoryError, refresh } = useCentralInventorySummary(open);
   const available = { "בנזין": summary?.gasoline_amount ?? 0, "סולר": summary?.diesel_amount ?? 0 };
   const allocate = useAppStore((s) => s.allocate);
   const branchList = useAppStore((s) => s.branchList);
@@ -60,7 +62,7 @@ export function AllocationDialog({
     setError(null);
     setLoading(true);
     try {
-      const fresh = await refreshCentralInventorySummary();
+      const fresh = await refresh();
       if (parsed["בנזין"] > fresh.gasoline_amount || parsed["סולר"] > fresh.diesel_amount) {
         const message = "סכום ההקצאה חורג מהמלאי הזמין עבור סוג הדלק שנבחר";
         setError(message); toast.error(message); return;
@@ -76,7 +78,8 @@ export function AllocationDialog({
           const err = await allocate(picked?.branch ?? target, picked?.supervisor, parsed[f], { approver, fuelType: f });
           if (err) { setError(err); toast.error(err); return; }
         }
-      await refreshCentralInventorySummary();
+      await refresh().catch(() => {});
+      await onAllocated?.().catch(() => {});
       onClose();
       toast.success("ההקצאה בוצעה בהצלחה והיתרה עודכנה");
     } catch {
