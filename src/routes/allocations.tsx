@@ -110,7 +110,7 @@ function AllocationsPage() {
                     <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
                       {b.balance.toLocaleString("he-IL")} ₪
                     </p>
-                    <FuelBreakdown list={b.availableList} className="mt-1 text-[11px]" />
+                    <FuelBreakdown list={b.availableList} className="mt-1 text-xs" />
                   </div>
                 </div>
 
