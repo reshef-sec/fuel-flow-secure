@@ -6,7 +6,8 @@ import { InternalLayout } from "@/components/layout/InternalLayout";
 import { NoAccess } from "@/components/layout/NoAccess";
 import { AllocationDialog } from "@/components/dashboard/AllocationDialog";
 import { Badge, Button, Card } from "@/design-system/delek-1ea111";
-import { useAppStore } from "@/store/appStore";
+import { centralPoolOf, useAppStore } from "@/store/appStore";
+import { useLiveInventory } from "@/lib/useLiveInventory";
 import { FuelBreakdown } from "@/components/fuel/fuel";
 
 export const Route = createFileRoute("/allocations")({
@@ -30,7 +31,9 @@ function AllocationsPage() {
   const branchList = useAppStore((s) => s.branchList);
   const vouchers = useAppStore((s) => s.vouchers);
   const role = useAppStore((s) => s.role);
-  const balance = useAppStore((s) => s.balance);
+  const centralPool = centralPoolOf(vouchers);
+  const balance = centralPool.reduce((sum, v) => sum + v.amount, 0);
+  useLiveInventory(role === "admin");
   const [allocOpen, setAllocOpen] = useState(false);
   const [presetBranch, setPresetBranch] = useState<string | undefined>(undefined);
 
@@ -57,12 +60,15 @@ function AllocationsPage() {
   return (
     <InternalLayout title="הקצאות לסניפים">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
         <p className="text-sm text-muted-foreground">
           יתרה זמינה לחלוקה:{" "}
           <span className="font-bold tabular-nums text-secondary">
             {balance.toLocaleString("he-IL")} ₪
           </span>
         </p>
+        <FuelBreakdown list={centralPool} className="mt-2" />
+        </div>
         <Button onClick={() => openAllocation(undefined)}>
           <Send className="size-4" />
           ביצוע הקצאה יזומה
@@ -104,7 +110,7 @@ function AllocationsPage() {
                     <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
                       {b.balance.toLocaleString("he-IL")} ₪
                     </p>
-                    <FuelBreakdown list={b.availableList} className="mt-1 text-[11px]" />
+                    <FuelBreakdown list={b.availableList} />
                   </div>
                 </div>
 

@@ -1,0 +1,25 @@
+import { useEffect } from "react";
+import { loadIssuanceStock } from "@/lib/cloudSync";
+import { useAppStore } from "@/store/appStore";
+
+/** Refresh while inventory is visible, including after returning to the tab. */
+export function useLiveInventory(active = true) {
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    let pending = false;
+    const refresh = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const vouchers = await loadIssuanceStock();
+        if (!cancelled) useAppStore.setState({ vouchers });
+      } catch { /* Keep the last known stock; submit separately checks fresh stock. */ }
+      finally { pending = false; }
+    };
+    void refresh();
+    const interval = window.setInterval(() => { void refresh(); }, 15000);
+    window.addEventListener("focus", refresh);
+    return () => { cancelled = true; window.clearInterval(interval); window.removeEventListener("focus", refresh); };
+  }, [active]);
+}
