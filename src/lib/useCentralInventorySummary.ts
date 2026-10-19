@@ -29,7 +29,7 @@ export function useCentralInventorySummary(active = true) {
     setError(null);
     const reload = () => { void refresh().catch(() => {}); };
     reload();
-    const interval = window.setInterval(reload, 15000);
+    const interval = window.setInterval(reload, 15 * 1000);
     window.addEventListener("focus", reload);
     window.addEventListener("central-inventory-changed", reload);
     return () => {
@@ -39,5 +39,5 @@ export function useCentralInventorySummary(active = true) {
       window.removeEventListener("central-inventory-changed", reload);
     };
   }, [active, refresh]);
-  return { summary, error, refresh };
+  return { summary, totalAvailableBalance: summary?.total_available_amount ?? null, error, refresh };
 }

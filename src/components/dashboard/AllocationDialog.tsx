@@ -22,7 +22,7 @@ export function AllocationDialog({
   presetTarget?: string;
   onAllocated?: () => Promise<unknown>;
 }) {
-  const { summary, error: inventoryError, refresh } = useCentralInventorySummary(open);
+  const { summary, totalAvailableBalance, error: inventoryError, refresh } = useCentralInventorySummary(open);
   const available = { "בנזין": summary?.gasoline_amount ?? 0, "סולר": summary?.diesel_amount ?? 0 };
   const allocate = useAppStore((s) => s.allocate);
   const branchList = useAppStore((s) => s.branchList);
@@ -77,9 +77,9 @@ export function AllocationDialog({
         if (parsed[f]) {
           const err = await allocate(picked?.branch ?? target, picked?.supervisor, parsed[f], { approver, fuelType: f });
           if (err) { setError(err); toast.error(err); return; }
+          await refresh().catch(() => {});
+          await onAllocated?.().catch(() => {});
         }
-      await refresh().catch(() => {});
-      await onAllocated?.().catch(() => {});
       onClose();
       toast.success("ההקצאה בוצעה בהצלחה והיתרה עודכנה");
     } catch {
@@ -99,7 +99,7 @@ export function AllocationDialog({
           <div className="min-w-0">
             <p className="text-sm font-semibold text-muted-foreground">יתרה זמינה לחלוקה</p>
             <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
-              {summary ? `${summary.total_available_amount.toLocaleString("he-IL")} ₪` : "—"}
+              {totalAvailableBalance !== null ? `₪${totalAvailableBalance.toLocaleString("he-IL")}` : "—"}
             </p>
             {summary ? <FuelBreakdown totals={available} className="mt-1" /> : <p className="mt-1 text-sm text-danger">{inventoryError ?? "טוען יתרת מלאי…"}</p>}
           </div>

@@ -60,7 +60,7 @@ function Dashboard() {
   const allVouchers = useAppStore((s) => s.vouchers);
   const role = useAppStore((s) => s.role);
   useLiveInventory(role === "admin");
-  const { summary, error: inventoryError } = useCentralInventorySummary(role === "admin");
+  const { summary, totalAvailableBalance, error: inventoryError } = useCentralInventorySummary(role === "admin");
   const me = useCurrentUser();
   const [requestOpen, setRequestOpen] = useState(false);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
@@ -84,7 +84,7 @@ function Dashboard() {
   // Branch-manager budget = branch vouchers not yet given to a supervisor.
   const centralPool = centralPoolOf(vouchers);
   const branchAvailable = available.filter((v) => !v.supervisor);
-  const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : summary?.total_available_amount ?? 0;
+  const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : totalAvailableBalance ?? 0;
   const branchesBudget = value(available.filter((v) => mainBranch(v.branch) !== MAIN_POOL));
 
   // Time-bound metrics use the selected period; budget metrics always show the live state.

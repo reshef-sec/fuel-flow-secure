@@ -18,7 +18,7 @@ export function useLiveInventory(active = true) {
       finally { pending = false; }
     };
     void refresh();
-    const interval = window.setInterval(() => { void refresh(); }, 15000);
+    const interval = window.setInterval(() => { void refresh(); }, 15 * 1000);
     window.addEventListener("focus", refresh);
     return () => { cancelled = true; window.clearInterval(interval); window.removeEventListener("focus", refresh); };
   }, [active]);

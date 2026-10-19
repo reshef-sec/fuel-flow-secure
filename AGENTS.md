@@ -2,4 +2,4 @@
 - Employee issuance must await voucher and worker-link persistence before publishing the link or updating local success state, so unsaved links cannot be shared.
 - Employee issuance reloads physical stock for every role; imports use the admin-guarded store_voucher_codes RPC so confidential code columns need no client SELECT grant.
 - Dashboard and central allocation totals use the shared get_central_inventory_summary database RPC, refresh on entry/focus/interval and after successful writes, and never fall back to saved budgets or client sums; exact voucher selection still checks physical stock and awaits transfer persistence.
-- Inventory summary hooks keep page-local state and ignore superseded responses; allocation dialogs explicitly refresh the parent after saved transfers so old requests cannot restore a pre-allocation balance.
+- Inventory summary hooks keep page-local state, expose the shared derived totalAvailableBalance and ignore superseded responses; allocation dialogs explicitly refresh the parent after each saved fuel transfer so old requests cannot restore a pre-allocation balance, including partial success.
