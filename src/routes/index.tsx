@@ -1,5 +1,6 @@
 import { Greeting } from "@/components/dashboard/Greeting";
 import { FuelBreakdown } from "@/components/fuel/fuel";
+import { PoolDenominations } from "@/components/dashboard/PoolDenominations";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { FilePlus2, UserCheck } from "lucide-react";
@@ -218,6 +219,8 @@ function Dashboard() {
           />
         </Card>
       ) : null}
+
+      {role === "admin" ? <PoolDenominations pool={centralPool} /> : null}
 
       {isBranchManager ? <SupervisorDistribution vouchers={available} issued={issuedValue} /> : null}
 
