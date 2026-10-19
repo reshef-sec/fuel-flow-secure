@@ -2,11 +2,12 @@ import { FUEL_TYPES, fuelOf, type FuelType } from "@/components/fuel/fuel";
 import { create } from "zustand";
 import { toast } from "sonner";
 import {
-  b2bToRow, clientToRow, db, linkToRow, loadAll, requestToRow, run, userPatch, userToRow, voucherToRow,
+  b2bToRow, clientToRow, db, linkToRow, loadAll, loadIssuanceStock, requestToRow, run, userPatch, userToRow, voucherToRow,
 } from "@/lib/cloudSync";
 
 import { logActivity } from "@/lib/activityLog";
 import { persistWorkerIssue } from "@/lib/persistWorkerIssue";
+import { fuelStockError, issuanceAmountError } from "@/lib/issuanceInventory";
 
 import {
   MAIN_POOL,
@@ -425,7 +426,7 @@ export const useAppStore = create<AppState>()(
         ({ error }: { error: { message: string } | null }) => {
           if (error) return toast.error(`שמירה בענן נכשלה: ${error.message}`);
           const codes = rows.slice(i, i + 500).filter((v) => v.realCode).map((v) => ({ serial: v.serial, real_code: v.realCode }));
-          if (codes.length) run(db.from("voucher_codes").upsert(codes));
+          if (codes.length) run(db.rpc("store_voucher_codes", { p_codes: codes }));
         },
       );
   },
@@ -631,69 +632,46 @@ export const useAppStore = create<AppState>()(
     }),
 
   issueWorkerVoucher: async (p) => {
+    for (const item of p.items) {
+      const error = issuanceAmountError(item.fuelType, item.amount);
+      if (error) return { error };
+    }
+    let stock: VoucherRecord[];
+    try { stock = await loadIssuanceStock(); }
+    catch { return { error: "בדיקת המלאי נכשלה — לא הופק לינק. יש לנסות שוב" }; }
+    set({ vouchers: stock });
     const st = get();
     const linkId = String(Math.floor(10000000 + Math.random() * 89999999));
-    // Branch managers and supervisors hand out budget they already hold.
-    const pool =
-      st.role === "admin"
-        ? []
-        : st.vouchers.filter(
-            (v) =>
-              isAvailable(v) &&
-              v.branch === p.branch &&
-              (st.role === "supervisor" ? v.supervisor === p.supervisor : true),
-          );
-    // Smart stock check per fuel type.
-    const byFuel = new Map<FuelType, VoucherRecord[]>(FUEL_TYPES.map((f) => [f, pool.filter((v) => fuelOf(v) === f)]));
-    if (st.role !== "admin") {
-      for (const f of FUEL_TYPES) {
-        const need = p.items.filter((it) => it.fuelType === f).reduce((t, it) => t + it.amount, 0);
-        const have = byFuel.get(f)!;
-        const haveSum = have.reduce((t, v) => t + v.amount, 0);
-        if (need > haveSum)
-          return {
-            error: `אין במלאי שובר ${f} בסכום המבוקש. המלאי הזמין כעת בסוג דלק זה: ${groupStock(have)}.`,
-          };
-      }
+    const pool = st.role === "admin" ? centralPoolOf(stock) : stock.filter(
+      v => isAvailable(v) && v.branch === p.branch &&
+        (st.role === "supervisor" ? v.supervisor === p.supervisor : !v.supervisor),
+    );
+    const byFuel = new Map<FuelType, VoucherRecord[]>(FUEL_TYPES.map(f => [f, pool.filter(v => fuelOf(v) === f)]));
+    for (const fuel of FUEL_TYPES) {
+      const need = p.items.filter(it => it.fuelType === fuel).reduce((sum, it) => sum + it.amount, 0);
+      const have = byFuel.get(fuel) ?? [];
+      const error = fuelStockError(fuel, need, have);
+      if (error) return { error: fuel === "סולר" ? error : `${error}. המלאי הזמין כעת בסוג דלק זה: ${groupStock(have)}.` };
     }
-    // Choose exact vouchers per item (supports 50 ₪ and 100 ₪ denominations).
     const chosen: VoucherRecord[][] = [];
-    for (const it of p.items) {
-      if (st.role === "admin") {
-        chosen.push([]);
-        continue;
-      }
-      const list = byFuel.get(it.fuelType)!;
-      const pick = pickExact(list, it.amount);
-      if (!pick)
-        return {
-          error: `אין במלאי שילוב שוברי ${it.fuelType} שמגיע בדיוק ל-₪${it.amount.toLocaleString("he-IL")}. המלאי הזמין כעת בסוג דלק זה: ${groupStock(list)}.`,
-        };
-      const ids = new Set(pick.map((v) => v.serial));
-      byFuel.set(it.fuelType, list.filter((v) => !ids.has(v.serial)));
-      chosen.push(pick);
+    for (const item of p.items) {
+      const list = byFuel.get(item.fuelType) ?? [];
+      const picked = pickExact(list, item.amount);
+      if (!picked) return { error: `אין במלאי שוברים בסכום זה. המלאי הזמין כעת בסוג דלק זה: ${groupStock(list)}.` };
+      const serials = new Set(picked.map(v => v.serial));
+      byFuel.set(item.fuelType, list.filter(v => !serials.has(v.serial)));
+      chosen.push(picked);
     }
     const issuedAt = new Date().toISOString();
     const exp = new Date();
     exp.setMonth(exp.getMonth() + 3);
     const expiresAt = exp.toISOString();
-    let base = Math.floor(700000 + Math.random() * 290000);
     const out: VoucherRecord[] = [];
     for (const [idx, it] of p.items.entries()) {
-      const units = st.role === "admin" ? denominations(it.amount) : chosen[idx]!.map((v) => v.amount);
-      for (const [i, value] of units.entries()) {
-        const src = chosen[idx]![i];
-        const seed: VoucherRecord = src ?? {
-          serial: String(base++),
-          realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
-          amount: value,
-          fuelType: it.fuelType,
-          branch: p.branch,
-          status: "טרם שומש",
-          updatedAt: today(),
-        };
+      for (const seed of chosen[idx] ?? []) {
         out.push({
           ...seed,
+          branch: p.branch,
           ...(p.supervisor ? { supervisor: p.supervisor } : {}),
           ...(st.authId ? { supervisorId: st.authId } : {}),
           status: "הוקצה לעובד",
@@ -746,10 +724,6 @@ export const useAppStore = create<AppState>()(
         links: [link, ...s.links],
       };
     });
-    if (st.role === "admin") {
-      const fresh = out.filter((v) => v.realCode).map((v) => ({ serial: v.serial, real_code: v.realCode }));
-      if (fresh.length) run(db.from("voucher_codes").upsert(fresh));
-    }
     logActivity(actorOf(get()), "הנפקת שובר לעובד", `קישור ${link.id} · ${link.total} ₪`);
     return link;
   },
