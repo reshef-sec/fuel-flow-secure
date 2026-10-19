@@ -1,17 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 import { validateStockSheet } from "./validateStockSheet";
 const H = ["מספר כרטיס", "קוד", "ערך", "סוג", "תוקף"];
 describe("validateStockSheet", () => {
   it("accepts a valid file", () => {
-    expect(validateStockSheet([H, ["019949", "X1", "100", "סולר", "2027-12-31"]])).toHaveLength(1);
+    assert.equal((validateStockSheet([H, ["019949", "X1", "100", "סולר", "2027-12-31"]]) as string[][]).length, 1);
   });
   it("rejects wrong headers", () => {
-    expect(typeof validateStockSheet([["a", "b", "c", "d", "e"], ["1", "x", "100", "סולר", ""]])).toBe("string");
+    assert.equal(typeof validateStockSheet([["a", "b", "c", "d", "e"], ["1", "x", "100", "סולר", ""]]), "string");
   });
   it("rejects amounts not in multiples of 50", () => {
-    expect(typeof validateStockSheet([H, ["1", "x", "120", "בנזין 95", ""]])).toBe("string");
+    assert.equal(typeof validateStockSheet([H, ["1", "x", "120", "בנזין 95", ""]]), "string");
   });
   it("rejects unknown fuel type", () => {
-    expect(typeof validateStockSheet([H, ["1", "x", "100", "גז", ""]])).toBe("string");
+    assert.equal(typeof validateStockSheet([H, ["1", "x", "100", "גז", ""]]), "string");
   });
 });
