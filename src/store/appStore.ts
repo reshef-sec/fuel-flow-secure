@@ -116,6 +116,24 @@ const denominations = (amount: number) => {
   return out;
 };
 
+/** Central-pool vouchers still available for allocation. */
+export const centralPoolOf = <T extends VoucherRecord>(list: T[], fuel?: "בנזין" | "סולר") =>
+  list.filter(
+    (v) => v.branch === MAIN_POOL && !v.supervisor && v.status === "טרם שומש" && (!fuel || fuelOf(v) === fuel),
+  );
+
+/** Returns an error when the central pool can't cover the requested split exactly; null when it can. */
+export function poolShortage(split: Record<"בנזין" | "סולר", number>, vouchers: VoucherRecord[]): string | null {
+  for (const f of ["בנזין", "סולר"] as const) {
+    if (!split[f]) continue;
+    const pool = centralPoolOf(vouchers, f);
+    if (!pool.length) return "אין מלאי זמין עבור סוג דלק זה במאגר המרכזי";
+    if (!pickExact(pool, split[f]))
+      return `אין במאגר המרכזי שילוב שוברי ${f} בסכום ${split[f].toLocaleString("he-IL")} ₪. המלאי הזמין: ${groupStock(pool)}.`;
+  }
+  return null;
+}
+
 /** Picks vouchers summing exactly to amount (largest first, with a small backtrack). */
 export function pickExact<T extends { amount: number }>(list: T[], amount: number): T[] | null {
   const sorted = [...list].sort((a, b) => b.amount - a.amount);
@@ -433,10 +451,13 @@ export const useAppStore = create<AppState>()(
       let diesel = Math.round(((req.dieselAmount ?? 0) * Math.min(amount, asked)) / asked / 50) * 50;
       if (amount > asked) diesel = req.dieselAmount ?? 0;
       const benzine = Math.max(0, amount - diesel);
+      const fail = poolShortage({ "בנזין": benzine, "סולר": diesel }, get().vouchers);
+      if (fail) return void toast.error(fail);
       if (benzine) get().allocate(req.branch, undefined, benzine, { requester: req.requester, approver, fuelType: "בנזין" });
       if (diesel) get().allocate(req.branch, undefined, diesel, { requester: req.requester, approver, fuelType: "סולר" });
     } else {
-      get().allocate(req.branch, undefined, amount, { requester: req.requester, approver });
+      const err = get().allocate(req.branch, undefined, amount, { requester: req.requester, approver });
+      if (err) return void toast.error(err);
     }
     set((s) => ({
       requests: s.requests.map((r) =>
