@@ -4,8 +4,8 @@ import { toast } from "sonner";
 
 import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { FuelSplitFields, emptySplit, readSplit } from "@/components/fuel/fuel";
-import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
+import { FuelSplitFields, emptySplit, fuelTotals, readSplit } from "@/components/fuel/fuel";
+import { centralPoolOf, fullName, poolShortage, useAppStore, useCurrentUser } from "@/store/appStore";
 
 export function AllocationDialog({
   open,
@@ -17,7 +17,10 @@ export function AllocationDialog({
   /** Pre-selected branch name, used by the quick-allocate action on branch cards. */
   presetTarget?: string;
 }) {
-  const balance = useAppStore((s) => s.balance);
+  const vouchers = useAppStore((s) => s.vouchers);
+  const pool = centralPoolOf(vouchers);
+  const available = fuelTotals(pool);
+  const balance = available["בנזין"] + available["סולר"];
   const allocate = useAppStore((s) => s.allocate);
   const branchList = useAppStore((s) => s.branchList);
   const users = useAppStore((s) => s.users);
@@ -52,9 +55,10 @@ export function AllocationDialog({
     const parsed = readSplit(split);
     if (!target) return setError("יש לבחור יעד הקצאה");
     if (typeof parsed === "string") return setError(parsed);
-    const numeric = parsed["בנזין"] + parsed["סולר"];
-    if (numeric > balance) {
-      setError("הסכום גבוה מהיתרה הזמינה לחלוקה");
+    const shortage = poolShortage(parsed, vouchers);
+    if (shortage) {
+      setError(shortage);
+      toast.error(shortage);
       return;
     }
     setError(null);
@@ -64,10 +68,13 @@ export function AllocationDialog({
       const picked = targets.find((t) => t.value === target);
       const approver = me ? fullName(me) : "אדמין מרכזי";
       for (const f of ["בנזין", "סולר"] as const)
-        if (parsed[f]) allocate(picked?.branch ?? target, picked?.supervisor, parsed[f], { approver, fuelType: f });
+        if (parsed[f]) {
+          const err = allocate(picked?.branch ?? target, picked?.supervisor, parsed[f], { approver, fuelType: f });
+          if (err) return void toast.error(err);
+        }
       onClose();
       toast.success("ההקצאה בוצעה בהצלחה והיתרה עודכנה");
-    }, 1000);
+    }, 400);
   }
 
   return (
@@ -101,7 +108,7 @@ export function AllocationDialog({
           </Select>
         </FormField>
 
-        <FuelSplitFields values={split} onChange={setSplit} />
+        <FuelSplitFields values={split} onChange={setSplit} available={available} />
 
         {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
 

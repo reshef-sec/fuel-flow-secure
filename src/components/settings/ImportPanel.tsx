@@ -128,15 +128,16 @@ export function ImportPanel() {
     if (!file) return;
     if (!isSheetFile(file.name)) return void toast.error("יש להעלות קובץ אקסל (xlsx, xls) או CSV");
     try {
-      const raw = stripHeader(await parseSheetFile(file), "כרטיס");
+      const all = await parseSheetFile(file);
+      const checked = validateStockSheet(all, new Set(vouchers.map((v) => v.serial)));
+      if (typeof checked === "string") return void toast.error(`קובץ אקסל אינו תואם לתבנית הנדרשת. ${checked}`);
+      const raw = checked;
       const today = new Date().toISOString().slice(0, 10);
-      const parsed = raw
-        .filter((r) => (r[0] ?? "").length > 0)
-        .map((r) => ({
+      const parsed = raw.map((r) => ({
           v: {
-            serial: String(r[0] ?? "").trim(),
-            realCode: String(r[1] ?? "").trim(),
-            amount: Number(String(r[2] ?? "").replace(/[^\d.]/g, "")) || 0,
+            serial: r[0]!.trim(),
+            realCode: r[1]!.trim(),
+            amount: Number(r[2]!.replace(/[₪,\s]/g, "")),
             branch: MAIN_POOL,
             status: "טרם שומש" as const,
             updatedAt: today,
@@ -144,7 +145,6 @@ export function ImportPanel() {
           },
           validUntil: String(r[4] ?? "").trim(),
         }));
-      if (!parsed.length) return void toast.error("לא נמצאו שורות תקינות בקובץ. יש להשתמש בתבנית האקסל");
       importVouchers(parsed.map((p) => p.v));
       setValidity((m) => ({ ...m, ...Object.fromEntries(parsed.map((p) => [p.v.serial, p.validUntil])) }));
       setRecent(parsed.map((p) => p.v.serial));

@@ -103,7 +103,8 @@ export function FuelSplitFields({
               inputMode="numeric"
               value={values[f]}
               onChange={(e) => onChange({ ...values, [f]: e.target.value })}
-              placeholder="0"
+              disabled={available ? available[f] === 0 : false}
+              placeholder={available && available[f] === 0 ? "אין מלאי" : "0"}
               className="tabular-nums"
             />
           </FormField>
