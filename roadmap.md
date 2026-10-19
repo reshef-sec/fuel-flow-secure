@@ -1,4 +1,5 @@
 # Roadmap — master system update
+- [x] Recover the newly issued missing employee link and await persistence before displaying issuance success.
 - [x] Stage 1: renames, dashboard, role column in requests
 - [x] Stage 2: report columns, work-vehicle detailed/summary, admin-only serials
 - [x] Stage 3: employee name, multi-client bundling, produced vouchers, 3-month expiry

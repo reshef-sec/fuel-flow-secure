@@ -1,1 +1,2 @@
 - No createServerFn/app-server code: backend logic lives in external-DB security-definer RPCs (src/lib/backend.ts) and the admin-accounts DB function, because the app must also deploy as a static Netlify SPA (STATIC_SPA build flag in vite.config.ts).
+- Employee issuance must await voucher and worker-link persistence before publishing the link or updating local success state, so unsaved links cannot be shared.

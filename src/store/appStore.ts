@@ -6,6 +6,7 @@ import {
 } from "@/lib/cloudSync";
 
 import { logActivity } from "@/lib/activityLog";
+import { persistWorkerIssue } from "@/lib/persistWorkerIssue";
 
 import {
   MAIN_POOL,
@@ -264,7 +265,7 @@ interface AppState {
   signLink: (id: string, workerId: string, phone: string) => void;
 
   /** Issues a voucher handed to an end worker, storing the resolved vehicle/client data. */
-  issueWorkerVoucher: (payload: WorkerIssuePayload) => WorkerLink | { error: string };
+  issueWorkerVoucher: (payload: WorkerIssuePayload) => Promise<WorkerLink | { error: string }>;
 
   reasons: ReasonRecord[];
   addReason: (reason: ReasonRecord) => void;
@@ -596,7 +597,7 @@ export const useAppStore = create<AppState>()(
       };
     }),
 
-  issueWorkerVoucher: (p) => {
+  issueWorkerVoucher: async (p) => {
     const st = get();
     const linkId = String(Math.floor(10000000 + Math.random() * 89999999));
     // Branch managers and supervisors hand out budget they already hold.
@@ -692,6 +693,16 @@ export const useAppStore = create<AppState>()(
       ...(st.authId ? { supervisorId: st.authId } : {}),
     };
     const bySerial = new Map(out.map((v) => [v.serial, v]));
+    try {
+      await persistWorkerIssue(
+        () => db.from("vouchers").upsert(out.map(voucherToRow)),
+        () => db.from("worker_links").insert(linkToRow(link)),
+      );
+    } catch (err) {
+      // Reload stock if only the voucher write succeeded. Never expose an unsaved link.
+      await get().loadFromCloud().catch(() => undefined);
+      return { error: `שמירת הלינק נכשלה: ${err instanceof Error ? err.message : "יש לנסות שוב"}` };
+    }
     set((s) => {
       const existing = new Set(s.vouchers.map((v) => v.serial));
       return {
@@ -702,17 +713,10 @@ export const useAppStore = create<AppState>()(
         links: [link, ...s.links],
       };
     });
-    void Promise.resolve(db.from("vouchers").upsert(out.map(voucherToRow))).then(
-      ({ error }: { error: { message: string } | null }) => {
-        if (error) {
-          toast.error(`שמירה בענן נכשלה: ${error.message}`);
-          return;
-        }
-        run(db.from("worker_links").insert(linkToRow(link)));
-        if (st.role === "admin")
-          { const fresh = out.filter((v) => v.realCode).map((v) => ({ serial: v.serial, real_code: v.realCode })); if (fresh.length) run(db.from("voucher_codes").upsert(fresh)); }
-      },
-    );
+    if (st.role === "admin") {
+      const fresh = out.filter((v) => v.realCode).map((v) => ({ serial: v.serial, real_code: v.realCode }));
+      if (fresh.length) run(db.from("voucher_codes").upsert(fresh));
+    }
     logActivity(actorOf(get()), "הנפקת שובר לעובד", `קישור ${link.id} · ${link.total} ₪`);
     return link;
   },
