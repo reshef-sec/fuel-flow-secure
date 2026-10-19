@@ -219,7 +219,7 @@ interface AppState {
     supervisor: string | undefined,
     amount: number,
     meta?: AllocationMeta,
-  ) => void;
+  ) => string | null;
 
   requests: VoucherRequest[];
   addRequest: (req: Omit<VoucherRequest, "id" | "createdAt" | "status">) => void;
@@ -307,23 +307,35 @@ export const useAppStore = create<AppState>()(
   balance: 0,
   vouchers: [],
   allocate: (branch, supervisor, amount, meta) => {
-    const created: VoucherRecord[] = denominations(amount).map((value, i) => ({
-      serial: String(Math.floor(100000 + Math.random() * 899999) + i),
-      realCode: `RB-${Math.floor(1000 + Math.random() * 8999)}-${Math.floor(1000 + Math.random() * 8999)}`,
-      amount: value,
-      fuelType: meta?.fuelType ?? "בנזין",
-      branch,
-      ...(supervisor ? { supervisor } : {}),
-      status: "טרם שומש" as const,
-      updatedAt: today(),
-      ...(meta?.requester ? { requester: meta.requester } : {}),
-      ...(meta?.approver ? { approver: meta.approver } : {}),
-    }));
+    // Moves real vouchers out of the central pool; never creates nominal stock.
+    const fuel = meta?.fuelType ?? "בנזין";
+    const pool = get().vouchers.filter(
+      (v) => v.branch === MAIN_POOL && !v.supervisor && v.status === "טרם שומש" && fuelOf(v) === fuel,
+    );
+    if (!pool.length) return "אין מלאי זמין עבור סוג דלק זה במאגר המרכזי";
+    const pick = pickExact(pool, amount);
+    if (!pick) return `אין במאגר המרכזי שילוב שוברי ${fuel} בסכום ${amount.toLocaleString("he-IL")} ₪. המלאי הזמין: ${groupStock(pool)}.`;
+    const ids = new Set(pick.map((v) => v.serial));
+    const changed: VoucherRecord[] = [];
+    const vouchers = get().vouchers.map((v) => {
+      if (!ids.has(v.serial)) return v;
+      const nv: VoucherRecord = {
+        ...v,
+        branch,
+        ...(supervisor ? { supervisor } : {}),
+        updatedAt: today(),
+        ...(meta?.requester ? { requester: meta.requester } : {}),
+        ...(meta?.approver ? { approver: meta.approver } : {}),
+      };
+      changed.push(nv);
+      return nv;
+    });
     const balance = Math.max(0, get().balance - amount);
-    set((s) => ({ balance, vouchers: [...created, ...s.vouchers] }));
-    if (created.length) run(db.from("vouchers").insert(created.map(voucherToRow)));
+    set({ balance, vouchers });
+    run(db.from("vouchers").upsert(changed.map(voucherToRow)));
     run(db.from("app_settings").update({ balance }).eq("key", "main"));
-    logActivity(actorOf(get()), "הקצאת שוברים", `${branch}${supervisor ? ` (${supervisor})` : ""} · ${meta?.fuelType ?? "בנזין"} · ${amount} ₪`);
+    logActivity(actorOf(get()), "הקצאת שוברים", `${branch}${supervisor ? ` (${supervisor})` : ""} · ${fuel} · ${amount} ₪`);
+    return null;
   },
   assignToSupervisor: (branch, supervisor, amount, fuelType) => {
     const candidates = get().vouchers.filter(
