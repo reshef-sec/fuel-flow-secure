@@ -1,4 +1,5 @@
 # Roadmap — master system update
+- [ ] Synchronize allocation totals and fuel breakdown with dashboard physical inventory; refresh stock before allocation and test limits.
 - [x] Provide safe voucher_codes permission SQL for the external database.
 - [x] Validate live physical stock and enforce petrol 50 / diesel 100 issuance steps (7 tests passed).
 - [ ] Apply voucher_codes_permissions_v3.sql and verify signed-in import/issuance (blocker: user runs SQL in external database).
