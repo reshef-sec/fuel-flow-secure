@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
+import { notifyCentralInventoryChanged } from "@/lib/centralInventorySummary";
 import type { VoucherRecord } from "@/components/dashboard/voucherData";
 import type {
   B2BClientRecord,
@@ -20,6 +21,7 @@ const s = (v: unknown) => (v == null ? undefined : String(v));
 export function run(p: PromiseLike<{ error: { message: string } | null }>) {
   void Promise.resolve(p).then(({ error }) => {
     if (error) toast.error(`שמירה בענן נכשלה: ${error.message}`);
+    else notifyCentralInventoryChanged();
   });
 }
 

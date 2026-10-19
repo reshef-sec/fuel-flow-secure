@@ -6,7 +6,8 @@ import { InternalLayout } from "@/components/layout/InternalLayout";
 import { NoAccess } from "@/components/layout/NoAccess";
 import { AllocationDialog } from "@/components/dashboard/AllocationDialog";
 import { Badge, Button, Card } from "@/design-system/delek-1ea111";
-import { centralPoolOf, useAppStore } from "@/store/appStore";
+import { useAppStore } from "@/store/appStore";
+import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { FuelBreakdown } from "@/components/fuel/fuel";
 
@@ -31,8 +32,7 @@ function AllocationsPage() {
   const branchList = useAppStore((s) => s.branchList);
   const vouchers = useAppStore((s) => s.vouchers);
   const role = useAppStore((s) => s.role);
-  const centralPool = centralPoolOf(vouchers);
-  const balance = centralPool.reduce((sum, v) => sum + v.amount, 0);
+  const { summary, error: inventoryError } = useCentralInventorySummary(role === "admin");
   useLiveInventory(role === "admin");
   const [allocOpen, setAllocOpen] = useState(false);
   const [presetBranch, setPresetBranch] = useState<string | undefined>(undefined);
@@ -64,10 +64,10 @@ function AllocationsPage() {
         <p className="text-sm text-muted-foreground">
           יתרה זמינה לחלוקה:{" "}
           <span className="font-bold tabular-nums text-secondary">
-            {balance.toLocaleString("he-IL")} ₪
+            {summary ? `${summary.total_available_amount.toLocaleString("he-IL")} ₪` : "—"}
           </span>
         </p>
-        <FuelBreakdown list={centralPool} className="mt-2" />
+        {summary ? <FuelBreakdown totals={{ "בנזין": summary.gasoline_amount, "סולר": summary.diesel_amount }} className="mt-2" /> : <p className="mt-2 text-sm text-danger">{inventoryError ?? "טוען יתרת מלאי…"}</p>}
         </div>
         <Button onClick={() => openAllocation(undefined)}>
           <Send className="size-4" />

@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activityLog";
 import { persistWorkerIssue } from "@/lib/persistWorkerIssue";
 import { fuelStockError, issuanceAmountError } from "@/lib/issuanceInventory";
 import { centralPoolOf, centralFuelLimitError } from "@/lib/centralInventory";
+import { notifyCentralInventoryChanged } from "@/lib/centralInventorySummary";
 export { centralPoolOf } from "@/lib/centralInventory";
 
 import {
@@ -238,12 +239,12 @@ interface AppState {
     supervisor: string | undefined,
     amount: number,
     meta?: AllocationMeta,
-  ) => string | null;
+  ) => Promise<string | null>;
 
   requests: VoucherRequest[];
   addRequest: (req: Omit<VoucherRequest, "id" | "createdAt" | "status">) => void;
   /** Approves a request (full or custom amount) and allocates to the requester branch. */
-  approveRequest: (id: string, amount: number, approver: string) => void;
+  approveRequest: (id: string, amount: number, approver: string) => Promise<void>;
   rejectRequest: (id: string, approver: string) => void;
   assignToSupervisor: (branch: string, supervisor: string, amount: number, fuelType?: FuelType) => void;
   markPazRedeemed: (count: number) => number;
@@ -325,7 +326,7 @@ export const useAppStore = create<AppState>()(
 
   balance: 0,
   vouchers: [],
-  allocate: (branch, supervisor, amount, meta) => {
+  allocate: async (branch, supervisor, amount, meta) => {
     // Moves real vouchers out of the central pool; never creates nominal stock.
     const fuel = meta?.fuelType ?? "בנזין";
     const limitError = centralFuelLimitError({ "בנזין": fuel === "בנזין" ? amount : 0, "סולר": fuel === "סולר" ? amount : 0 }, get().vouchers);
@@ -350,8 +351,10 @@ export const useAppStore = create<AppState>()(
       return nv;
     });
     const balance = Math.max(0, get().balance - amount);
-    set({ balance, vouchers });
-    run(db.from("vouchers").upsert(changed.map(voucherToRow)));
+    const { error } = await db.from("vouchers").upsert(changed.map(voucherToRow));
+    if (error) return `שמירת ההקצאה נכשלה: ${error.message}`;
+    set((state) => ({ balance, vouchers: state.vouchers.map(v => changed.find(c => c.serial === v.serial) ?? v) }));
+    notifyCentralInventoryChanged();
     run(db.from("app_settings").update({ balance }).eq("key", "main"));
     logActivity(actorOf(get()), "הקצאת שוברים", `${branch}${supervisor ? ` (${supervisor})` : ""} · ${fuel} · ${amount} ₪`);
     return null;
@@ -443,7 +446,7 @@ export const useAppStore = create<AppState>()(
     run(db.from("voucher_requests").insert(requestToRow(row)));
     logActivity(actorOf(get()), "הגשת דרישת שוברים", `${row.branch} · ${row.amount} ₪`);
   },
-  approveRequest: (id, amount, approver) => {
+  approveRequest: async (id, amount, approver) => {
     const req = get().requests.find((r) => r.id === id);
     if (!req) return;
     const asked = (req.benzineAmount ?? 0) + (req.dieselAmount ?? 0);
@@ -454,10 +457,13 @@ export const useAppStore = create<AppState>()(
       const benzine = Math.max(0, amount - diesel);
       const fail = poolShortage({ "בנזין": benzine, "סולר": diesel }, get().vouchers);
       if (fail) return void toast.error(fail);
-      if (benzine) get().allocate(req.branch, undefined, benzine, { requester: req.requester, approver, fuelType: "בנזין" });
-      if (diesel) get().allocate(req.branch, undefined, diesel, { requester: req.requester, approver, fuelType: "סולר" });
+      for (const [fuelType, fuelAmount] of [["בנזין", benzine], ["סולר", diesel]] as const) {
+        if (!fuelAmount) continue;
+        const error = await get().allocate(req.branch, undefined, fuelAmount, { requester: req.requester, approver, fuelType });
+        if (error) return void toast.error(error);
+      }
     } else {
-      const err = get().allocate(req.branch, undefined, amount, { requester: req.requester, approver });
+      const err = await get().allocate(req.branch, undefined, amount, { requester: req.requester, approver });
       if (err) return void toast.error(err);
     }
     set((s) => ({

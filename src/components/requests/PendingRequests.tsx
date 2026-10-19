@@ -15,11 +15,12 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { fullName, roleLabels, useAppStore, useCurrentUser } from "@/store/appStore";
+import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 
 /** Admin-only queue of voucher requests awaiting approval. */
 export function PendingRequests() {
   const requests = useAppStore((s) => s.requests);
-  const balance = useAppStore((s) => s.balance);
+  const { summary } = useCentralInventorySummary();
   const approveRequest = useAppStore((s) => s.approveRequest);
   const rejectRequest = useAppStore((s) => s.rejectRequest);
   const me = useCurrentUser();
@@ -35,16 +36,17 @@ export function PendingRequests() {
 
   const pending = requests.filter((r) => r.status === "ממתין לאישור");
 
-  function approve(id: string, amount: number) {
+  async function approve(id: string, amount: number) {
     if (amount % 50 !== 0 || amount <= 0) {
       toast.error("הסכום חייב להיות בכפולות של 50 ₪");
       return;
     }
-    if (amount > balance) {
+    if (!summary || amount > summary.total_available_amount) {
       toast.error("הסכום גבוה מהיתרה הזמינה לחלוקה");
       return;
     }
-    approveRequest(id, amount, approver);
+    await approveRequest(id, amount, approver);
+    if (useAppStore.getState().requests.find(r => r.id === id)?.status !== "אושר") return;
     setCustomId(null);
     setCustomAmount("");
     toast.success(`הדרישה אושרה והוקצו ${amount.toLocaleString("he-IL")} ₪`);

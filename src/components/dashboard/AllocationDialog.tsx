@@ -4,10 +4,11 @@ import { toast } from "sonner";
 
 import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { FuelBreakdown, FuelSplitFields, emptySplit, fuelTotals, readSplit } from "@/components/fuel/fuel";
+import { FuelBreakdown, FuelSplitFields, emptySplit, readSplit } from "@/components/fuel/fuel";
 import { loadIssuanceStock } from "@/lib/cloudSync";
 import { useLiveInventory } from "@/lib/useLiveInventory";
-import { centralPoolOf, fullName, poolShortage, useAppStore, useCurrentUser } from "@/store/appStore";
+import { fullName, poolShortage, useAppStore, useCurrentUser } from "@/store/appStore";
+import { useCentralInventorySummary, refreshCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 
 export function AllocationDialog({
   open,
@@ -19,10 +20,8 @@ export function AllocationDialog({
   /** Pre-selected branch name, used by the quick-allocate action on branch cards. */
   presetTarget?: string;
 }) {
-  const vouchers = useAppStore((s) => s.vouchers);
-  const pool = centralPoolOf(vouchers);
-  const available = fuelTotals(pool);
-  const balance = available["בנזין"] + available["סולר"];
+  const { summary, error: inventoryError } = useCentralInventorySummary(open);
+  const available = { "בנזין": summary?.gasoline_amount ?? 0, "סולר": summary?.diesel_amount ?? 0 };
   const allocate = useAppStore((s) => s.allocate);
   const branchList = useAppStore((s) => s.branchList);
   const users = useAppStore((s) => s.users);
@@ -61,6 +60,11 @@ export function AllocationDialog({
     setError(null);
     setLoading(true);
     try {
+      const fresh = await refreshCentralInventorySummary();
+      if (parsed["בנזין"] > fresh.gasoline_amount || parsed["סולר"] > fresh.diesel_amount) {
+        const message = "סכום ההקצאה חורג מהמלאי הזמין עבור סוג הדלק שנבחר";
+        setError(message); toast.error(message); return;
+      }
       const stock = await loadIssuanceStock();
       useAppStore.setState({ vouchers: stock });
       const shortage = poolShortage(parsed, stock);
@@ -69,9 +73,10 @@ export function AllocationDialog({
       const approver = me ? fullName(me) : "אדמין מרכזי";
       for (const f of ["בנזין", "סולר"] as const)
         if (parsed[f]) {
-          const err = allocate(picked?.branch ?? target, picked?.supervisor, parsed[f], { approver, fuelType: f });
+          const err = await allocate(picked?.branch ?? target, picked?.supervisor, parsed[f], { approver, fuelType: f });
           if (err) { setError(err); toast.error(err); return; }
         }
+      await refreshCentralInventorySummary();
       onClose();
       toast.success("ההקצאה בוצעה בהצלחה והיתרה עודכנה");
     } catch {
@@ -91,9 +96,9 @@ export function AllocationDialog({
           <div className="min-w-0">
             <p className="text-sm font-semibold text-muted-foreground">יתרה זמינה לחלוקה</p>
             <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
-              {balance.toLocaleString("he-IL")} ₪
+              {summary ? `${summary.total_available_amount.toLocaleString("he-IL")} ₪` : "—"}
             </p>
-            <FuelBreakdown list={pool} className="mt-1" />
+            {summary ? <FuelBreakdown totals={available} className="mt-1" /> : <p className="mt-1 text-sm text-danger">{inventoryError ?? "טוען יתרת מלאי…"}</p>}
           </div>
         </div>
 
@@ -121,7 +126,7 @@ export function AllocationDialog({
           <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
             ביטול
           </Button>
-          <Button type="submit" loading={loading}>
+          <Button type="submit" loading={loading} disabled={!summary}>
             בצע הקצאה
           </Button>
         </div>
