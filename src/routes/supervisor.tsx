@@ -39,6 +39,7 @@ import {
   type WorkerIssueItem,
 } from "@/store/appStore";
 import { ProducedLinks } from "@/components/production/ProducedLinks";
+import { issuanceAmountRules, issuanceAmountError } from "@/lib/issuanceInventory";
 
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
@@ -98,9 +99,10 @@ function SupervisorPage() {
       const n = Number(b.amount);
       const sel = b.mode === "b2b" ? b.b2b : b.regular;
       if (!sel || !n || !b.reason) return setError(`לקוח ${i + 1}: יש לבחור לקוח, למלא סכום ולבחור סיבה`);
-      if (n % 50 !== 0) return setError(`לקוח ${i + 1}: הסכום חייב להיות בכפולות של 50 ₪`);
       if (!b.fuelType) return setError(`לקוח ${i + 1}: יש לבחור סוג דלק`);
       const fuelType = b.fuelType;
+       const amountError = issuanceAmountError(fuelType, n);
+       if (amountError) return setError(`לקוח ${i + 1}: ${amountError}`);
       items.push(
         b.mode === "b2b" && b.b2b
           ? { amount: n, fuelType, reason: b.reason, route: "b2b", clientName: b.b2b.clientName, clientCode: b.b2b.clientCode, accountName: b.b2b.accountName, standard: b.b2b.standard }
@@ -118,6 +120,7 @@ function SupervisorPage() {
       });
       if ("error" in created) {
         setError(created.error);
+        toast.error(created.error);
         return;
       }
       setLink(publicVoucherUrl(created.id));
@@ -254,6 +257,7 @@ function ClientBlock({
   );
   const modeReasons = reasons.filter((r) => r.category === (mode === "b2b" ? "B2B" : "Regular"));
   const selected = mode === "b2b" ? b2b : regular;
+  const amountRules = issuanceAmountRules(block.fuelType);
 
   const matches = useMemo(() => {
     const q = search.trim();
@@ -352,8 +356,8 @@ function ClientBlock({
             <option value="סולר">סולר</option>
           </Select>
         </FormField>
-        <FormField label="סכום (₪)" hint="בכפולות של 50 ₪">
-          <Input aria-label="סכום" type="number" min={50} step={50} inputMode="numeric" value={block.amount} onChange={(e) => onChange({ amount: e.target.value })} placeholder="300" className="tabular-nums" />
+        <FormField label="סכום (₪)" hint={amountRules.hint}>
+          <Input aria-label="סכום" type="number" min={amountRules.min} step={amountRules.step} inputMode="numeric" value={block.amount} onChange={(e) => onChange({ amount: e.target.value })} placeholder="300" className="tabular-nums" />
         </FormField>
         <FormField label="סיבת הנפקה">
           <Select aria-label="בחר סיבת הנפקה" value={block.reason} onChange={(e) => onChange({ reason: e.target.value })}>
