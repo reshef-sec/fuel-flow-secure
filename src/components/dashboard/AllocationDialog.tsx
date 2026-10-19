@@ -108,7 +108,7 @@ export function AllocationDialog({
           </Select>
         </FormField>
 
-        <FuelSplitFields values={split} onChange={setSplit} />
+        <FuelSplitFields values={split} onChange={setSplit} available={available} />
 
         {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
 
