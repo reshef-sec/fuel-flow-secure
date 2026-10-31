@@ -2,7 +2,7 @@ import { FUEL_TYPES, fuelOf, type FuelType } from "@/components/fuel/fuel";
 import { create } from "zustand";
 import { toast } from "sonner";
 import {
-  b2bToRow, clientToRow, db, loadAll, loadIssuanceStock, requestToRow, run, userPatch, userToRow, voucherToRow,
+  b2bToRow, clientToRow, db, loadAll, loadIssuanceStock, requestToRow, run, userPatch, userToRow,
 } from "@/lib/cloudSync";
 
 import { logActivity } from "@/lib/activityLog";

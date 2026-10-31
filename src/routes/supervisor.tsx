@@ -46,7 +46,6 @@ import { centralPoolOf, pickExact } from "@/store/appStore";
 import { isAvailable } from "@/components/dashboard/voucherData";
 import { isActiveClient } from "@/lib/importIntegrity";
 import { supabase } from "@/lib/supabaseClient";
-import { b2bToRow, clientToRow } from "@/lib/cloudSync";
 
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
