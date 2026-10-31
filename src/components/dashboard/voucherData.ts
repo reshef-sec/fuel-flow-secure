@@ -1,7 +1,7 @@
 import type { FuelType } from "@/components/fuel/fuel";
 import { assignmentLabel } from "@/lib/branchLabels";
 
-export type VoucherStatus = "מומש סופית" | "טרם שומש" | "חסום" | "הוקצה לעובד";
+export type VoucherStatus = "מומש סופית" | "מומש בפועל" | "טרם שומש" | "חסום" | "הוקצה לעובד";
 
 export const MAIN_POOL = "מאגר ראשי";
 
@@ -19,6 +19,7 @@ export interface VoucherRecord {
   client?: string;
   status: VoucherStatus;
   updatedAt: string;
+  redeemedAt?: string;
   /** דורש ההקצאה — user who requested the allocation */
   requester?: string;
   /** גורם מאשר — admin who approved / executed the allocation */
@@ -72,7 +73,7 @@ export const isIssued = (v: VoucherRecord) => Boolean(v.linkId || v.workerName |
 
 /** Unused budget still available to hand out (not issued, redeemed or blocked). */
 export const isAvailable = (v: VoucherRecord) =>
-  !isIssued(v) && v.status !== "מומש סופית" && v.status !== "חסום";
+  !isIssued(v) && v.status !== "מומש סופית" && v.status !== "מומש בפועל" && v.status !== "חסום";
 
 export const isWorkerVoucher = (v: VoucherRecord) =>
   Boolean(v.workerId || v.workerName) || v.status === "הוקצה לעובד";

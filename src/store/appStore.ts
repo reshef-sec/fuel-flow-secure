@@ -6,6 +6,7 @@ import {
 } from "@/lib/cloudSync";
 
 import { logActivity } from "@/lib/activityLog";
+import { syncVehiclePool, importVoucherInventory, reconcilePazFeedback, type VehicleSyncResult } from "@/lib/backend";
 import { fuelStockError, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { transferInventory } from "@/lib/transferInventory";
 import { pickExact } from "@/lib/inventorySelection";
@@ -225,10 +226,9 @@ interface AppState {
   approveRequest: (id: string, amount: number, approver: string) => Promise<void>;
   rejectRequest: (id: string, approver: string) => void;
   assignToSupervisor: (branch: string, supervisor: string, amount: number, fuelType?: FuelType) => Promise<string | null>;
-  markPazRedeemed: (count: number) => number;
   /** Marks vouchers redeemed by serial numbers from the Paz feedback file. */
-  markSerialsRedeemed: (serials: string[]) => number;
-  importVouchers: (rows: VoucherRecord[]) => void;
+  markSerialsRedeemed: (serials: string[]) => Promise<number>;
+  importVouchers: (rows: VoucherRecord[]) => Promise<{ added: number; skipped: number; serials: string[] }>;
 
 
   users: UserRecord[];
@@ -248,14 +248,14 @@ interface AppState {
   addClient: (client: ClientRecord) => void;
   updateClient: (clientId: string, siteId: string, patch: Partial<ClientRecord>) => void;
   /** Upsert by clientId + siteId. Returns added/updated counts. */
-  importClients: (rows: ClientRecord[]) => { added: number; updated: number };
+  importClients: (rows: ClientRecord[]) => Promise<VehicleSyncResult>;
   removeClient: (clientId: string, siteId: string) => void;
 
   b2bClients: B2BClientRecord[];
   addB2b: (row: B2BClientRecord) => void;
   updateB2b: (clientCode: string, accountName: string, patch: Partial<B2BClientRecord>) => void;
   /** Upsert by clientCode + accountName. */
-  importB2b: (rows: B2BClientRecord[]) => { added: number; updated: number };
+  importB2b: (rows: B2BClientRecord[]) => Promise<VehicleSyncResult>;
   removeB2b: (clientCode: string, accountName: string) => void;
 
   links: WorkerLink[];
@@ -367,48 +367,17 @@ export const useAppStore = create<AppState>()(
     logActivity(actorOf(get()), "הקצאה למפקח", `${supervisor} · ${fuelType} · ${amount} ₪`);
     return null;
   },
-  markPazRedeemed: (count) => {
-    let left = count;
-    const changed: VoucherRecord[] = [];
-    const vouchers = get().vouchers.map((v) => {
-      if (left <= 0 || v.status !== "הוקצה לעובד") return v;
-      left -= 1;
-      const nv = { ...v, status: "מומש סופית" as const, updatedAt: today() };
-      changed.push(nv);
-      return nv;
-    });
-    set({ vouchers });
-    if (changed.length) run(db.from("vouchers").upsert(changed.map(voucherToRow)));
-    if (changed.length) logActivity(actorOf(get()), "מימוש שוברים (פז)", `${changed.length} שוברים`);
-    if (changed.length) logActivity(actorOf(get()), "מימוש שוברים (פז)", `${changed.length} שוברים`);
-    return changed.length;
+  markSerialsRedeemed: async (serials) => {
+    const updated = await reconcilePazFeedback([...new Set(serials.map(s => s.trim()).filter(Boolean))]);
+    set({ vouchers: await loadIssuanceStock() });
+    notifyCentralInventoryChanged();
+    return updated;
   },
-  markSerialsRedeemed: (serials) => {
-    const wanted = new Set(serials.map((s) => s.trim()).filter(Boolean));
-    const changed: VoucherRecord[] = [];
-    const vouchers = get().vouchers.map((v) => {
-      if (!wanted.has(v.serial) || v.status === "מומש סופית") return v;
-      const nv = { ...v, status: "מומש סופית" as const, updatedAt: today() };
-      changed.push(nv);
-      return nv;
-    });
-    set({ vouchers });
-    if (changed.length) run(db.from("vouchers").upsert(changed.map(voucherToRow)));
-    return changed.length;
-  },
-  importVouchers: (rows) => {
-    set((s) => {
-      const incoming = new Set(rows.map((r) => r.serial));
-      return { vouchers: [...rows, ...s.vouchers.filter((v) => !incoming.has(v.serial))] };
-    });
-    for (let i = 0; i < rows.length; i += 500)
-      void Promise.resolve(db.from("vouchers").upsert(rows.slice(i, i + 500).map(voucherToRow))).then(
-        ({ error }: { error: { message: string } | null }) => {
-          if (error) return toast.error(`שמירה בענן נכשלה: ${error.message}`);
-          const codes = rows.slice(i, i + 500).filter((v) => v.realCode).map((v) => ({ serial: v.serial, real_code: v.realCode }));
-          if (codes.length) run(db.rpc("store_voucher_codes", { p_codes: codes }));
-        },
-      );
+  importVouchers: async (rows) => {
+    const result = await importVoucherInventory(rows.map(v => ({ serial: v.serial, real_code: v.realCode, amount: v.amount, fuel_type: v.fuelType ?? "בנזין" })));
+    set({ vouchers: await loadIssuanceStock() });
+    notifyCentralInventoryChanged();
+    return result;
   },
 
   requests: [],
@@ -526,28 +495,11 @@ export const useAppStore = create<AppState>()(
     if (next)
       run(db.from("regular_clients").update(clientToRow(next)).eq("client_id", clientId).eq("site_id", siteId));
   },
-  importClients: (rows) => {
-    const key = (c: ClientRecord) => `${c.clientId}|${c.siteId}`;
-    const incoming = new Map(rows.map((r) => [key(r), r]));
-    const current = get().nonB2bClients;
-    const known = new Set(current.map(key));
-    let deactivated = 0;
-    const changed: ClientRecord[] = [];
-    const list = current.map((c) => {
-      const inFile = incoming.has(key(c));
-      const active = c.isActive !== false;
-      if (inFile === active) return c;
-      if (!inFile) deactivated += 1;
-      const nc = { ...c, isActive: inFile };
-      changed.push(nc);
-      return nc;
-    });
-    const fresh = [...incoming.values()].filter((r) => !known.has(key(r))).map((r) => ({ ...r, isActive: true }));
-    set({ nonB2bClients: [...fresh, ...list] });
-    const toSave = [...fresh, ...changed].map(clientToRow);
-    for (let i = 0; i < toSave.length; i += 500)
-      run(db.from("regular_clients").upsert(toSave.slice(i, i + 500), { onConflict: "client_id,site_id" }));
-    return { added: fresh.length, updated: deactivated };
+  importClients: async (rows) => {
+    const result = await syncVehiclePool("regular", rows.map(clientToRow));
+    const fresh = await loadAll();
+    set({ nonB2bClients: fresh.nonB2bClients });
+    return result;
   },
   removeClient: (clientId, siteId) => {
     set((s) => ({
@@ -573,28 +525,11 @@ export const useAppStore = create<AppState>()(
     if (next)
       run(db.from("b2b_clients").update(b2bToRow(next)).eq("client_code", code).eq("account_name", account));
   },
-  importB2b: (rows) => {
-    const key = (c: B2BClientRecord) => `${c.clientCode}|${c.accountName}`;
-    const incoming = new Map(rows.map((r) => [key(r), r]));
-    const current = get().b2bClients;
-    const known = new Set(current.map(key));
-    let deactivated = 0;
-    const changed: B2BClientRecord[] = [];
-    const list = current.map((c) => {
-      const inFile = incoming.has(key(c));
-      const active = c.isActive !== false;
-      if (inFile === active) return c;
-      if (!inFile) deactivated += 1;
-      const nc = { ...c, isActive: inFile };
-      changed.push(nc);
-      return nc;
-    });
-    const fresh = [...incoming.values()].filter((r) => !known.has(key(r))).map((r) => ({ ...r, isActive: true }));
-    set({ b2bClients: [...fresh, ...list] });
-    const toSave = [...fresh, ...changed].map(b2bToRow);
-    for (let i = 0; i < toSave.length; i += 500)
-      run(db.from("b2b_clients").upsert(toSave.slice(i, i + 500), { onConflict: "client_code,account_name" }));
-    return { added: fresh.length, updated: deactivated };
+  importB2b: async (rows) => {
+    const result = await syncVehiclePool("b2b", rows.map(b2bToRow));
+    const fresh = await loadAll();
+    set({ b2bClients: fresh.b2bClients });
+    return result;
   },
   removeB2b: (code, account) => {
     set((s) => ({

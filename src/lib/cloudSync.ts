@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { notifyCentralInventoryChanged } from "@/lib/centralInventorySummary";
+import { normalizeVoucherStatus } from "@/lib/importIntegrity";
 import type { VoucherRecord } from "@/components/dashboard/voucherData";
 import type {
   B2BClientRecord,
@@ -42,7 +43,7 @@ export const voucherToRow = (v: VoucherRecord) => ({
 const rowToVoucher = (r: Row, codes: Map<string, string>): VoucherRecord => {
   const v: Row = {
     serial: r.serial, realCode: codes.get(String(r.serial)) ?? "", amount: Number(r.amount),
-    branch: r.branch ?? "מאגר ראשי", status: r.status === "available" ? "טרם שומש" : r.status,
+    branch: r.branch ?? "מאגר ראשי", status: normalizeVoucherStatus(r.status), redeemedAt: s(r.redeemed_at),
     fuelType: r.fuel_type === "סולר" ? "סולר" : "בנזין",
     updatedAt: r.updated_on, supervisor: s(r.supervisor), client: s(r.client), requester: s(r.requester),
     approver: s(r.approver), clientId: s(r.client_id), siteId: s(r.site_id), siteName: s(r.site_name),
@@ -129,11 +130,11 @@ export async function loadAll() {
       clientCode: String(r.client_code), accountName: String(r.account_name), clientName: String(r.client_name),
       branch: String(r.branch), standard: String(r.standard), balance: s(r.balance), loadType: s(r.load_type),
       budgetSection: s(r.budget_section), accountKey: s(r.account_key), itemFamily: s(r.item_family),
-      accountStatus: s(r.account_status), accountType: s(r.account_type), isActive: r.is_active !== false,
+      accountStatus: s(r.account_status), accountType: s(r.account_type), isActive: r.is_active === true,
     })) as B2BClientRecord[],
     nonB2bClients: clients.map((r) => ({
       clientId: String(r.client_id), clientName: String(r.client_name), siteId: String(r.site_id),
-      siteName: String(r.site_name), standard: s(r.standard), isActive: r.is_active !== false,
+      siteName: String(r.site_name), standard: s(r.standard), isActive: r.is_active === true,
     })) as ClientRecord[],
     vouchers: vouchers.map((r) => rowToVoucher(r, codes)).reverse(),
     users: users.map((r) => ({

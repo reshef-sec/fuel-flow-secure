@@ -3,6 +3,7 @@ import { formatIsraelDate } from "@/lib/israelDate";
 
 export const statusVariant: Record<VoucherStatus, "success" | "info" | "danger" | "purple"> = {
   "מומש סופית": "success",
+  "מומש בפועל": "success",
   "טרם שומש": "info",
   "הוקצה לעובד": "purple",
   חסום: "danger",
