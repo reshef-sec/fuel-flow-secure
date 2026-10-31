@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
+import { cleanUserName } from "./userDisplay";
 
 export interface Profile {
   id: string;
@@ -24,7 +25,14 @@ export function useAuth() {
       return;
     }
     const { data } = await supabase.from("profiles").select("*").eq("id", s.user.id).maybeSingle();
-    setProfile((data as Profile | null) ?? null);
+    const next = data as Profile | null;
+    if (next) {
+      const { data: account } = await supabase.from("app_users")
+        .select("first_name,last_name").eq("national_id", next.national_id).maybeSingle();
+      const accountName = account ? cleanUserName(`${account.first_name ?? ""} ${account.last_name ?? ""}`) : "";
+      next.full_name = accountName || cleanUserName(next.full_name);
+    }
+    setProfile(next);
     setLoading(false);
   }, []);
 

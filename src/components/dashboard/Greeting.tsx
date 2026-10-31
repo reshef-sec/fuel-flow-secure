@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Moon, Sparkles, Sun } from "lucide-react";
 
 import { useAuthContext } from "@/lib/auth-context";
+import { userDisplayName } from "@/lib/userDisplay";
 
 /** Current hour in Israel (Asia/Jerusalem), 0–23. */
 function israelHour() {
@@ -28,7 +29,7 @@ export function Greeting() {
   }, []);
   if (hour === null) return <div className="mb-5 h-[60px]" aria-hidden />;
   const g = slot(hour);
-  const name = (profile?.full_name ?? "").trim().split(/\s+/)[0] ?? "";
+  const name = userDisplayName(profile);
 
   return (
     <div className="mb-5">
