@@ -9,6 +9,7 @@ import { loadIssuanceStock } from "@/lib/cloudSync";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { fullName, poolShortage, useAppStore, useCurrentUser } from "@/store/appStore";
 import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
+import { STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 
 export function AllocationDialog({
   open,
@@ -28,7 +29,8 @@ export function AllocationDialog({
   const branchList = useAppStore((s) => s.branchList);
   const users = useAppStore((s) => s.users);
   const me = useCurrentUser();
-  useLiveInventory(open);
+  const stockReady = useLiveInventory(open);
+  const stock = useAppStore(s => s.vouchers);
 
   const targets: { value: string; label: string; branch: string; supervisor?: string }[] = [
     ...branchList.map((b) => ({ value: b.name, label: b.name, branch: b.name })),
@@ -45,6 +47,9 @@ export function AllocationDialog({
   const [split, setSplit] = useState(emptySplit);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const currentSplit = readSplit(split);
+  const stockError = typeof currentSplit === "string" ? null : poolShortage(currentSplit, stock);
+  useEffect(() => { if (open && stockReady && stockError) toast.error(stockError); }, [open, stockReady, stockError]);
 
   useEffect(() => {
     if (!open) return;
@@ -64,7 +69,7 @@ export function AllocationDialog({
     try {
       const fresh = await refresh();
       if (parsed["בנזין"] > fresh.gasoline_amount || parsed["סולר"] > fresh.diesel_amount) {
-        const message = "סכום ההקצאה חורג מהמלאי הזמין עבור סוג הדלק שנבחר";
+        const message = STOCK_SHORTAGE;
         setError(message); toast.error(message); return;
       }
       const stock = await loadIssuanceStock();
@@ -123,13 +128,13 @@ export function AllocationDialog({
 
         <FuelSplitFields values={split} onChange={setSplit} available={available} />
 
-        {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+        {error || stockError ? <p className="text-sm font-semibold text-danger">{error ?? stockError}</p> : null}
 
         <div className="flex flex-wrap justify-end gap-2 pt-1">
           <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
             ביטול
           </Button>
-          <Button type="submit" loading={loading} disabled={!summary}>
+          <Button type="submit" loading={loading} disabled={!summary || !stockReady || !!stockError || typeof currentSplit === "string"}>
             בצע הקצאה
           </Button>
         </div>

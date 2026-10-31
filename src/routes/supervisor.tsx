@@ -39,7 +39,11 @@ import {
   type WorkerIssueItem,
 } from "@/store/appStore";
 import { ProducedLinks } from "@/components/production/ProducedLinks";
-import { issuanceAmountRules, issuanceAmountError } from "@/lib/issuanceInventory";
+import { issuanceAmountRules, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
+import { useLiveInventory } from "@/lib/useLiveInventory";
+import { fuelOf } from "@/components/fuel/fuel";
+import { centralPoolOf, pickExact } from "@/store/appStore";
+import { isAvailable } from "@/components/dashboard/voucherData";
 
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
@@ -80,6 +84,8 @@ function SupervisorPage() {
   const role = useAppStore((s) => s.role);
   const issueWorkerVoucher = useAppStore((s) => s.issueWorkerVoucher);
   const me = useCurrentUser();
+  const stockReady = useLiveInventory();
+  const stock = useAppStore(s => s.vouchers);
 
   const [employeeName, setEmployeeName] = useState("");
   const [blocks, setBlocks] = useState<Block[]>(() => [newBlock()]);
@@ -87,6 +93,21 @@ function SupervisorPage() {
   const [loading, setLoading] = useState(false);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const stockError = useMemo(() => {
+    const pool = role === "admin" ? centralPoolOf(stock) : stock.filter(v => isAvailable(v)
+      && v.status === "טרם שומש" && v.branch === me?.branch
+      && (role === "supervisor" ? v.supervisor === (me ? fullName(me) : "") : !v.supervisor));
+    let remaining = pool;
+    for (const block of blocks) {
+      if (!block.fuelType || !Number(block.amount) || issuanceAmountError(block.fuelType, Number(block.amount))) continue;
+      const picked = pickExact(remaining.filter(v => fuelOf(v) === block.fuelType), Number(block.amount));
+      if (!picked) return STOCK_SHORTAGE;
+      const ids = new Set(picked.map(v => v.serial));
+      remaining = remaining.filter(v => !ids.has(v.serial));
+    }
+    return null;
+  }, [stock, role, me, blocks]);
+  useEffect(() => { if (stockReady && stockError) toast.error(stockError); }, [stockReady, stockError]);
 
   const patch = (key: number, p: Partial<Block>) =>
     setBlocks((bs) => bs.map((b) => (b.key === key ? { ...b, ...p } : b)));
@@ -180,9 +201,9 @@ function SupervisorPage() {
               הוספת לקוח
             </Button>
 
-            {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+            {error || stockError ? <p className="text-sm font-semibold text-danger">{error ?? stockError}</p> : null}
 
-            <Button type="submit" loading={loading} block>
+            <Button type="submit" loading={loading} disabled={!stockReady || !!stockError} block>
               <Send className="size-4" />
               הפקת לינק לעובד
             </Button>
