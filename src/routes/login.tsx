@@ -81,11 +81,6 @@ function LoginPage() {
           <h1 className="font-display text-xl font-extrabold text-secondary">
             {needsSetup ? "הגדרת מנהל ראשי" : "כניסה למערכת"}
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {needsSetup
-              ? "טרם הוגדר מנהל. הזינו את פרטיכם — הסיסמה הראשונית היא תעודת הזהות."
-              : "סיסמה ראשונית: מספר תעודת הזהות"}
-          </p>
         </div>
 
         {needsSetup ? (
@@ -103,7 +98,7 @@ function LoginPage() {
               inputMode="tel"
               autoComplete="username"
               dir="ltr"
-              className="ps-9 text-right"
+              className="px-10 text-right"
               aria-label="מספר נייד"
             />
           </div>
@@ -118,7 +113,7 @@ function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               dir="ltr"
-              className="ps-9 text-right"
+              className="px-10 text-right"
               aria-label="סיסמה"
             />
           </div>

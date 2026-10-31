@@ -1,4 +1,9 @@
 # Roadmap — master system update
+- [ ] Priority A: real authenticated names, secure login copy and icon spacing.
+- [ ] Priority A: petrol 100 / diesel 50 steps and fresh physical stock checks with disabled submission.
+- [ ] Priority A: Israeli date displays/filters and complete report columns.
+- [ ] Priority A: remove demo generators/fallbacks; do not delete live records without identifying them.
+- [ ] Priority A: run regression tests and verify available browser flows.
 - [x] Remove the nominal demo balance and bind both screens and the dialog to the shared totalAvailableBalance; refresh after each saved fuel transfer (15 tests passed; authenticated end-to-end check remains blocked below).
 - [x] Provide secure get_central_inventory_summary SQL and connect dashboard/allocation totals directly to it, refreshing after saved transfers (14 tests passed).
 - [x] User reports get_central_inventory_summary installed in the external database.
