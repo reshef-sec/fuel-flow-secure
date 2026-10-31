@@ -72,11 +72,11 @@ export function ClientsPanel() {
         toast.error("לא נמצאו שורות תקינות. עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן");
         return;
       }
-      const { added, updated } = importClients(rows);
+      const { added, updated, deactivated } = await importClients(rows);
       setPage(0);
-      toast.success(`נוספו ${added.toLocaleString("he-IL")} אתרים, ${updated.toLocaleString("he-IL")} סומנו כלא פעילים`);
-    } catch {
-      toast.error("קריאת הקובץ נכשלה. יש לוודא שהקובץ תקין");
+      toast.success(`נוספו ${added} אתרים, ${updated} עודכנו, ${deactivated} סומנו כלא פעילים`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "סנכרון הקובץ נכשל");
     }
   }
 

@@ -127,3 +127,11 @@ export const completePasswordChange = ({ data }: Args<{ password: string }>) => 
 export const getDevelopmentToolsAccess = () => rpc<boolean>("can_use_development_tools", {});
 export const generateDemoData = () => rpc<{ vouchers_created: number }>("generate_demo_data", {});
 export const resetSystemData = (confirmation: string) => rpc<void>("reset_development_data", { p_confirmation: confirmation });
+
+export interface VehicleSyncResult { added: number; updated: number; deactivated: number }
+export const syncVehiclePool = (pool: "regular" | "b2b", rows: Record<string, unknown>[]) =>
+  rpc<VehicleSyncResult>("sync_vehicle_pool", { p_pool: pool, p_rows: rows });
+export const importVoucherInventory = (rows: Record<string, unknown>[]) =>
+  rpc<{ added: number; skipped: number; serials: string[] }>("import_voucher_inventory", { p_rows: rows });
+export const reconcilePazFeedback = (serials: string[]) =>
+  rpc<number>("reconcile_redeemed_vouchers", { card_numbers: serials });

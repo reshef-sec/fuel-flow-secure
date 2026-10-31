@@ -15,11 +15,12 @@ export function validateStockSheet(rows: string[][], existing: Set<string> = new
   if (!data.length) return "לא נמצאו שורות נתונים.";
   const seen = new Set<string>();
   for (let i = 0; i < data.length; i++) {
-    const r = data[i]!;
+    const r = data[i];
+    if (!r) continue;
     const line = `שורה ${i + 2}: `;
     const serial = (r[0] ?? "").trim();
     if (!/^[\w-]+$/.test(serial)) return `${line}מספר כרטיס חסר או לא תקין.`;
-    if (seen.has(serial) || existing.has(serial)) return `${line}מספר כרטיס ${serial} כפול או כבר קיים במאגר.`;
+    if (seen.has(serial) || existing.has(serial)) continue;
     seen.add(serial);
     if (!(r[1] ?? "").trim()) return `${line}קוד חסר.`;
     const amount = Number((r[2] ?? "").replace(/[₪,\s]/g, ""));
