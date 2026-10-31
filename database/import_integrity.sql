@@ -99,6 +99,29 @@ END $$;
 REVOKE ALL ON FUNCTION public.sync_vehicle_pool(text,jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.sync_vehicle_pool(text,jsonb) TO authenticated;
 
+-- Enforce active clients even when a stale browser or direct RPC attempts issuance.
+-- Only the initial employee assignment is checked; historical rows may later be redeemed.
+CREATE OR REPLACE FUNCTION public.require_active_issuance_client()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public
+AS $$ BEGIN
+  IF nullif(NEW.link_id,'') IS NULL THEN RETURN NEW; END IF;
+  IF TG_OP='UPDATE' THEN
+    IF OLD.link_id IS NOT DISTINCT FROM NEW.link_id THEN RETURN NEW; END IF;
+  END IF;
+  IF NEW.route='regular' THEN
+    PERFORM 1 FROM public.regular_clients WHERE client_id=NEW.client_id AND site_id=NEW.site_id AND is_active=true FOR SHARE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'הלקוח או האתר אינם פעילים'; END IF;
+  ELSIF NEW.route='b2b' THEN
+    PERFORM 1 FROM public.b2b_clients WHERE client_code=NEW.client_code AND account_name=NEW.account_name AND is_active=true FOR SHARE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'לקוח רכב העבודה אינו פעיל'; END IF;
+  ELSE RAISE EXCEPTION 'יש לבחור מאגר לקוחות להנפקה'; END IF;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.require_active_issuance_client() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS require_active_issuance_client ON public.vouchers;
+CREATE TRIGGER require_active_issuance_client BEFORE INSERT OR UPDATE OF link_id ON public.vouchers
+  FOR EACH ROW EXECUTE FUNCTION public.require_active_issuance_client();
+
 CREATE OR REPLACE FUNCTION public.import_voucher_inventory(p_rows jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public
 AS $$
