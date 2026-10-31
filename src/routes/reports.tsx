@@ -12,6 +12,7 @@ import { IsraelDateInput } from "@/components/ui/IsraelDateInput";
 import { formatIsraelDate, inDateRange } from "@/lib/israelDate";
 import { branchLabel, branchOptions } from "@/lib/branchLabels";
 import { MAIN_POOL } from "@/components/dashboard/voucherData";
+import { historicalClientName } from "@/lib/importIntegrity";
 import {
   Badge,
   Button,
@@ -60,6 +61,8 @@ function ReportsPage() {
   const branchList = useAppStore((s) => s.branchList);
   const users = useAppStore((s) => s.users);
   const clients = useAppStore((s) => s.nonB2bClients);
+  const b2bClients = useAppStore((s) => s.b2bClients);
+  const reportVouchers = useMemo(() => vouchers.map(v => ({ ...v, client: historicalClientName(v, clients, b2bClients) })), [vouchers, clients, b2bClients]);
   const role = useAppStore((s) => s.role);
   const me = useCurrentUser();
   const [filters, setFilters] = useState(empty);
@@ -78,14 +81,14 @@ function ReportsPage() {
     [users, lockedBranch],
   );
   const clientOptions = useMemo(() => {
-    const fromVouchers = vouchers.map((v) => v.client).filter(Boolean) as string[];
+    const fromVouchers = reportVouchers.map((v) => v.client).filter(Boolean) as string[];
     const fromSettings = clients.map((c) => c.clientName);
     return Array.from(new Set([...fromVouchers, ...fromSettings]));
-  }, [vouchers, clients]);
+  }, [reportVouchers, clients]);
 
   const rows = useMemo(
     () =>
-      vouchers.filter((v) => {
+      reportVouchers.filter((v) => {
         if (v.route === "b2b") return false;
         if (lockedBranch && v.branch !== lockedBranch) return false;
         if (lockedSupervisor !== null && v.supervisor !== lockedSupervisor) return false;
@@ -96,7 +99,7 @@ function ReportsPage() {
         if (filters.status && v.status !== filters.status) return false;
         return true;
       }),
-    [vouchers, filters, lockedBranch, lockedSupervisor],
+    [reportVouchers, filters, lockedBranch, lockedSupervisor],
   );
 
   const paged = usePaged(rows);

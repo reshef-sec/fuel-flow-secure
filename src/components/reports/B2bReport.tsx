@@ -18,6 +18,7 @@ import type { VoucherRecord } from "@/components/dashboard/voucherData";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 import { formatIsraelDate, inDateRange } from "@/lib/israelDate";
 import { branchLabel } from "@/lib/branchLabels";
+import { historicalClientName } from "@/lib/importIntegrity";
 
 /** B2B billing report — one row per 100 ₪ code issued via the "ברכב עבודה" route. */
 export interface ReportFilterValues {
@@ -31,13 +32,14 @@ export interface ReportFilterValues {
 
 export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
   const vouchers = useAppStore((s) => s.vouchers);
+  const clients = useAppStore((s) => s.b2bClients);
   const branchList = useAppStore((s) => s.branchList);
   const role = useAppStore((s) => s.role);
   const me = useCurrentUser();
   const myName = me ? fullName(me) : "";
 
   const rows = useMemo(() => {
-    let list = vouchers.filter((v) => v.route === "b2b");
+    let list = vouchers.filter((v) => v.route === "b2b").map(v => ({ ...v, client: historicalClientName(v, [], clients) }));
     if (role === "branch" && me?.branch) list = list.filter((v) => v.branch === me.branch);
     if (role === "supervisor") list = list.filter((v) => v.supervisor === myName);
     if (filters) {
@@ -52,7 +54,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
       });
     }
     return list.map(v => ({ v, value: v.amount, code: v.serial }));
-  }, [vouchers, role, me?.branch, myName, filters]);
+  }, [vouchers, clients, role, me?.branch, myName, filters]);
 
   const [view, setView] = useState<"detail" | "summary">("detail");
   const isAdmin = role === "admin";
