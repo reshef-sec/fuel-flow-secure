@@ -1,5 +1,6 @@
 import { MAIN_POOL, isAvailable, mainBranch, type VoucherRecord } from "@/components/dashboard/voucherData";
 import type { FuelType } from "@/components/fuel/fuel";
+import { STOCK_SHORTAGE } from "./issuanceInventory";
 
 export const centralPoolOf = <T extends VoucherRecord>(list: T[], fuel?: FuelType) =>
   list.filter(v => mainBranch(v.branch) === MAIN_POOL && !v.supervisor && isAvailable(v)
@@ -10,7 +11,7 @@ export function centralFuelLimitError(split: Record<FuelType, number>, list: Vou
   for (const fuel of ["בנזין", "סולר"] as const) {
     const total = pool.filter(v => (v.fuelType ?? "בנזין") === fuel).reduce((sum, v) => sum + v.amount, 0);
     if (!Number.isFinite(split[fuel]) || split[fuel] < 0) return "סכום לא תקין";
-    if (split[fuel] > total) return `אין מספיק מלאי ${fuel} זמין במאגר המרכזי. זמין: ${total.toLocaleString("he-IL")} ₪`;
+    if (split[fuel] > total) return STOCK_SHORTAGE;
   }
   return null;
 }
