@@ -1,7 +1,7 @@
 export type IssuanceFuel = "בנזין" | "סולר";
 export const issuanceAmountRules = (fuel: IssuanceFuel | "") => fuel === "סולר"
-  ? { min: 50, step: 50, hint: "בכפולות של 50 ₪ עבור סולר" }
-  : { min: 100, step: 100, hint: "בכפולות של 100 ₪ עבור בנזין 95" };
+  ? { min: 50, step: 50, hint: "בכפולות של 50 ₪" }
+  : { min: 100, step: 100, hint: "בכפולות של 100 ₪" };
 export function issuanceAmountError(fuel: IssuanceFuel, amount: number): string | null {
   const { min, step, hint } = issuanceAmountRules(fuel);
   return !Number.isSafeInteger(amount) || amount < min || amount % step !== 0

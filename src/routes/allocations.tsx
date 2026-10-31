@@ -10,6 +10,7 @@ import { useAppStore } from "@/store/appStore";
 import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { FuelBreakdown } from "@/components/fuel/fuel";
+import { branchLabel } from "@/lib/branchLabels";
 
 export const Route = createFileRoute("/allocations")({
   head: () => ({
@@ -88,7 +89,7 @@ function AllocationsPage() {
               <Card key={b.id} padding="lg">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-display text-lg font-extrabold text-secondary">{b.name}</p>
+                    <p className="font-display text-lg font-extrabold text-secondary">{branchLabel(b.name)}</p>
                     <p className="text-sm text-muted-foreground">
                       {b.manager || "—"} · {b.city || "—"}
                     </p>

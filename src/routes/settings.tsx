@@ -51,7 +51,7 @@ function SettingsPage() {
 
   return (
     <InternalLayout title="הגדרות מערכת">
-      <Tabs items={tabs} value={tab} onChange={setTab} />
+      <Tabs items={tabs} value={tab} onChange={setTab} scrollable />
       <div className="mt-6">
         {tab === "import" ? <ImportPanel /> : null}
         {tab === "reasons" ? <ReasonsPanel /> : null}

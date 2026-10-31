@@ -1,4 +1,7 @@
 # Roadmap — master system update
+- [ ] Priority B: unified central-pool display labels without changing stored stock names.
+- [ ] Priority B: deduplicated assignments/report branch options, spacious issuance fields and exact helper copy.
+- [ ] Priority B: single-line scrollable settings tabs; verify badge visibility and regression checks.
 - [x] Priority A: real authenticated name resolution, secure login copy and icon spacing.
 - [x] Priority A: petrol 100 / diesel 50 steps, exact physical selection, live checks and disabled submission; transfer RPC integration fails closed until installed.
 - [x] Priority A: Israeli date displays/filters, Israel-time timestamps and scrollable complete report columns.

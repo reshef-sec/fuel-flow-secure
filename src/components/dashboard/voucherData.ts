@@ -1,4 +1,5 @@
 import type { FuelType } from "@/components/fuel/fuel";
+import { assignmentLabel } from "@/lib/branchLabels";
 
 export type VoucherStatus = "מומש סופית" | "טרם שומש" | "חסום" | "הוקצה לעובד";
 
@@ -78,7 +79,7 @@ export const isWorkerVoucher = (v: VoucherRecord) =>
 
 /** "מאגר ראשי" | "צפון" | "סניף צפון (מפקח דן)" */
 export function formatAssignment(v: { branch: string; supervisor?: string }) {
-  return v.supervisor ? `${v.branch} (${v.supervisor})` : v.branch;
+  return assignmentLabel(v.branch, v.supervisor);
 }
 
 export const vouchers: VoucherRecord[] = [];
