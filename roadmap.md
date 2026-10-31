@@ -1,4 +1,5 @@
 # Roadmap — master system update
+- [ ] Restore Maya-only development tools with server-verified ownership, demo generation, strong reset confirmation, and exact external-database SQL.
 - [x] Priority B: unified central-pool display labels without changing stored stock names; no SQL cleanup required.
 - [x] Priority B: deduplicated assignments/report branch options, spacious issuance fields, removed 300 placeholder and exact helper copy.
 - [x] Priority B: single-line scrollable settings tabs; published badge already hidden and absent in available localhost view; 28 regression tests passed and latest build OK.
