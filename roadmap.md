@@ -1,4 +1,5 @@
 # Roadmap — master system update
+- [ ] Audit and enforce atomic vehicle delta sync, active-only issuance, historical report resolution, unique stock imports with skipped counts, and timestamped/audited Paz redemption; provide SQL first.
 - [x] Restore development tools with database-verified Maya UUID, fail-closed DOM hiding, demo inventory generation and typed reset confirmation; provide external-database installation SQL without executing resets.
 - [ ] Install development-tools SQL in the external database and verify Maya/other-admin/supervisor access and real demo/reset workflows (blocker: user installs SQL; external authenticated session unavailable).
 - [x] Priority B: unified central-pool display labels without changing stored stock names; no SQL cleanup required.
