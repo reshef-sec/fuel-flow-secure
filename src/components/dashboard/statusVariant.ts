@@ -1,4 +1,5 @@
 import type { VoucherStatus } from "./voucherData";
+import { formatIsraelDate } from "@/lib/israelDate";
 
 export const statusVariant: Record<VoucherStatus, "success" | "info" | "danger" | "purple"> = {
   "מומש סופית": "success",
@@ -7,11 +8,7 @@ export const statusVariant: Record<VoucherStatus, "success" | "info" | "danger" 
   חסום: "danger",
 };
 
-export const heDate = new Intl.DateTimeFormat("he-IL", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
+export const heDate = { format: (value: Date) => formatIsraelDate(value) };
 
 export function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
   const escape = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;

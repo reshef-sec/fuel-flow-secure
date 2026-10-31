@@ -18,6 +18,7 @@ import {
 } from "@/design-system/delek-1ea111";
 import { supabase } from "@/lib/supabaseClient";
 import { Pager, usePaged } from "@/components/ui/Pager";
+import { formatIsraelDate } from "@/lib/israelDate";
 
 interface AuditRecord {
   id: string;
@@ -29,12 +30,7 @@ interface AuditRecord {
   ip: string;
 }
 
-const formatAt = (iso: string) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-};
+const formatAt = (iso: string) => formatIsraelDate(iso, true);
 
 const actionVariant = (action: string) =>
   action.includes("חסימת")

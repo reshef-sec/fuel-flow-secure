@@ -16,6 +16,7 @@ import { Pager, usePaged } from "@/components/ui/Pager";
 import { downloadCsv, heDate } from "@/components/dashboard/statusVariant";
 import type { VoucherRecord } from "@/components/dashboard/voucherData";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
+import { formatIsraelDate, inDateRange } from "@/lib/israelDate";
 
 /** B2B billing report — one row per 100 ₪ code issued via the "ברכב עבודה" route. */
 export interface ReportFilterValues {
@@ -41,8 +42,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
     if (filters) {
       const f = filters;
       list = list.filter((v) => {
-        if (f.from && v.updatedAt < f.from) return false;
-        if (f.to && v.updatedAt > f.to) return false;
+        if (!inDateRange(v.deliveredAt ?? v.updatedAt, f.from, f.to)) return false;
         if (f.branch && v.branch !== f.branch) return false;
         if (f.supervisor && v.supervisor !== f.supervisor) return false;
         if (f.client && v.client !== f.client) return false;
@@ -50,12 +50,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
         return true;
       });
     }
-    // Split multi-code vouchers into one row per 100 ₪ code.
-    return list.flatMap((v) => {
-      const n = Math.max(1, Math.round(v.amount / 100));
-      if (n === 1) return [{ v, value: v.amount, code: v.serial }];
-      return Array.from({ length: n }, (_, i) => ({ v, value: 100, code: `${v.serial}-${i + 1}` }));
-    });
+    return list.map(v => ({ v, value: v.amount, code: v.serial }));
   }, [vouchers, role, me?.branch, myName, filters]);
 
   const [view, setView] = useState<"detail" | "summary">("detail");
@@ -69,7 +64,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
     v.branch, `${value} ₪`, v.fuelType ?? "בנזין", code, v.client ?? "—",
     v.clientCode ?? v.clientId ?? "—", v.accountName ?? v.siteName ?? "—", v.standard ?? v.standardName ?? "—",
     v.workerName ?? "—", v.workerId ?? "—", v.workerPhone ?? "—",
-    heDate.format(new Date(v.deliveredAt ?? v.updatedAt)), v.reason ?? "—",
+    formatIsraelDate(v.deliveredAt ?? v.updatedAt), v.reason ?? "—",
   ]);
 
   // One row per תקן for the filtered period.
@@ -127,12 +122,12 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
           </Button>
         </div>
       </div>
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4 min-w-0 max-w-full md:overflow-x-auto">
         <Table>
           <TableHead>
             <TableRow>
               {headers.map((h) => (
-                <TableHeaderCell key={h} className="whitespace-nowrap">{h}</TableHeaderCell>
+                <TableHeaderCell key={h} className="whitespace-nowrap md:min-w-32">{h}</TableHeaderCell>
               ))}
             </TableRow>
           </TableHead>
@@ -147,7 +142,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
               paged.slice.map((cells, i) => (
                 <TableRow key={i}>
                   {cells.map((c, j) => (
-                    <TableCell key={j} className="whitespace-nowrap">
+                    <TableCell key={j} className="whitespace-nowrap md:min-w-32">
                       {view === "detail" && j === 2 ? <FuelBadge fuel={c === "סולר" ? "סולר" : "בנזין"} /> : c}
                     </TableCell>
                   ))}

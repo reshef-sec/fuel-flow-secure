@@ -1,5 +1,6 @@
 import { FuelBadge, fuelOf } from "@/components/fuel/fuel";
 import { publicVoucherUrl } from "@/lib/publicUrl";
+import { formatIsraelDate } from "@/lib/israelDate";
 import { useMemo, useState } from "react";
 import { Copy, LockOpen, SquareArrowOutUpRight } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
@@ -98,7 +99,7 @@ export function ProducedLinks({ limit }: { limit?: number }) {
         ) : (
           paged.slice.map((l) => (
             <TableRow key={l.id}>
-              <TableCell className="tabular-nums whitespace-nowrap">{l.createdAt}</TableCell>
+              <TableCell className="tabular-nums whitespace-nowrap">{formatIsraelDate(l.createdAt)}</TableCell>
               <TableCell className="font-semibold">{l.employeeName ?? "—"}</TableCell>
               <TableCell className="text-muted-foreground">{clientsOf(l.serials) || "—"}</TableCell>
               <TableCell className="tabular-nums">{l.total.toLocaleString("he-IL")} ₪</TableCell>
