@@ -8,12 +8,13 @@ import { InternalLayout } from "@/components/layout/InternalLayout";
 import { Tabs } from "@/components/ui/Tabs";
 import { Pager, usePaged } from "@/components/ui/Pager";
 import { B2bReport } from "@/components/reports/B2bReport";
+import { IsraelDateInput } from "@/components/ui/IsraelDateInput";
+import { formatIsraelDate, inDateRange } from "@/lib/israelDate";
 import {
   Badge,
   Button,
   Card,
   FormField,
-  Input,
   Select,
   Table,
   TableBody,
@@ -22,7 +23,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/design-system/delek-1ea111";
-import { downloadCsv, heDate, statusVariant } from "@/components/dashboard/statusVariant";
+import { downloadCsv, statusVariant } from "@/components/dashboard/statusVariant";
 import { formatAssignment, type VoucherStatus } from "@/components/dashboard/voucherData";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 
@@ -85,8 +86,7 @@ function ReportsPage() {
         if (v.route === "b2b") return false;
         if (lockedBranch && v.branch !== lockedBranch) return false;
         if (lockedSupervisor !== null && v.supervisor !== lockedSupervisor) return false;
-        if (filters.from && v.updatedAt < filters.from) return false;
-        if (filters.to && v.updatedAt > filters.to) return false;
+        if (!inDateRange(v.deliveredAt ?? v.updatedAt, filters.from, filters.to)) return false;
         if (filters.branch && v.branch !== filters.branch) return false;
         if (filters.supervisor && v.supervisor !== filters.supervisor) return false;
         if (filters.client && v.client !== filters.client) return false;
@@ -124,7 +124,7 @@ function ReportsPage() {
     v.workerPhone ?? "—",
     v.reason ?? "—",
     v.status,
-    heDate.format(new Date(v.updatedAt)),
+    formatIsraelDate(v.deliveredAt ?? v.updatedAt),
   ]);
   const statusCol = headers.indexOf("סטטוס");
   const fuelCol = headers.indexOf("סוג דלק");
@@ -176,20 +176,10 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
 
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <FormField label="מתאריך">
-            <Input
-              type="date"
-              value={filters.from}
-              onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-              aria-label="מתאריך"
-            />
+            <IsraelDateInput value={filters.from} onChange={from => setFilters({ ...filters, from })} label="מתאריך" />
           </FormField>
           <FormField label="עד תאריך">
-            <Input
-              type="date"
-              value={filters.to}
-              onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-              aria-label="עד תאריך"
-            />
+            <IsraelDateInput value={filters.to} onChange={to => setFilters({ ...filters, to })} label="עד תאריך" />
           </FormField>
           <FormField label="סניף">
             {lockedBranch !== null ? (
@@ -289,12 +279,12 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
           </div>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 min-w-0 max-w-full md:overflow-x-auto">
           <Table>
             <TableHead>
               <TableRow>
                 {headers.map((h) => (
-                  <TableHeaderCell key={h} className="whitespace-nowrap">{h}</TableHeaderCell>
+                  <TableHeaderCell key={h} className="whitespace-nowrap md:min-w-32">{h}</TableHeaderCell>
                 ))}
               </TableRow>
             </TableHead>
@@ -308,8 +298,8 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
               ) : (
                 paged.slice.map((v, i) => (
                   <TableRow key={v.serial}>
-                    {cells[paged.offset + i]!.map((c, j) => (
-                      <TableCell key={j} className="whitespace-nowrap">
+                    {cells[paged.offset + i]?.map((c, j) => (
+                      <TableCell key={j} className="whitespace-nowrap md:min-w-32">
                         {j === statusCol ? (
                           <Badge variant={statusVariant[v.status]} size="md">{v.status}</Badge>
                         ) : j === fuelCol ? (

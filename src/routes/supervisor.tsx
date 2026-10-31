@@ -1,6 +1,6 @@
 import type { FuelType } from "@/components/fuel/fuel";
 import { publicVoucherUrl } from "@/lib/publicUrl";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   BadgeCheck,
@@ -39,7 +39,11 @@ import {
   type WorkerIssueItem,
 } from "@/store/appStore";
 import { ProducedLinks } from "@/components/production/ProducedLinks";
-import { issuanceAmountRules, issuanceAmountError } from "@/lib/issuanceInventory";
+import { issuanceAmountRules, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
+import { useLiveInventory } from "@/lib/useLiveInventory";
+import { fuelOf } from "@/components/fuel/fuel";
+import { centralPoolOf, pickExact } from "@/store/appStore";
+import { isAvailable } from "@/components/dashboard/voucherData";
 
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
@@ -80,6 +84,8 @@ function SupervisorPage() {
   const role = useAppStore((s) => s.role);
   const issueWorkerVoucher = useAppStore((s) => s.issueWorkerVoucher);
   const me = useCurrentUser();
+  const stockReady = useLiveInventory();
+  const stock = useAppStore(s => s.vouchers);
 
   const [employeeName, setEmployeeName] = useState("");
   const [blocks, setBlocks] = useState<Block[]>(() => [newBlock()]);
@@ -87,12 +93,28 @@ function SupervisorPage() {
   const [loading, setLoading] = useState(false);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const stockError = useMemo(() => {
+    const pool = role === "admin" ? centralPoolOf(stock) : stock.filter(v => isAvailable(v)
+      && v.status === "טרם שומש" && v.branch === me?.branch
+      && (role === "supervisor" ? v.supervisor === (me ? fullName(me) : "") : !v.supervisor));
+    let remaining = pool;
+    for (const block of blocks) {
+      if (!block.fuelType || !Number(block.amount) || issuanceAmountError(block.fuelType, Number(block.amount))) continue;
+      const picked = pickExact(remaining.filter(v => fuelOf(v) === block.fuelType), Number(block.amount));
+      if (!picked) return STOCK_SHORTAGE;
+      const ids = new Set(picked.map(v => v.serial));
+      remaining = remaining.filter(v => !ids.has(v.serial));
+    }
+    return null;
+  }, [stock, role, me, blocks]);
+  useEffect(() => { if (stockReady && stockError) toast.error(stockError); }, [stockReady, stockError]);
 
   const patch = (key: number, p: Partial<Block>) =>
     setBlocks((bs) => bs.map((b) => (b.key === key ? { ...b, ...p } : b)));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!me) return setError("לא נמצא משתמש מחובר");
     if (employeeName.trim().length < 2) return setError("יש למלא שם עובד");
     const items: WorkerIssueItem[] = [];
     for (const [i, b] of blocks.entries()) {
@@ -103,19 +125,17 @@ function SupervisorPage() {
       const fuelType = b.fuelType;
        const amountError = issuanceAmountError(fuelType, n);
        if (amountError) return setError(`לקוח ${i + 1}: ${amountError}`);
-      items.push(
-        b.mode === "b2b" && b.b2b
-          ? { amount: n, fuelType, reason: b.reason, route: "b2b", clientName: b.b2b.clientName, clientCode: b.b2b.clientCode, accountName: b.b2b.accountName, standard: b.b2b.standard }
-          : { amount: n, fuelType, reason: b.reason, route: "regular", clientName: b.regular!.clientName, clientCode: b.regular!.clientId, siteId: b.regular!.siteId, siteName: b.regular!.siteName, ...(b.regular!.standard ? { standard: b.regular!.standard } : {}) },
-      );
+      if (b.mode === "b2b" && b.b2b) items.push({ amount: n, fuelType, reason: b.reason, route: "b2b", clientName: b.b2b.clientName, clientCode: b.b2b.clientCode, accountName: b.b2b.accountName, standard: b.b2b.standard });
+      else if (b.regular) items.push({ amount: n, fuelType, reason: b.reason, route: "regular", clientName: b.regular.clientName, clientCode: b.regular.clientId, siteId: b.regular.siteId, siteName: b.regular.siteName, ...(b.regular.standard ? { standard: b.regular.standard } : {}) });
     }
     setError(null);
     setLoading(true);
     try {
       const created = await issueWorkerVoucher({
         employeeName: employeeName.trim(),
-        branch: me?.branch || "הנהלה",
-        ...(me ? { supervisor: fullName(me), requester: fullName(me) } : {}),
+        branch: me.branch || "הנהלה",
+        ...(role === "supervisor" ? { supervisor: fullName(me) } : {}),
+        requester: fullName(me),
         items,
       });
       if ("error" in created) {
@@ -180,9 +200,9 @@ function SupervisorPage() {
               הוספת לקוח
             </Button>
 
-            {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+            {error || stockError ? <p className="text-sm font-semibold text-danger">{error ?? stockError}</p> : null}
 
-            <Button type="submit" loading={loading} block>
+            <Button type="submit" loading={loading} disabled={!stockReady || !!stockError} block>
               <Send className="size-4" />
               הפקת לינק לעובד
             </Button>

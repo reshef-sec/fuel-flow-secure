@@ -1,5 +1,8 @@
 - No createServerFn/app-server code: backend logic lives in external-DB security-definer RPCs (src/lib/backend.ts) and the admin-accounts DB function, because the app must also deploy as a static Netlify SPA (STATIC_SPA build flag in vite.config.ts).
-- Employee issuance must await voucher and worker-link persistence before publishing the link or updating local success state, so unsaved links cannot be shared.
+- Employee issuance and physical allocations use transfer_voucher_stock, which verifies fuel steps and pool ownership and locks/transfers physical vouchers atomically; issuance inserts the worker link in the same transaction and never falls back to client upserts when the RPC is unavailable.
 - Employee issuance reloads physical stock for every role; imports use the admin-guarded store_voucher_codes RPC so confidential code columns need no client SELECT grant.
 - Dashboard and central allocation totals use the shared get_central_inventory_summary database RPC, refresh on entry/focus/interval and after successful writes, and never fall back to saved budgets or client sums; exact voucher selection still checks physical stock and awaits transfer persistence.
 - Inventory summary hooks keep page-local state, expose the shared derived totalAvailableBalance and ignore superseded responses; allocation dialogs explicitly refresh the parent after each saved fuel transfer so old requests cannot restore a pre-allocation balance, including partial success.
+- User display resolves authenticated profiles and matching live app-user names through userDisplay helpers; useCurrentUser must never impersonate a role-preview account.
+- Display dates through israelDate helpers and localized ISO-backed inputs; keep stored/filter date values in ISO format to preserve sorting.
+- Exact voucher combinations use the browser-safe inventorySelection module so physical selection can be regression-tested without importing UI or database clients.

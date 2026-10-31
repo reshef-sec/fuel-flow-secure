@@ -7,6 +7,8 @@ import { Modal } from "@/components/ui/Modal";
 import { FuelBreakdown, FuelSplitFields, emptySplit, fuelOf, readSplit, type FuelType } from "@/components/fuel/fuel";
 import { isAvailable } from "@/components/dashboard/voucherData";
 import { fullName, groupStock, pickExact, useAppStore } from "@/store/appStore";
+import { useLiveInventory } from "@/lib/useLiveInventory";
+import { STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 
 export function SupervisorAllocationDialog({
   open,
@@ -20,6 +22,7 @@ export function SupervisorAllocationDialog({
   branchBalance: number;
 }) {
   const users = useAppStore((s) => s.users);
+  const stockReady = useLiveInventory(open);
   const assignToSupervisor = useAppStore((s) => s.assignToSupervisor);
   const allVouchers = useAppStore((s) => s.vouchers);
   const free = allVouchers.filter((v) => v.branch === branch && !v.supervisor && isAvailable(v) && v.status === "טרם שומש");
@@ -31,6 +34,10 @@ export function SupervisorAllocationDialog({
   const [split, setSplit] = useState(emptySplit);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const currentSplit = readSplit(split);
+  const stockError = typeof currentSplit === "string" ? null : (["בנזין", "סולר"] as const).some(f =>
+    currentSplit[f] > 0 && !pickExact(free.filter(v => fuelOf(v) === f), currentSplit[f])) ? STOCK_SHORTAGE : null;
+  useEffect(() => { if (open && stockReady && stockError) toast.error(stockError); }, [open, stockReady, stockError]);
 
   useEffect(() => {
     if (!open) return;
@@ -40,7 +47,7 @@ export function SupervisorAllocationDialog({
     setLoading(false);
   }, [open]);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = readSplit(split);
     if (!supervisor) return setError("יש לבחור מפקח");
@@ -58,12 +65,14 @@ export function SupervisorAllocationDialog({
     }
     setError(null);
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      for (const f of ["בנזין", "סולר"] as const) if (parsed[f]) assignToSupervisor(branch, supervisor, parsed[f], f);
+    try {
+      for (const f of ["בנזין", "סולר"] as const) if (parsed[f]) {
+        const error = await assignToSupervisor(branch, supervisor, parsed[f], f);
+        if (error) { setError(error); toast.error(error); return; }
+      }
       onClose();
       toast.success(`הועברו ${numeric.toLocaleString("he-IL")} ₪ ל${supervisor}`);
-    }, 1000);
+    } finally { setLoading(false); }
   }
 
   return (
@@ -106,13 +115,13 @@ export function SupervisorAllocationDialog({
 
         <FuelSplitFields values={split} onChange={setSplit} available={avail} />
 
-        {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+        {error || stockError ? <p className="text-sm font-semibold text-danger">{error ?? stockError}</p> : null}
 
         <div className="flex flex-wrap justify-end gap-2 pt-1">
           <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
             ביטול
           </Button>
-          <Button type="submit" loading={loading}>
+          <Button type="submit" loading={loading} disabled={!stockReady || !!stockError || typeof currentSplit === "string"}>
             בצע הקצאה
           </Button>
         </div>

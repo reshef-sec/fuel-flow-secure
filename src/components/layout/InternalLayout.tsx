@@ -19,6 +19,7 @@ import {
 import { Logo, Select } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { useAuthContext } from "@/lib/auth-context";
+import { userDisplayName } from "@/lib/userDisplay";
 import { useIsSuperAdmin } from "@/lib/superAdmin";
 import { supabase } from "@/lib/supabaseClient";
 import { RealtimeNotifications } from "@/components/layout/RealtimeNotifications";
@@ -141,7 +142,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
             </button>
             <span className="hidden items-center gap-2 rounded-pill bg-surface-muted px-3 py-1.5 sm:flex">
               <UserCircle2 className="size-5 text-secondary" />
-              <span className="text-sm font-semibold text-secondary">{profile?.full_name || roleLabels[role]}</span>
+              <span className="text-sm font-semibold text-secondary">{userDisplayName(profile)}</span>
             </span>
             <button
               onClick={() => void supabase.auth.signOut()}

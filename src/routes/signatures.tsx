@@ -19,6 +19,7 @@ import {
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { supabase } from "@/lib/supabaseClient";
 import { useAppStore } from "@/store/appStore";
+import { formatIsraelDate } from "@/lib/israelDate";
 
 export const Route = createFileRoute("/signatures")({
   head: () => ({
@@ -45,12 +46,7 @@ interface SignatureRecord {
   signature: string;
 }
 
-const fmt = (iso: string) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-};
+const fmt = (iso: string) => formatIsraelDate(iso, true);
 
 function SignaturesPage() {
   const role = useAppStore((s) => s.role);

@@ -1,4 +1,5 @@
 import { Fuel } from "lucide-react";
+import { issuanceAmountRules, validateFuelSplit } from "@/lib/issuanceInventory";
 import { FormField, Input } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 
@@ -93,15 +94,15 @@ export function FuelSplitFields({
             label={<span className="inline-flex items-center gap-1.5"><FuelIcon fuel={f} className="size-4" />{fuelLabel(f)} (₪)</span>}
             hint={
               available
-                ? `זמין: ${available[f].toLocaleString("he-IL")} ₪ · בכפולות של 50 ₪`
-                : "בכפולות של 50 ₪"
+                 ? `זמין: ${available[f].toLocaleString("he-IL")} ₪ · ${issuanceAmountRules(f).hint}`
+                 : issuanceAmountRules(f).hint
             }
           >
             <Input
               aria-label={`סכום ${f}`}
               type="number"
               min={0}
-              step={50}
+               step={issuanceAmountRules(f).step}
               inputMode="numeric"
               value={values[f]}
               onChange={(e) => onChange({ ...values, [f]: e.target.value })}
@@ -124,11 +125,7 @@ export function FuelSplitFields({
 
 /** Validates a split; returns error text or the numeric amounts. */
 export function readSplit(values: Record<FuelType, string>): string | Record<FuelType, number> {
-  const out = { "בנזין": Number(values["בנזין"]) || 0, "סולר": Number(values["סולר"]) || 0 };
-  if (out["בנזין"] < 0 || out["סולר"] < 0) return "סכום לא תקין";
-  if (out["בנזין"] + out["סולר"] <= 0) return "יש להזין סכום לפחות לסוג דלק אחד";
-  if (out["בנזין"] % 50 || out["סולר"] % 50) return "הסכומים חייבים להיות בכפולות של 50 ₪";
-  return out;
+  return validateFuelSplit(values);
 }
 
 export const emptySplit = (): Record<FuelType, string> => ({ "בנזין": "", "סולר": "" });

@@ -41,7 +41,8 @@ export const voucherToRow = (v: VoucherRecord) => ({
 });
 const rowToVoucher = (r: Row, codes: Map<string, string>): VoucherRecord => {
   const v: Row = {
-    serial: r.serial, realCode: codes.get(String(r.serial)) ?? "", amount: r.amount, branch: r.branch, status: r.status,
+    serial: r.serial, realCode: codes.get(String(r.serial)) ?? "", amount: Number(r.amount),
+    branch: r.branch ?? "מאגר ראשי", status: r.status === "available" ? "טרם שומש" : r.status,
     fuelType: r.fuel_type === "סולר" ? "סולר" : "בנזין",
     updatedAt: r.updated_on, supervisor: s(r.supervisor), client: s(r.client), requester: s(r.requester),
     approver: s(r.approver), clientId: s(r.client_id), siteId: s(r.site_id), siteName: s(r.site_name),

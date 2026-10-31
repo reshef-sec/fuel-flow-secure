@@ -11,9 +11,7 @@ import { UsersPanel } from "@/components/settings/UsersPanel";
 import { ClientsPanel } from "@/components/settings/ClientsPanel";
 import { AuditPanel } from "@/components/settings/AuditPanel";
 import { B2bPanel } from "@/components/settings/B2bPanel";
-import { DemoPanel } from "@/components/settings/DemoPanel";
-import { useIsSuperAdmin } from "@/lib/superAdmin";
-import { FlaskConical, UploadCloud } from "lucide-react";
+import { UploadCloud } from "lucide-react";
 import { ImportPanel } from "@/components/settings/ImportPanel";
 
 
@@ -48,14 +46,12 @@ const tabs = [
 
 
 function SettingsPage() {
-  const [tab, setTab] = useState<string>(Route.useSearch().tab ?? "import");
-  const isSuper = useIsSuperAdmin();
-  const items = isSuper ? [...tabs, { id: "demo", label: "סביבת דמו", icon: FlaskConical }] : tabs;
+  const initialTab = Route.useSearch().tab;
+  const [tab, setTab] = useState<string>(tabs.some(t => t.id === initialTab) ? initialTab ?? "import" : "import");
 
   return (
     <InternalLayout title="הגדרות מערכת">
-      <Tabs items={items} value={tab} onChange={setTab} />
-      {isSuper && tab === "demo" ? <div className="mt-6"><DemoPanel /></div> : null}
+      <Tabs items={tabs} value={tab} onChange={setTab} />
       <div className="mt-6">
         {tab === "import" ? <ImportPanel /> : null}
         {tab === "reasons" ? <ReasonsPanel /> : null}

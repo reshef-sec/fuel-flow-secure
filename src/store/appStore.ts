@@ -2,12 +2,14 @@ import { FUEL_TYPES, fuelOf, type FuelType } from "@/components/fuel/fuel";
 import { create } from "zustand";
 import { toast } from "sonner";
 import {
-  b2bToRow, clientToRow, db, linkToRow, loadAll, loadIssuanceStock, requestToRow, run, userPatch, userToRow, voucherToRow,
+  b2bToRow, clientToRow, db, loadAll, loadIssuanceStock, requestToRow, run, userPatch, userToRow, voucherToRow,
 } from "@/lib/cloudSync";
 
 import { logActivity } from "@/lib/activityLog";
-import { persistWorkerIssue } from "@/lib/persistWorkerIssue";
-import { fuelStockError, issuanceAmountError } from "@/lib/issuanceInventory";
+import { fuelStockError, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
+import { transferInventory } from "@/lib/transferInventory";
+import { pickExact } from "@/lib/inventorySelection";
+export { pickExact } from "@/lib/inventorySelection";
 import { centralPoolOf, centralFuelLimitError } from "@/lib/centralInventory";
 import { notifyCentralInventoryChanged } from "@/lib/centralInventorySummary";
 export { centralPoolOf } from "@/lib/centralInventory";
@@ -113,12 +115,6 @@ export interface WorkerLink {
   locked?: boolean;
 }
 
-/** Splits an amount into 100 ₪ units plus one 50 ₪ unit for the remainder. */
-const denominations = (amount: number) => {
-  const out = Array<number>(Math.floor(amount / 100)).fill(100);
-  if (amount % 100 >= 50) out.push(50);
-  return out;
-};
 
 /** Central-pool vouchers still available for allocation. */
 
@@ -129,33 +125,15 @@ export function poolShortage(split: Record<"בנזין" | "סולר", number>, v
   for (const f of ["בנזין", "סולר"] as const) {
     if (!split[f]) continue;
     const pool = centralPoolOf(vouchers, f);
-    if (!pool.length) return "אין מלאי זמין עבור סוג דלק זה במאגר המרכזי";
+    const amountError = issuanceAmountError(f, split[f]);
+    if (amountError) return amountError;
+    if (!pool.length) return STOCK_SHORTAGE;
     if (!pickExact(pool, split[f]))
-      return `אין במאגר המרכזי שילוב שוברי ${f} בסכום ${split[f].toLocaleString("he-IL")} ₪. המלאי הזמין: ${groupStock(pool)}.`;
+      return `${STOCK_SHORTAGE}. המלאי הזמין: ${groupStock(pool)}.`;
   }
   return null;
 }
 
-/** Picks vouchers summing exactly to amount (largest first, with a small backtrack). */
-export function pickExact<T extends { amount: number }>(list: T[], amount: number): T[] | null {
-  const sorted = [...list].sort((a, b) => b.amount - a.amount);
-  const res: T[] = [];
-  const go = (i: number, left: number, depth: number): boolean => {
-    if (left === 0) return true;
-    if (i >= sorted.length || depth > 2000) return false;
-    const v = sorted[i]!;
-    if (v.amount <= left) {
-      res.push(v);
-      if (go(i + 1, left - v.amount, depth + 1)) return true;
-      res.pop();
-    }
-    // skip voucher only if the next one has a different value (avoid duplicate branches)
-    let j = i + 1;
-    while (j < sorted.length && sorted[j]!.amount === v.amount) j++;
-    return go(j, left, depth + 1);
-  };
-  return go(0, amount, 0) ? res : null;
-}
 
 /** "100 ₪ (15 שוברים), 50 ₪ (2 שוברים)" — stock grouped by face value. */
 export function groupStock(list: { amount: number }[]) {
@@ -246,7 +224,7 @@ interface AppState {
   /** Approves a request (full or custom amount) and allocates to the requester branch. */
   approveRequest: (id: string, amount: number, approver: string) => Promise<void>;
   rejectRequest: (id: string, approver: string) => void;
-  assignToSupervisor: (branch: string, supervisor: string, amount: number, fuelType?: FuelType) => void;
+  assignToSupervisor: (branch: string, supervisor: string, amount: number, fuelType?: FuelType) => Promise<string | null>;
   markPazRedeemed: (count: number) => number;
   /** Marks vouchers redeemed by serial numbers from the Paz feedback file. */
   markSerialsRedeemed: (serials: string[]) => number;
@@ -329,12 +307,16 @@ export const useAppStore = create<AppState>()(
   allocate: async (branch, supervisor, amount, meta) => {
     // Moves real vouchers out of the central pool; never creates nominal stock.
     const fuel = meta?.fuelType ?? "בנזין";
+    const amountError = issuanceAmountError(fuel, amount);
+    if (amountError) return amountError;
+    try { set({ vouchers: await loadIssuanceStock() }); }
+    catch { return "בדיקת המלאי נכשלה — ההקצאה לא בוצעה"; }
     const limitError = centralFuelLimitError({ "בנזין": fuel === "בנזין" ? amount : 0, "סולר": fuel === "סולר" ? amount : 0 }, get().vouchers);
     if (limitError) return limitError;
     const pool = centralPoolOf(get().vouchers, fuel);
-    if (!pool.length) return "אין מלאי זמין עבור סוג דלק זה במאגר המרכזי";
+    if (!pool.length) return STOCK_SHORTAGE;
     const pick = pickExact(pool, amount);
-    if (!pick) return `אין במאגר המרכזי שילוב שוברי ${fuel} בסכום ${amount.toLocaleString("he-IL")} ₪. המלאי הזמין: ${groupStock(pool)}.`;
+    if (!pick) return `${STOCK_SHORTAGE}. המלאי הזמין: ${groupStock(pool)}.`;
     const ids = new Set(pick.map((v) => v.serial));
     const changed: VoucherRecord[] = [];
     const vouchers = get().vouchers.map((v) => {
@@ -351,19 +333,26 @@ export const useAppStore = create<AppState>()(
       return nv;
     });
     const balance = Math.max(0, get().balance - amount);
-    const { error } = await db.from("vouchers").upsert(changed.map(voucherToRow));
-    if (error) return `שמירת ההקצאה נכשלה: ${error.message}`;
+    try {
+      await transferInventory([{ amount, fuel_type: fuel, serials: pick.map(v => v.serial), details: { requester: meta?.requester, approver: meta?.approver } }], branch, supervisor);
+    } catch (error) { return error instanceof Error ? error.message : "שמירת ההקצאה נכשלה"; }
     set((state) => ({ balance, vouchers: state.vouchers.map(v => changed.find(c => c.serial === v.serial) ?? v) }));
     notifyCentralInventoryChanged();
     run(db.from("app_settings").update({ balance }).eq("key", "main"));
     logActivity(actorOf(get()), "הקצאת שוברים", `${branch}${supervisor ? ` (${supervisor})` : ""} · ${fuel} · ${amount} ₪`);
     return null;
   },
-  assignToSupervisor: (branch, supervisor, amount, fuelType) => {
+  assignToSupervisor: async (branch, supervisor, amount, fuelType = "בנזין") => {
+    const amountError = issuanceAmountError(fuelType, amount);
+    if (amountError) return amountError;
+    try { set({ vouchers: await loadIssuanceStock() }); }
+    catch { return "בדיקת המלאי נכשלה — ההקצאה לא בוצעה"; }
     const candidates = get().vouchers.filter(
       (v) => v.branch === branch && !v.supervisor && v.status === "טרם שומש" && (!fuelType || fuelOf(v) === fuelType),
     );
-    const picked = new Set((pickExact(candidates, amount) ?? []).map((v) => v.serial));
+    const selection = pickExact(candidates, amount);
+    if (!selection) return STOCK_SHORTAGE;
+    const picked = new Set(selection.map((v) => v.serial));
     const changed: VoucherRecord[] = [];
     const vouchers = get().vouchers.map((v) => {
       if (!picked.has(v.serial)) return v;
@@ -371,24 +360,12 @@ export const useAppStore = create<AppState>()(
       changed.push(nv);
       return nv;
     });
+    try { await transferInventory([{ amount, fuel_type: fuelType, serials: [...picked] }], branch, supervisor); }
+    catch (error) { return error instanceof Error ? error.message : "שמירת ההקצאה נכשלה"; }
     set({ vouchers });
-    if (!changed.length) return;
-    logActivity(actorOf(get()), "הקצאה למפקח", `${supervisor} · ${fuelType ?? "בנזין"} · ${changed.reduce((t, v) => t + v.amount, 0)} ₪`);
-    const nid = get().users.find((u) => fullName(u) === supervisor)?.id;
-    void (async () => {
-      let supervisorId: string | undefined;
-      if (nid) {
-        try {
-          const { lookupAuthId } = await import("@/lib/backend");
-          supervisorId = (await lookupAuthId({ data: { nationalId: nid } })).id ?? undefined;
-        } catch {
-          /* tag stays empty; supervisor will not see these until fixed */
-        }
-      }
-      const tagged = changed.map((v) => ({ ...v, ...(supervisorId ? { supervisorId } : {}) }));
-      set((s) => ({ vouchers: s.vouchers.map((v) => tagged.find((t) => t.serial === v.serial) ?? v) }));
-      run(db.from("vouchers").upsert(tagged.map(voucherToRow)));
-    })();
+    notifyCentralInventoryChanged();
+    logActivity(actorOf(get()), "הקצאה למפקח", `${supervisor} · ${fuelType} · ${amount} ₪`);
+    return null;
   },
   markPazRedeemed: (count) => {
     let left = count;
@@ -663,7 +640,7 @@ export const useAppStore = create<AppState>()(
     for (const item of p.items) {
       const list = byFuel.get(item.fuelType) ?? [];
       const picked = pickExact(list, item.amount);
-      if (!picked) return { error: `אין במלאי שוברים בסכום זה. המלאי הזמין כעת בסוג דלק זה: ${groupStock(list)}.` };
+      if (!picked) return { error: `${STOCK_SHORTAGE}. המלאי הזמין כעת בסוג דלק זה: ${groupStock(list)}.` };
       const serials = new Set(picked.map(v => v.serial));
       byFuel.set(item.fuelType, list.filter(v => !serials.has(v.serial)));
       chosen.push(picked);
@@ -711,10 +688,12 @@ export const useAppStore = create<AppState>()(
     };
     const bySerial = new Map(out.map((v) => [v.serial, v]));
     try {
-      await persistWorkerIssue(
-        () => db.from("vouchers").upsert(out.map(voucherToRow)),
-        () => db.from("worker_links").insert(linkToRow(link)),
-      );
+      await transferInventory(p.items.map((item, index) => ({
+        amount: item.amount, fuel_type: item.fuelType, serials: (chosen[index] ?? []).map(v => v.serial),
+        details: { client: item.clientName, client_id: item.clientCode, client_code: item.clientCode,
+          account_name: item.accountName, standard: item.standard, site_id: item.siteId,
+          site_name: item.siteName, route: item.route, reason: item.reason, requester: p.requester },
+      })), p.branch, p.supervisor, { id: linkId, employee_name: p.employeeName });
     } catch (err) {
       // Reload stock if only the voucher write succeeded. Never expose an unsaved link.
       await get().loadFromCloud().catch(() => undefined);
@@ -731,6 +710,7 @@ export const useAppStore = create<AppState>()(
       };
     });
     logActivity(actorOf(get()), "הנפקת שובר לעובד", `קישור ${link.id} · ${link.total} ₪`);
+    notifyCentralInventoryChanged();
     return link;
   },
 
@@ -768,12 +748,9 @@ export function pickCurrentUser(users: UserRecord[], role: Role) {
 
 export function useCurrentUser() {
   const users = useAppStore((s) => s.users);
-  const role = useAppStore((s) => s.role);
   const nid = useAppStore((s) => s.myNationalId);
   const mine = nid ? users.find((u) => u.id === nid) : undefined;
-  // The signed-in person, unless the super admin is previewing another role.
-  if (mine && mine.role === role) return mine;
-  return pickCurrentUser(users, role);
+  return mine;
 }
 
 export { MAIN_POOL };
@@ -784,6 +761,6 @@ export const currentActor = () => actorOf(useAppStore.getState());
 
 function actorOf(st: AppState) {
   const mine = st.myNationalId ? st.users.find((u) => u.id === st.myNationalId) : undefined;
-  const u = mine ?? pickCurrentUser(st.users, st.role);
+  const u = mine;
   return { name: u ? fullName(u) : "", role: st.role };
 }
