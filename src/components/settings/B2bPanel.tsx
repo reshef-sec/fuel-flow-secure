@@ -59,7 +59,7 @@ export function B2bPanel() {
   const filtered = useMemo(() => {
     const q = query.trim();
     if (!q) return rows;
-    return rows.filter((r) => Object.values(r).some((v) => v.includes(q)));
+    return rows.filter((r) => Object.values(r).some((v) => String(v ?? "").includes(q)));
   }, [rows, query]);
 
   async function handleFiles(files: FileList | null) {
@@ -76,13 +76,16 @@ export function B2bPanel() {
         toast.error(`לא נמצאה שורת כותרות. עמודות: ${cols.join(", ")}`);
         return;
       }
-      const header = all[headerIdx]!.map(norm);
+      const header = (all[headerIdx] ?? []).map(norm);
       const index = Object.fromEntries(columns.map((c) => [c.key, header.indexOf(norm(c.label))]));
       const parsed = all
         .slice(headerIdx + 1)
         .map((r) => {
           const row = {} as Record<Key, string>;
-          for (const c of columns) row[c.key] = index[c.key]! >= 0 ? String(r[index[c.key]!] ?? "").trim() : "";
+          for (const c of columns) {
+            const position = index[c.key];
+            row[c.key] = position !== undefined && position >= 0 ? String(r[position] ?? "").trim() : "";
+          }
           return row as unknown as B2BClientRecord;
         })
         .filter((r) => r.clientCode && r.accountName);
@@ -90,10 +93,10 @@ export function B2bPanel() {
         toast.error(`לא נמצאו שורות תקינות. עמודות: ${cols.join(", ")}`);
         return;
       }
-      const { added, updated } = importB2b(parsed);
-      toast.success(`נוספו ${added} חדשים, ${updated} סומנו כלא פעילים`);
-    } catch {
-      toast.error("קריאת הקובץ נכשלה");
+      const { added, updated, deactivated } = await importB2b(parsed);
+      toast.success(`נוספו ${added} חדשים, ${updated} עודכנו, ${deactivated} סומנו כלא פעילים`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "סנכרון הקובץ נכשל");
     }
   }
 

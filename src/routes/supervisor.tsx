@@ -44,6 +44,9 @@ import { useLiveInventory } from "@/lib/useLiveInventory";
 import { fuelOf } from "@/components/fuel/fuel";
 import { centralPoolOf, pickExact } from "@/store/appStore";
 import { isAvailable } from "@/components/dashboard/voucherData";
+import { isActiveClient } from "@/lib/importIntegrity";
+import { supabase } from "@/lib/supabaseClient";
+import { b2bToRow, clientToRow } from "@/lib/cloudSync";
 
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
@@ -269,11 +272,30 @@ function ClientBlock({
   const nonB2b = useAppStore((s) => s.nonB2bClients);
   const reasons = useAppStore((s) => s.reasons);
   const { mode, search, b2b, regular } = block;
+  const [activeKeys, setActiveKeys] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setActiveKeys(null);
+    const table = mode === "b2b" ? "b2b_clients" : "regular_clients";
+    const columns = mode === "b2b" ? "client_code,account_name" : "client_id,site_id";
+    void (async () => {
+      const keys = new Set<string>();
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase.from(table).select(columns).eq("is_active", true).range(from, from + 999);
+        if (error) throw error;
+        for (const row of (data ?? []) as unknown as Record<string, unknown>[]) keys.add(JSON.stringify(mode === "b2b" ? [row.client_code, row.account_name] : [row.client_id, row.site_id]));
+        if (!data || data.length < 1000) break;
+      }
+      if (!cancelled) setActiveKeys(keys);
+    })().catch(() => { /* Fail closed; inactive or unverified clients are never offered. */ });
+    return () => { cancelled = true; };
+  }, [mode, b2bClients, nonB2b]);
+  const verifiedActive = (c: B2BClientRecord | ClientRecord) => isActiveClient(c) && Boolean(activeKeys?.has(JSON.stringify("accountName" in c ? [c.clientCode,c.accountName] : [c.clientId,c.siteId])));
 
   // Inactive clients (missing from the last import) are never offered.
   const allowedB2b = useMemo(
-    () => b2bClients.filter((c) => c.isActive !== false && (role === "admin" || c.branch === branch)),
-    [b2bClients, role, branch],
+    () => b2bClients.filter((c) => verifiedActive(c) && (role === "admin" || c.branch === branch)),
+    [b2bClients, role, branch, activeKeys],
   );
   const modeReasons = reasons.filter((r) => r.category === (mode === "b2b" ? "B2B" : "Regular"));
   const selected = mode === "b2b" ? b2b : regular;
@@ -283,8 +305,8 @@ function ClientBlock({
     const q = search.trim();
     if (!q || selected) return [];
     if (mode === "b2b") return allowedB2b.filter((c) => c.clientName.includes(q) || c.accountName.includes(q)).slice(0, 8);
-    return nonB2b.filter((c) => c.isActive !== false && (c.clientName.includes(q) || c.siteName.includes(q))).slice(0, 8);
-  }, [search, selected, mode, allowedB2b, nonB2b]);
+    return nonB2b.filter((c) => verifiedActive(c) && (c.clientName.includes(q) || c.siteName.includes(q))).slice(0, 8);
+  }, [search, selected, mode, allowedB2b, nonB2b, activeKeys]);
 
   return (
     <div className="space-y-4 rounded-xl border border-border p-4">

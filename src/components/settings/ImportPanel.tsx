@@ -21,6 +21,7 @@ import { FuelBadge, parseFuelType } from "@/components/fuel/fuel";
 import { Pager, usePaged } from "@/components/ui/Pager";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { validateStockSheet } from "@/lib/validateStockSheet";
+import { partitionStockRows } from "@/lib/importIntegrity";
 import { useAppStore } from "@/store/appStore";
 
 const templateColumns = [
@@ -132,13 +133,14 @@ export function ImportPanel() {
       const all = await parseSheetFile(file);
       const checked = validateStockSheet(all, new Set(vouchers.map((v) => v.serial)));
       if (typeof checked === "string") return void toast.error(`קובץ אקסל אינו תואם לתבנית הנדרשת. ${checked}`);
-      const raw = checked;
+      const { accepted: raw, skipped: localSkipped } = partitionStockRows(checked, new Set(vouchers.map(v => v.serial)));
+      if (!raw.length) return void toast.info(`לא נוספו שוברים · ${localSkipped} כרטיסים כפולים דולגו`);
       const today = new Date().toISOString().slice(0, 10);
       const parsed = raw.map((r) => ({
           v: {
-            serial: r[0]!.trim(),
-            realCode: r[1]!.trim(),
-            amount: Number(r[2]!.replace(/[₪,\s]/g, "")),
+            serial: String(r[0] ?? "").trim(),
+            realCode: String(r[1] ?? "").trim(),
+            amount: Number(String(r[2] ?? "").replace(/[₪,\s]/g, "")),
             branch: MAIN_POOL,
             status: "טרם שומש" as const,
             updatedAt: today,
@@ -146,12 +148,12 @@ export function ImportPanel() {
           },
           validUntil: String(r[4] ?? "").trim(),
         }));
-      importVouchers(parsed.map((p) => p.v));
+      const result = await importVouchers(parsed.map((p) => p.v));
       setValidity((m) => ({ ...m, ...Object.fromEntries(parsed.map((p) => [p.v.serial, p.validUntil])) }));
-      setRecent(parsed.map((p) => p.v.serial));
-      toast.success(`הקובץ "${file.name}" נטען · ${parsed.length} שוברים נוספו למאגר`);
-    } catch {
-      toast.error("קריאת הקובץ נכשלה. יש לוודא שהקובץ תקין");
+      setRecent(result.serials);
+      toast.success(`נוספו ${result.added} שוברים · ${result.skipped + localSkipped} כרטיסים כפולים דולגו`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ייבוא הקובץ נכשל");
     }
   }
 
@@ -163,11 +165,11 @@ export function ImportPanel() {
       const raw = stripHeader(await parseSheetFile(file), "כרטיס");
       const serials = raw.map((r) => String(r[0] ?? "").trim()).filter(Boolean);
       if (!serials.length) return void toast.error("לא נמצאו מספרי כרטיסים בקובץ");
-      const updated = markSerialsRedeemed(serials);
+      const updated = await markSerialsRedeemed(serials);
       if (!updated) return void toast.info("מספרי הכרטיסים בקובץ לא נמצאו במאגר או שכבר מומשו");
-      toast.success(`היזון חוזר נטען · ${updated} שוברים עודכנו ל"מומש"`);
-    } catch {
-      toast.error("קריאת הקובץ נכשלה. יש לוודא שהקובץ תקין");
+      toast.success(`היזון חוזר נטען · ${updated} שוברים עודכנו ל"מומש בפועל"`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ייבוא היזון חוזר נכשל");
     }
   }
 
@@ -217,7 +219,7 @@ export function ImportPanel() {
           </div>
           <DropZone
             title="גרור קובץ מימושים לכאן"
-            hint='התאמה לפי מספר כרטיס (עמודה A) · עדכון ל"מומש"'
+            hint='התאמה לפי מספר כרטיס (עמודה A) · עדכון ל"מומש בפועל"'
             button="בחירת קובץ"
             icon={RefreshCcw}
             tone="accent"
