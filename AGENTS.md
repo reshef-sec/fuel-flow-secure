@@ -6,3 +6,4 @@
 - User display resolves authenticated profiles and matching live app-user names through userDisplay helpers; useCurrentUser must never impersonate a role-preview account.
 - Display dates through israelDate helpers and localized ISO-backed inputs; keep stored/filter date values in ISO format to preserve sorting.
 - Exact voucher combinations use the browser-safe inventorySelection module so physical selection can be regression-tested without importing UI or database clients.
+- Branch terminology and assignment suffixes use branchLabels presentation helpers; preserve legacy stored pool identifiers, transfer targets and authorization checks rather than renaming stock for a UI-only change.

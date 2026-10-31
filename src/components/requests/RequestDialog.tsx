@@ -5,6 +5,7 @@ import { Button, FormField, Input, Textarea } from "@/design-system/delek-1ea111
 import { Modal } from "@/components/ui/Modal";
 import { FuelSplitFields, emptySplit, readSplit } from "@/components/fuel/fuel";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
+import { branchLabel } from "@/lib/branchLabels";
 
 /** Lets an authorized user submit a voucher request for admin approval. */
 export function RequestDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -51,7 +52,7 @@ export function RequestDialog({ open, onClose }: { open: boolean; onClose: () =>
       <form onSubmit={submit} className="space-y-5">
         <div className="rounded-lg bg-surface-muted p-4 text-sm">
           <p className="font-semibold text-secondary">{me ? fullName(me) : "—"}</p>
-          <p className="text-muted-foreground">סניף {me?.branch ?? "—"}</p>
+          <p className="text-muted-foreground">סניף {me?.branch ? branchLabel(me.branch) : "—"}</p>
         </div>
 
         <FuelSplitFields values={split} onChange={setSplit} />
