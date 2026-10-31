@@ -2,7 +2,7 @@ import { FUEL_TYPES, fuelOf, type FuelType } from "@/components/fuel/fuel";
 import { create } from "zustand";
 import { toast } from "sonner";
 import {
-  b2bToRow, clientToRow, db, linkToRow, loadAll, loadIssuanceStock, requestToRow, run, userPatch, userToRow, voucherToRow,
+  b2bToRow, clientToRow, db, loadAll, loadIssuanceStock, requestToRow, run, userPatch, userToRow, voucherToRow,
 } from "@/lib/cloudSync";
 
 import { logActivity } from "@/lib/activityLog";
@@ -748,7 +748,6 @@ export function pickCurrentUser(users: UserRecord[], role: Role) {
 
 export function useCurrentUser() {
   const users = useAppStore((s) => s.users);
-  const role = useAppStore((s) => s.role);
   const nid = useAppStore((s) => s.myNationalId);
   const mine = nid ? users.find((u) => u.id === nid) : undefined;
   return mine;

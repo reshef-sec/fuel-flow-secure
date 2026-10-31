@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { Pager, usePaged } from "@/components/ui/Pager";
-import { downloadCsv, heDate } from "@/components/dashboard/statusVariant";
+import { downloadCsv } from "@/components/dashboard/statusVariant";
 import type { VoucherRecord } from "@/components/dashboard/voucherData";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 import { formatIsraelDate, inDateRange } from "@/lib/israelDate";

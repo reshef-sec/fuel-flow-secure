@@ -3,8 +3,8 @@ import { STOCK_SHORTAGE } from "./issuanceInventory";
 /** Bounded exact change, using each physical voucher at most once. */
 export function pickExact<T extends { amount: number }>(list: T[], amount: number): T[] | null {
   if (!Number.isSafeInteger(amount) || amount <= 0) return null;
-  const paths = new Map<number, { card: T; previous: number }>();
-  paths.set(0, { card: list[0] as T, previous: 0 });
+  const paths = new Map<number, { card: T; previous: number } | null>();
+  paths.set(0, null);
   for (const card of list) {
     if (!Number.isSafeInteger(card.amount) || card.amount <= 0) continue;
     for (const sum of [...paths.keys()].sort((a, b) => b - a)) {

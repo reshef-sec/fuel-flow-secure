@@ -1,6 +1,6 @@
 import type { FuelType } from "@/components/fuel/fuel";
 import { publicVoucherUrl } from "@/lib/publicUrl";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   BadgeCheck,
@@ -114,6 +114,7 @@ function SupervisorPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!me) return setError("לא נמצא משתמש מחובר");
     if (employeeName.trim().length < 2) return setError("יש למלא שם עובד");
     const items: WorkerIssueItem[] = [];
     for (const [i, b] of blocks.entries()) {
@@ -124,19 +125,17 @@ function SupervisorPage() {
       const fuelType = b.fuelType;
        const amountError = issuanceAmountError(fuelType, n);
        if (amountError) return setError(`לקוח ${i + 1}: ${amountError}`);
-      items.push(
-        b.mode === "b2b" && b.b2b
-          ? { amount: n, fuelType, reason: b.reason, route: "b2b", clientName: b.b2b.clientName, clientCode: b.b2b.clientCode, accountName: b.b2b.accountName, standard: b.b2b.standard }
-          : { amount: n, fuelType, reason: b.reason, route: "regular", clientName: b.regular!.clientName, clientCode: b.regular!.clientId, siteId: b.regular!.siteId, siteName: b.regular!.siteName, ...(b.regular!.standard ? { standard: b.regular!.standard } : {}) },
-      );
+      if (b.mode === "b2b" && b.b2b) items.push({ amount: n, fuelType, reason: b.reason, route: "b2b", clientName: b.b2b.clientName, clientCode: b.b2b.clientCode, accountName: b.b2b.accountName, standard: b.b2b.standard });
+      else if (b.regular) items.push({ amount: n, fuelType, reason: b.reason, route: "regular", clientName: b.regular.clientName, clientCode: b.regular.clientId, siteId: b.regular.siteId, siteName: b.regular.siteName, ...(b.regular.standard ? { standard: b.regular.standard } : {}) });
     }
     setError(null);
     setLoading(true);
     try {
       const created = await issueWorkerVoucher({
         employeeName: employeeName.trim(),
-        branch: me?.branch || "הנהלה",
-        ...(me ? { supervisor: fullName(me), requester: fullName(me) } : {}),
+        branch: me.branch || "הנהלה",
+        ...(role === "supervisor" ? { supervisor: fullName(me) } : {}),
+        requester: fullName(me),
         items,
       });
       if ("error" in created) {
