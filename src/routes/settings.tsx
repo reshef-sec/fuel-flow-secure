@@ -13,6 +13,7 @@ import { AuditPanel } from "@/components/settings/AuditPanel";
 import { B2bPanel } from "@/components/settings/B2bPanel";
 import { UploadCloud } from "lucide-react";
 import { ImportPanel } from "@/components/settings/ImportPanel";
+import { DevelopmentPanel } from "@/components/settings/DevelopmentPanel";
 
 
 export const Route = createFileRoute("/settings")({
@@ -61,7 +62,7 @@ function SettingsPage() {
         {tab === "b2b" ? <B2bPanel /> : null}
         {tab === "audit" ? <AuditPanel /> : null}
       </div>
-
+      <DevelopmentPanel />
     </InternalLayout>
   );
 }

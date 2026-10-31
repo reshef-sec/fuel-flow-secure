@@ -1,4 +1,6 @@
 # Roadmap — master system update
+- [x] Restore development tools with database-verified Maya UUID, fail-closed DOM hiding, demo inventory generation and typed reset confirmation; provide external-database installation SQL without executing resets.
+- [ ] Install development-tools SQL in the external database and verify Maya/other-admin/supervisor access and real demo/reset workflows (blocker: user installs SQL; external authenticated session unavailable).
 - [x] Priority B: unified central-pool display labels without changing stored stock names; no SQL cleanup required.
 - [x] Priority B: deduplicated assignments/report branch options, spacious issuance fields, removed 300 placeholder and exact helper copy.
 - [x] Priority B: single-line scrollable settings tabs; published badge already hidden and absent in available localhost view; 28 regression tests passed and latest build OK.
