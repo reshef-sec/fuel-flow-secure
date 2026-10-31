@@ -376,7 +376,7 @@ export function UsersPanel() {
             >
               {branchNames.map((b) => (
                 <option key={b} value={b}>
-                  {b}
+                  {branchLabel(b)}
                 </option>
               ))}
             </Select>
