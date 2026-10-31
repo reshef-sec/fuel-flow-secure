@@ -1,9 +1,11 @@
 # Roadmap — master system update
-- [ ] Priority A: real authenticated names, secure login copy and icon spacing.
-- [ ] Priority A: petrol 100 / diesel 50 steps and fresh physical stock checks with disabled submission.
-- [ ] Priority A: Israeli date displays/filters and complete report columns.
-- [ ] Priority A: remove demo generators/fallbacks; do not delete live records without identifying them.
-- [ ] Priority A: run regression tests and verify available browser flows.
+- [x] Priority A: real authenticated name resolution, secure login copy and icon spacing.
+- [x] Priority A: petrol 100 / diesel 50 steps, exact physical selection, live checks and disabled submission; transfer RPC integration fails closed until installed.
+- [x] Priority A: Israeli date displays/filters, Israel-time timestamps and scrollable complete report columns.
+- [x] Priority A: remove demo generator/tab and artificial report card splitting; remove role-preview identity fallback.
+- [x] Priority A: 28 regression tests passed; login verified desktop/mobile without overlap, overflow or runtime errors; latest build OK.
+- [ ] Priority A: install production_priority_a_v2.sql in external database and verify atomic transfers/issuance with authenticated live data (blocker: external DB setup and no authenticated session).
+- [ ] Priority A: identify and remove previously saved demo records, preserving genuine operational data (blocker: external database records unavailable for safe inspection).
 - [x] Remove the nominal demo balance and bind both screens and the dialog to the shared totalAvailableBalance; refresh after each saved fuel transfer (15 tests passed; authenticated end-to-end check remains blocked below).
 - [x] Provide secure get_central_inventory_summary SQL and connect dashboard/allocation totals directly to it, refreshing after saved transfers (14 tests passed).
 - [x] User reports get_central_inventory_summary installed in the external database.
@@ -11,7 +13,7 @@
 - [x] Synchronize allocation totals and fuel breakdown with dashboard physical inventory; refresh stock before allocation and test limits (11 tests passed).
 - [ ] Verify central allocation while signed in to the external application (blocker: no available authenticated browser session).
 - [x] Provide safe voucher_codes permission SQL for the external database.
-- [x] Validate live physical stock and enforce 50 NIS issuance steps for both petrol and diesel.
+- [x] Validate live physical stock and enforce petrol 100 / diesel 50 NIS issuance steps.
 - [ ] Apply voucher_codes_permissions_v3.sql and verify signed-in import/issuance (blocker: user runs SQL in external database).
 - [x] Recover the newly issued missing employee link and await persistence before displaying issuance success.
 - [x] Stage 1: renames, dashboard, role column in requests
