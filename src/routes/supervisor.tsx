@@ -368,18 +368,18 @@ function ClientBlock({
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <FormField label="סוג דלק">
+      <div className="grid min-w-0 gap-x-4 gap-y-5 sm:grid-cols-2">
+        <FormField label="סוג דלק" className="min-w-0">
           <Select aria-label="בחר סוג דלק" value={block.fuelType} onChange={(e) => onChange({ fuelType: e.target.value as FuelType })}>
             <option value="">בחר סוג דלק…</option>
             <option value="בנזין">בנזין 95</option>
             <option value="סולר">סולר</option>
           </Select>
         </FormField>
-        <FormField label="סכום (₪)" hint={amountRules.hint}>
-          <Input aria-label="סכום" type="number" min={amountRules.min} step={amountRules.step} inputMode="numeric" value={block.amount} onChange={(e) => onChange({ amount: e.target.value })} placeholder="300" className="tabular-nums" />
+        <FormField label="סכום (₪)" hint={block.fuelType ? amountRules.hint : undefined} className="min-w-0">
+          <Input aria-label="סכום" type="number" min={amountRules.min} step={amountRules.step} inputMode="numeric" value={block.amount} onChange={(e) => onChange({ amount: e.target.value })} className="min-w-0 tabular-nums" />
         </FormField>
-        <FormField label="סיבת הנפקה">
+        <FormField label="סיבת הנפקה" className="min-w-0 sm:col-span-2">
           <Select aria-label="בחר סיבת הנפקה" value={block.reason} onChange={(e) => onChange({ reason: e.target.value })}>
             <option value="">בחר סיבה…</option>
             {modeReasons.map((r) => (

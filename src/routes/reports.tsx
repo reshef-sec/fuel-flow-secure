@@ -10,6 +10,8 @@ import { Pager, usePaged } from "@/components/ui/Pager";
 import { B2bReport } from "@/components/reports/B2bReport";
 import { IsraelDateInput } from "@/components/ui/IsraelDateInput";
 import { formatIsraelDate, inDateRange } from "@/lib/israelDate";
+import { branchLabel, branchOptions } from "@/lib/branchLabels";
+import { MAIN_POOL } from "@/components/dashboard/voucherData";
 import {
   Badge,
   Button,
@@ -61,6 +63,7 @@ function ReportsPage() {
   const role = useAppStore((s) => s.role);
   const me = useCurrentUser();
   const [filters, setFilters] = useState(empty);
+  const branches = branchOptions([MAIN_POOL, ...branchList.map(b => b.name)]);
 
   // Branch managers are locked to their own branch — no "all branches" option.
   const lockedBranch = role === "admin" ? null : (me?.branch ?? "");
@@ -87,7 +90,7 @@ function ReportsPage() {
         if (lockedBranch && v.branch !== lockedBranch) return false;
         if (lockedSupervisor !== null && v.supervisor !== lockedSupervisor) return false;
         if (!inDateRange(v.deliveredAt ?? v.updatedAt, filters.from, filters.to)) return false;
-        if (filters.branch && v.branch !== filters.branch) return false;
+        if (filters.branch && branchLabel(v.branch) !== filters.branch) return false;
         if (filters.supervisor && v.supervisor !== filters.supervisor) return false;
         if (filters.client && v.client !== filters.client) return false;
         if (filters.status && v.status !== filters.status) return false;
@@ -184,7 +187,7 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
           <FormField label="סניף">
             {lockedBranch !== null ? (
               <Select value={lockedBranch} onChange={() => {}} aria-label="סניף" disabled>
-                <option value={lockedBranch}>{lockedBranch || "—"}</option>
+                <option value={lockedBranch}>{lockedBranch ? branchLabel(lockedBranch) : "—"}</option>
               </Select>
             ) : (
               <Select
@@ -193,10 +196,9 @@ th,td{border:1px solid #cbd5e1;padding:6px;text-align:right}th{background:#e8f0f
                 aria-label="סניף"
               >
                 <option value="">כל הסניפים</option>
-                <option value="מאגר ראשי">מאגר ראשי</option>
-                {branchList.map((b) => (
-                  <option key={b.id} value={b.name}>
-                    {b.name}
+                {branches.map((b) => (
+                  <option key={b.label} value={b.label}>
+                    {b.label}
                   </option>
                 ))}
               </Select>

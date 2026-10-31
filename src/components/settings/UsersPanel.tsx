@@ -20,6 +20,7 @@ import { Modal } from "@/components/ui/Modal";
 import { deleteAccount, resetAccountPassword, syncAccount } from "@/lib/backend";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
+import { branchLabel } from "@/lib/branchLabels";
 
 const roleFromLabel = (value: string): Role => {
   const v = value.trim();
@@ -270,7 +271,7 @@ export function UsersPanel() {
           <TableBody>
             {rows.map((u) => (
               <TableRow key={u.id}>
-                <TableCell>{u.branch}</TableCell>
+                <TableCell>{u.branch ? branchLabel(u.branch) : "—"}</TableCell>
                 <TableCell className="tabular-nums">{u.id}</TableCell>
                 <TableCell className="font-semibold">{u.lastName}</TableCell>
                 <TableCell>{u.firstName}</TableCell>
@@ -375,7 +376,7 @@ export function UsersPanel() {
             >
               {branchNames.map((b) => (
                 <option key={b} value={b}>
-                  {b}
+                  {branchLabel(b)}
                 </option>
               ))}
             </Select>

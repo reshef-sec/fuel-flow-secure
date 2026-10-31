@@ -19,6 +19,7 @@ import { Modal } from "@/components/ui/Modal";
 import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { useAppStore, type B2BClientRecord } from "@/store/appStore";
+import { branchLabel } from "@/lib/branchLabels";
 
 type Key = Exclude<keyof B2BClientRecord, "isActive">;
 /** Exact Excel column order (RTL). */
@@ -205,7 +206,7 @@ export function B2bPanel() {
                 <TableRow key={`${r.clientCode}|${r.accountName}`} className={r.isActive === false ? "opacity-50" : undefined} title={r.isActive === false ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}>
                   {columns.map((c) => (
                     <TableCell key={c.key} className="whitespace-nowrap">
-                      {r[c.key] || "—"}
+                      {c.key === "branch" && r.branch ? branchLabel(r.branch) : r[c.key] || "—"}
                     </TableCell>
                   ))}
                   <TableCell>
@@ -252,7 +253,7 @@ export function B2bPanel() {
               <option value="">בחר סניף…</option>
               {branchList.map((b) => (
                 <option key={b.id} value={b.name}>
-                  {b.name}
+                  {branchLabel(b.name)}
                 </option>
               ))}
             </Select>

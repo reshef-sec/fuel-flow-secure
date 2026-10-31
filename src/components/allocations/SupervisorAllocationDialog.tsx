@@ -9,6 +9,7 @@ import { isAvailable } from "@/components/dashboard/voucherData";
 import { fullName, groupStock, pickExact, useAppStore } from "@/store/appStore";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { STOCK_SHORTAGE } from "@/lib/issuanceInventory";
+import { branchLabel } from "@/lib/branchLabels";
 
 export function SupervisorAllocationDialog({
   open,
@@ -84,7 +85,7 @@ export function SupervisorAllocationDialog({
           </span>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-muted-foreground">
-              יתרה זמינה במאגר {branch}
+              יתרה זמינה במאגר {branchLabel(branch)}
             </p>
             <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
               {branchBalance.toLocaleString("he-IL")} ₪

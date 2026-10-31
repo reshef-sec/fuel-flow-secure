@@ -16,6 +16,7 @@ import {
 } from "@/design-system/delek-1ea111";
 import { fullName, roleLabels, useAppStore, useCurrentUser } from "@/store/appStore";
 import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
+import { branchLabel } from "@/lib/branchLabels";
 
 /** Admin-only queue of voucher requests awaiting approval. */
 export function PendingRequests() {
@@ -86,7 +87,7 @@ export function PendingRequests() {
               pending.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-semibold">{r.requester}</TableCell>
-                  <TableCell>{r.branch}</TableCell>
+                  <TableCell>{branchLabel(r.branch)}</TableCell>
                   <TableCell>{roleOf(r)}</TableCell>
                   <TableCell className="tabular-nums">
                     {r.amount.toLocaleString("he-IL")} ₪

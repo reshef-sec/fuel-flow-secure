@@ -10,6 +10,7 @@ import { useLiveInventory } from "@/lib/useLiveInventory";
 import { fullName, poolShortage, useAppStore, useCurrentUser } from "@/store/appStore";
 import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 import { STOCK_SHORTAGE } from "@/lib/issuanceInventory";
+import { assignmentLabel, branchLabel } from "@/lib/branchLabels";
 
 export function AllocationDialog({
   open,
@@ -33,12 +34,12 @@ export function AllocationDialog({
   const stock = useAppStore(s => s.vouchers);
 
   const targets: { value: string; label: string; branch: string; supervisor?: string }[] = [
-    ...branchList.map((b) => ({ value: b.name, label: b.name, branch: b.name })),
+    ...branchList.map((b) => ({ value: b.name, label: branchLabel(b.name), branch: b.name })),
     ...users
       .filter((u) => u.role === "supervisor")
       .map((u) => ({
         value: `${u.branch}|${fullName(u)}`,
-        label: `${u.branch} (${fullName(u)})`,
+        label: assignmentLabel(u.branch, fullName(u)),
         branch: u.branch,
         supervisor: fullName(u),
       })),

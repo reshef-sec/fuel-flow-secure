@@ -17,6 +17,7 @@ import { downloadCsv } from "@/components/dashboard/statusVariant";
 import type { VoucherRecord } from "@/components/dashboard/voucherData";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 import { formatIsraelDate, inDateRange } from "@/lib/israelDate";
+import { branchLabel } from "@/lib/branchLabels";
 
 /** B2B billing report — one row per 100 ₪ code issued via the "ברכב עבודה" route. */
 export interface ReportFilterValues {
@@ -43,7 +44,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
       const f = filters;
       list = list.filter((v) => {
         if (!inDateRange(v.deliveredAt ?? v.updatedAt, f.from, f.to)) return false;
-        if (f.branch && v.branch !== f.branch) return false;
+        if (f.branch && branchLabel(v.branch) !== f.branch) return false;
         if (f.supervisor && v.supervisor !== f.supervisor) return false;
         if (f.client && v.client !== f.client) return false;
         if (f.status && v.status !== f.status) return false;
@@ -61,7 +62,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
     "שם עובד", "ת.ז", "טלפון", "תאריך מסירה", "סיבת הפקה",
   ];
   const detail = rows.map(({ v, value, code }) => [
-    v.branch, `${value} ₪`, v.fuelType ?? "בנזין", code, v.client ?? "—",
+    branchLabel(v.branch), `${value} ₪`, v.fuelType ?? "בנזין", code, v.client ?? "—",
     v.clientCode ?? v.clientId ?? "—", v.accountName ?? v.siteName ?? "—", v.standard ?? v.standardName ?? "—",
     v.workerName ?? "—", v.workerId ?? "—", v.workerPhone ?? "—",
     formatIsraelDate(v.deliveredAt ?? v.updatedAt), v.reason ?? "—",

@@ -15,6 +15,7 @@ import {
 } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
 import { useAppStore, type BranchRecord } from "@/store/appStore";
+import { branchLabel } from "@/lib/branchLabels";
 
 const empty = { name: "", manager: "", city: "" };
 
@@ -97,13 +98,13 @@ export function BranchesPanel() {
             ) : (
               branchList.map((b) => (
                 <TableRow key={b.id}>
-                  <TableCell className="font-semibold">{b.name}</TableCell>
+                  <TableCell className="font-semibold">{branchLabel(b.name)}</TableCell>
                   <TableCell>{b.manager || "—"}</TableCell>
                   <TableCell>{b.city || "—"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <button
-                        aria-label={`ערוך ${b.name}`}
+                        aria-label={`ערוך ${branchLabel(b.name)}`}
                         onClick={() => {
                           setEditing(b);
                           setOpen(true);
@@ -113,7 +114,7 @@ export function BranchesPanel() {
                         <Pencil className="size-4" />
                       </button>
                       <button
-                        aria-label={`מחק ${b.name}`}
+                        aria-label={`מחק ${branchLabel(b.name)}`}
                         onClick={() => {
                           removeBranch(b.id);
                           toast.success("הסניף נמחק");

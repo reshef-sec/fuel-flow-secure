@@ -17,6 +17,7 @@ import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/vouche
 import { centralPoolOf } from "@/lib/centralInventory";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
+import { branchLabel } from "@/lib/branchLabels";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -125,7 +126,7 @@ function Dashboard() {
         <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="font-display text-lg font-extrabold text-secondary">
-              דרישת שוברים לסניף {me.branch}
+              דרישת שוברים לסניף {branchLabel(me.branch)}
             </p>
             <p className="text-sm text-muted-foreground">
               יש לך הרשאה להקים דרישת שוברים לאישור אדמין מרכזי
@@ -167,7 +168,7 @@ function Dashboard() {
             <div>
               <p className="text-sm font-semibold text-muted-foreground">היתרה הזמינה שלי</p>
               <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">{balance.toLocaleString("he-IL")} ₪</p>
-              <p className="text-xs text-muted-foreground">{branchAvailable.length} שוברים זמינים · סניף {myBranch || "—"}</p>
+              <p className="text-xs text-muted-foreground">{branchAvailable.length} שוברים זמינים · סניף {myBranch ? branchLabel(myBranch) : "—"}</p>
               <FuelBreakdown list={branchAvailable} className="mt-1" />
             </div>
             <Button size="sm" className="self-start" onClick={() => setSupervisorOpen(true)}>

@@ -3,13 +3,14 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Card } from "@/design-system/delek-1ea111";
 import { MAIN_POOL, type Role } from "@/store/appStore";
 import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
+import { branchLabel } from "@/lib/branchLabels";
 
 type V = { branch: string; amount: number; deliveredAt?: string | null; updatedAt: string };
 type Slice = { name: string; value: number; branches: string[]; details?: { name: string; value: number }[] };
 
 const OTHERS = "אחרים";
 const TOP = 5;
-const DIRECT = "הונפק ישירות ממאגר ראשי";
+const DIRECT = "הונפק ישירות ממאגר מרכזי";
 const PALETTE = ["var(--color-primary)", "var(--color-accent)", "var(--color-secondary)", "var(--color-warning)", "var(--color-mint-300)", "var(--color-muted-foreground)"];
 const USED = "var(--color-danger)";
 const LEFT = "var(--color-success)";
@@ -21,11 +22,11 @@ function Tip({ active, payload, total }: { active?: boolean; payload?: { name: s
   const p = payload[0];
   return (
     <div className="rounded-md border border-border bg-surface px-3 py-2 text-sm shadow-md">
-      <p className="font-bold text-secondary">{p.name}</p>
+      <p className="font-bold text-secondary">{branchLabel(p.name)}</p>
       <p>{p.payload?.details ? "סה\"כ: " : ""}{ils(p.value)} · {total ? Math.round((p.value / total) * 100) : 0}%</p>
       {p.payload?.details ? (
         <ul className="mt-1 max-h-48 space-y-0.5 overflow-y-auto border-t border-border pt-1 text-xs">
-          {p.payload.details.map((d) => <li key={d.name} className="flex justify-between gap-4"><span>{d.name}</span><span className="tabular-nums">{ils(d.value)}</span></li>)}
+          {p.payload.details.map((d) => <li key={d.name} className="flex justify-between gap-4"><span>{branchLabel(d.name)}</span><span className="tabular-nums">{ils(d.value)}</span></li>)}
         </ul>
       ) : null}
     </div>
@@ -117,7 +118,7 @@ export function BudgetUtilization({ vouchers, since, role, myBranch, periodLabel
     <Card padding="lg" className="flex-1">
       <div className="mb-2 flex items-baseline justify-between gap-2">
         <p className="font-display text-lg font-extrabold text-secondary">ניצול תקציב</p>
-        <p className="text-sm text-muted-foreground">{poolTitle} · {periodLabel}</p>
+        <p className="text-sm text-muted-foreground">{branchLabel(poolTitle)} · {periodLabel}</p>
       </div>
       {poolTotal === 0 ? <p className="py-16 text-center text-sm text-muted-foreground">אין נתונים לתקופה</p> : (
         <div className="relative h-64">
@@ -167,7 +168,7 @@ export function BudgetUtilization({ vouchers, since, role, myBranch, periodLabel
         <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm">
           {slices.map((s, i) => (
             <button key={s.name} onClick={() => setSelected((c) => (c === s.name ? null : s.name))} className={`flex items-center gap-1.5 ${selected && selected !== s.name ? "opacity-50" : ""}`}>
-              <span className="size-3 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} />{s.name}
+              <span className="size-3 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} />{branchLabel(s.name)}
             </button>
           ))}
         </div>
