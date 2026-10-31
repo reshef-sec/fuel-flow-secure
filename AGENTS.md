@@ -7,3 +7,4 @@
 - Display dates through israelDate helpers and localized ISO-backed inputs; keep stored/filter date values in ISO format to preserve sorting.
 - Exact voucher combinations use the browser-safe inventorySelection module so physical selection can be regression-tested without importing UI or database clients.
 - Branch terminology and assignment suffixes use branchLabels presentation helpers; preserve legacy stored pool identifiers, transfer targets and authorization checks rather than renaming stock for a UI-only change.
+- Development tools use external database RPCs pinned to a single installer-verified immutable owner UUID plus the protected admin role; client rendering fails closed until that RPC verifies the active identity, preventing name spoofing or role-preview access.

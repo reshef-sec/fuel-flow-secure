@@ -122,3 +122,8 @@ export const syncAccount = ({ data }: Args<AccountInput>) => accounts("sync", no
 export const resetAccountPassword = ({ data }: Args<AccountInput>) => accounts("reset", norm(data));
 export const deleteAccount = ({ data }: Args<{ nationalId: string }>) => accounts("delete", data);
 export const completePasswordChange = ({ data }: Args<{ password: string }>) => accounts("change_password", data);
+
+// Authorization is pinned to one immutable user UUID in the external database.
+export const getDevelopmentToolsAccess = () => rpc<boolean>("can_use_development_tools", {});
+export const generateDemoData = () => rpc<{ vouchers_created: number }>("generate_demo_data", {});
+export const resetSystemData = (confirmation: string) => rpc<void>("reset_development_data", { p_confirmation: confirmation });
