@@ -1,5 +1,6 @@
 # Roadmap — master system update
-- [ ] Audit and enforce atomic vehicle delta sync, active-only issuance, historical report resolution, unique stock imports with skipped counts, and timestamped/audited Paz redemption; provide SQL first.
+- [x] Implement atomic vehicle delta-sync RPCs, active-only issuance queries/trigger, inactive historical report resolution, unique stock imports with skipped counts, and timestamped/audited Paz redemption; 34 app tests and isolated PostgreSQL regression/reinstallation tests passed.
+- [ ] Install final import-integrity SQL in the external database and verify all three flows while signed in (blocker: user executes provided SQL; external app session unavailable).
 - [x] Restore development tools with database-verified Maya UUID, fail-closed DOM hiding, demo inventory generation and typed reset confirmation; provide external-database installation SQL without executing resets.
 - [ ] Install development-tools SQL in the external database and verify Maya/other-admin/supervisor access and real demo/reset workflows (blocker: user installs SQL; external authenticated session unavailable).
 - [x] Priority B: unified central-pool display labels without changing stored stock names; no SQL cleanup required.
