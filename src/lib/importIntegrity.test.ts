@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { historicalClientName, isActiveClient, normalizeVoucherStatus, partitionStockRows } from "./importIntegrity";
 import { isAvailable } from "../components/dashboard/voucherData";
 describe("import integrity", () => {
+  it("maps issued database rows to employee-issued status", () => {
+    assert.equal(normalizeVoucherStatus("issued"), "הוקצה לעובד");
+  });
   it("offers only explicitly active clients for new issuance", () => {
     assert.equal(isActiveClient({ isActive: true }), true);
     assert.equal(isActiveClient({ isActive: false }), false);

@@ -623,12 +623,14 @@ export const useAppStore = create<AppState>()(
       ...(st.authId ? { supervisorId: st.authId } : {}),
     };
     try {
-      const issued = await issueVoucherToWorker(p.items.map((item) => ({
+      const result = await issueVoucherToWorker(p.items.map((item) => ({
         amount: item.amount, fuel_type: item.fuelType,
         details: { client: item.clientName, client_id: item.clientCode, client_code: item.clientCode,
           account_name: item.accountName, standard: item.standard, site_id: item.siteId,
           site_name: item.siteName, route: item.route, reason: item.reason, requester: p.requester },
       })), p.branch, p.supervisor, { id: linkId, employee_name: p.employeeName });
+      const issued = result.cards;
+      link.id = result.linkId;
       // The database chose the physical cards; reflect its choice locally.
       const chosenSerials = new Set(issued.map(c => c.serial));
       const seeds = out.slice();
@@ -636,10 +638,10 @@ export const useAppStore = create<AppState>()(
       for (const card of issued) {
         const tmpl = seeds[itemTemplates[card.itemIndex] ?? 0];
         const base = stock.find(v => v.serial === card.serial);
-        if (tmpl && base) out.push({ ...tmpl, ...{ serial: base.serial, amount: base.amount, fuelType: base.fuelType, realCode: base.realCode } });
+        if (tmpl && base) out.push({ ...tmpl, serial: card.serial, amount: card.amount, fuelType: card.fuelType, realCode: "", linkId: result.linkId });
       }
       link.serials = [...chosenSerials];
-      link.total = issued.reduce((t, c) => t + c.amount, 0);
+      link.total = result.total;
       bySerial = new Map(out.map((v) => [v.serial, v]));
     } catch (err) {
       // Reload stock if only the voucher write succeeded. Never expose an unsaved link.
