@@ -42,9 +42,7 @@ import {
 import { ProducedLinks } from "@/components/production/ProducedLinks";
 import { issuanceAmountRules, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { useLiveInventory } from "@/lib/useLiveInventory";
-import { fuelOf } from "@/components/fuel/fuel";
-import { centralPoolOf, pickExact } from "@/store/appStore";
-import { isAvailable } from "@/components/dashboard/voucherData";
+import { pickExact } from "@/store/appStore";
 import { isActiveClient } from "@/lib/importIntegrity";
 import { supabase } from "@/lib/supabaseClient";
 
