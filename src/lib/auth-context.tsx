@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "./useAuth";
 import { useAppStore } from "@/store/appStore";
+import { isPublicPath, isWorkerPublicPath } from "./publicPaths";
+export { isPublicPath } from "./publicPaths";
 
 type AuthValue = ReturnType<typeof useAuth>;
 const AuthContext = createContext<AuthValue | null>(null);
@@ -11,10 +13,6 @@ export function useAuthContext() {
   if (!v) throw new Error("useAuthContext outside AuthProvider");
   return v;
 }
-
-const PUBLIC_PREFIXES = ["/login", "/worker", "/voucher", "/__mockup", "/__component"];
-export const isPublicPath = (p: string) =>
-  PUBLIC_PREFIXES.some((pre) => p === pre || p.startsWith(`${pre}/`) || p.startsWith(`${pre}.`));
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
@@ -35,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isPublic = isPublicPath(pathname);
 
   useEffect(() => {
+    // Worker links never inherit staff login or mandatory password-change redirects.
+    if (isWorkerPublicPath(pathname)) return;
     if (auth.loading) return;
     if (!auth.session || !auth.profile) {
       if (!isPublic) navigate({ to: "/login", replace: true });
