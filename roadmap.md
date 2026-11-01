@@ -1,4 +1,6 @@
 # Roadmap — master system update
+- [x] Supply JSONB drop-and-replace issuance SQL first; parse persisted link identity and safe voucher JSON, normalize issued status, and add response regression tests; 45 application tests and disposable PostgreSQL JSONB/type-mismatch, reinstall, branch authorization, anonymous rejection and rollback checks passed.
+- [ ] Install issue_voucher_to_worker_v2.sql and verify live issuance/read-back (blocker: user executes SQL in external database; no external authenticated session available).
 - [x] Implement atomic vehicle delta-sync RPCs, active-only issuance queries/trigger, inactive historical report resolution, unique stock imports with skipped counts, and timestamped/audited Paz redemption; 34 app tests and isolated PostgreSQL regression/reinstallation tests passed.
 - [ ] Install final import-integrity SQL in the external database and verify all three flows while signed in (blocker: user executes provided SQL; external app session unavailable).
 - [x] Restore development tools with database-verified Maya UUID, fail-closed DOM hiding, demo inventory generation and typed reset confirmation; provide external-database installation SQL without executing resets.
