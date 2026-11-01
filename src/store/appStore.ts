@@ -8,7 +8,8 @@ import {
 import { logActivity } from "@/lib/activityLog";
 import { syncVehiclePool, importVoucherInventory, reconcilePazFeedback, type VehicleSyncResult } from "@/lib/backend";
 import { fuelStockError, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
-import { transferInventory } from "@/lib/transferInventory";
+import { transferInventory, issueVoucherToWorker } from "@/lib/transferInventory";
+import { cardsOfFuel, issuancePool } from "@/lib/issuanceStock";
 import { pickExact } from "@/lib/inventorySelection";
 export { pickExact } from "@/lib/inventorySelection";
 import { centralPoolOf, centralFuelLimitError } from "@/lib/centralInventory";
@@ -560,11 +561,8 @@ export const useAppStore = create<AppState>()(
     set({ vouchers: stock });
     const st = get();
     const linkId = String(Math.floor(10000000 + Math.random() * 89999999));
-    const pool = st.role === "admin" ? centralPoolOf(stock) : stock.filter(
-      v => isAvailable(v) && v.branch === p.branch &&
-        (st.role === "supervisor" ? v.supervisor === p.supervisor : !v.supervisor),
-    );
-    const byFuel = new Map<FuelType, VoucherRecord[]>(FUEL_TYPES.map(f => [f, pool.filter(v => fuelOf(v) === f)]));
+    const pool = issuancePool(stock, { role: st.role, branch: p.branch, supervisorName: p.supervisor });
+    const byFuel = new Map<FuelType, VoucherRecord[]>(FUEL_TYPES.map(f => [f, cardsOfFuel(pool, f)]));
     for (const fuel of FUEL_TYPES) {
       const need = p.items.filter(it => it.fuelType === fuel).reduce((sum, it) => sum + it.amount, 0);
       const have = byFuel.get(fuel) ?? [];
@@ -585,8 +583,10 @@ export const useAppStore = create<AppState>()(
     exp.setMonth(exp.getMonth() + 3);
     const expiresAt = exp.toISOString();
     const out: VoucherRecord[] = [];
+    const itemTemplates: number[] = [];
     for (const [idx, it] of p.items.entries()) {
       for (const seed of chosen[idx] ?? []) {
+        if (!itemTemplates[idx]) itemTemplates[idx] = out.length;
         out.push({
           ...seed,
           branch: p.branch,
@@ -612,6 +612,7 @@ export const useAppStore = create<AppState>()(
         });
       }
     }
+    let bySerial = new Map<string, VoucherRecord>();
     const link: WorkerLink = {
       id: linkId,
       total: out.reduce((t, v) => t + v.amount, 0),
@@ -621,14 +622,25 @@ export const useAppStore = create<AppState>()(
       branch: p.branch,
       ...(st.authId ? { supervisorId: st.authId } : {}),
     };
-    const bySerial = new Map(out.map((v) => [v.serial, v]));
     try {
-      await transferInventory(p.items.map((item, index) => ({
-        amount: item.amount, fuel_type: item.fuelType, serials: (chosen[index] ?? []).map(v => v.serial),
+      const issued = await issueVoucherToWorker(p.items.map((item) => ({
+        amount: item.amount, fuel_type: item.fuelType,
         details: { client: item.clientName, client_id: item.clientCode, client_code: item.clientCode,
           account_name: item.accountName, standard: item.standard, site_id: item.siteId,
           site_name: item.siteName, route: item.route, reason: item.reason, requester: p.requester },
       })), p.branch, p.supervisor, { id: linkId, employee_name: p.employeeName });
+      // The database chose the physical cards; reflect its choice locally.
+      const chosenSerials = new Set(issued.map(c => c.serial));
+      const seeds = out.slice();
+      out.length = 0;
+      for (const card of issued) {
+        const tmpl = seeds[itemTemplates[card.itemIndex] ?? 0];
+        const base = stock.find(v => v.serial === card.serial);
+        if (tmpl && base) out.push({ ...tmpl, ...{ serial: base.serial, amount: base.amount, fuelType: base.fuelType, realCode: base.realCode } });
+      }
+      link.serials = [...chosenSerials];
+      link.total = issued.reduce((t, c) => t + c.amount, 0);
+      bySerial = new Map(out.map((v) => [v.serial, v]));
     } catch (err) {
       // Reload stock if only the voucher write succeeded. Never expose an unsaved link.
       await get().loadFromCloud().catch(() => undefined);

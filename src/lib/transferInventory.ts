@@ -15,3 +15,15 @@ export async function transferInventory(items: StockTransferItem[], branch: stri
   if (error) throw new Error(error.code === "PGRST202"
     ? "יש להריץ תחילה את סקריפט בדיקת המלאי ושמירת ההקצאות במסד הנתונים" : error.message);
 }
+export interface IssueItem { amount: number; fuel_type: "בנזין" | "סולר"; details?: Record<string, string | undefined> }
+
+/** Database picks, locks (FOR UPDATE SKIP LOCKED) and issues matching cards atomically, plus the link row. */
+export async function issueVoucherToWorker(items: IssueItem[], branch: string, supervisor: string | undefined, link: { id: string; employee_name: string }) {
+  const { data, error } = await db.rpc("issue_voucher_to_worker", {
+    p_items: items, p_branch: branch, p_supervisor: supervisor ?? null, p_link: link,
+  });
+  if (error) throw new Error(error.code === "PGRST202"
+    ? "יש להריץ תחילה את סקריפט issue_voucher_to_worker במסד הנתונים" : error.message);
+  return ((data as { serial: string; amount: number; fuel_type: string; item_index: number }[] | null) ?? [])
+    .map(r => ({ itemIndex: Number(r.item_index ?? 0), serial: String(r.serial), amount: Number(r.amount), fuelType: r.fuel_type === "סולר" ? "סולר" as const : "בנזין" as const }));
+}
