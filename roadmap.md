@@ -1,4 +1,5 @@
 # Roadmap — master system update
+- [x] Generate same-origin worker links and bypass staff password-change redirects on employee routes; 49 tests pass. Anonymous real-link checks on localhost and Netlify display identification, unknown tokens fail, and direct redemption-code reads are denied; no SQL change required. Lovable-hosted address redirects at the platform layer, outside app routing.
 - [x] Supply JSONB drop-and-replace issuance SQL first; parse persisted link identity and safe voucher JSON, normalize issued status, and add response regression tests; 45 application tests and disposable PostgreSQL JSONB/type-mismatch, reinstall, branch authorization, anonymous rejection and rollback checks passed.
 - [ ] Install issue_voucher_to_worker_v2.sql and verify live issuance/read-back (blocker: user executes SQL in external database; no external authenticated session available).
 - [x] Implement atomic vehicle delta-sync RPCs, active-only issuance queries/trigger, inactive historical report resolution, unique stock imports with skipped counts, and timestamped/audited Paz redemption; 34 app tests and isolated PostgreSQL regression/reinstallation tests passed.
