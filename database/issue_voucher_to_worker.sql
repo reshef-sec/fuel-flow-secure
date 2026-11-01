@@ -78,7 +78,7 @@ BEGIN
           ELSE public.canonical_branch(v.branch) = public.canonical_branch(caller_branch)
             AND (v.supervisor_id = caller OR public.card_holder(v.supervisor, v.branch) = caller_name)
         END
-      ORDER BY v.amount DESC, v.serial
+      ORDER BY (v.amount = want) DESC, v.amount DESC, v.serial
       FOR UPDATE SKIP LOCKED
     LOOP
       EXIT WHEN got = want;
