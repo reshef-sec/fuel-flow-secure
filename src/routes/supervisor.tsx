@@ -17,6 +17,7 @@ import {
   SquareArrowOutUpRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cardsOfFuel, issuancePool } from "@/lib/issuanceStock";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import {
@@ -96,26 +97,32 @@ function SupervisorPage() {
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const stockError = useMemo(() => {
-    const pool = role === "admin" ? centralPoolOf(stock) : stock.filter(v => isAvailable(v)
-      && v.status === "טרם שומש" && v.branch === me?.branch
-      && (role === "supervisor" ? v.supervisor === (me ? fullName(me) : "") : !v.supervisor));
+    const pool = issuancePool(stock, { role, branch: me?.branch, supervisorName: me ? fullName(me) : undefined });
     let remaining = pool;
     for (const block of blocks) {
       if (!block.fuelType || !Number(block.amount) || issuanceAmountError(block.fuelType, Number(block.amount))) continue;
-      const picked = pickExact(remaining.filter(v => fuelOf(v) === block.fuelType), Number(block.amount));
+      const picked = pickExact(cardsOfFuel(remaining, block.fuelType), Number(block.amount));
       if (!picked) return STOCK_SHORTAGE;
       const ids = new Set(picked.map(v => v.serial));
       remaining = remaining.filter(v => !ids.has(v.serial));
     }
     return null;
   }, [stock, role, me, blocks]);
-  useEffect(() => { if (stockReady && stockError) toast.error(stockError); }, [stockReady, stockError]);
+  useEffect(() => {
+    if (!stockReady || !stockError) return;
+    toast.error(stockError, { id: "issuance-stock" });
+    return () => { toast.dismiss("issuance-stock"); };
+  }, [stockReady, stockError]);
+  // Any field change clears stale validation from the previous attempt.
+  useEffect(() => { setError(null); }, [employeeName, blocks]);
 
   const patch = (key: number, p: Partial<Block>) =>
     setBlocks((bs) => bs.map((b) => (b.key === key ? { ...b, ...p } : b)));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    toast.dismiss();
+    setError(null);
     if (!me) return setError("לא נמצא משתמש מחובר");
     if (employeeName.trim().length < 2) return setError("יש למלא שם עובד");
     const items: WorkerIssueItem[] = [];

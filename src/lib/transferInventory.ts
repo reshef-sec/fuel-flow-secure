@@ -24,6 +24,6 @@ export async function issueVoucherToWorker(items: IssueItem[], branch: string, s
   });
   if (error) throw new Error(error.code === "PGRST202"
     ? "יש להריץ תחילה את סקריפט issue_voucher_to_worker במסד הנתונים" : error.message);
-  return ((data as { serial: string; amount: number; fuel_type: string }[] | null) ?? [])
-    .map(r => ({ serial: String(r.serial), amount: Number(r.amount), fuelType: r.fuel_type === "סולר" ? "סולר" as const : "בנזין" as const }));
+  return ((data as { serial: string; amount: number; fuel_type: string; item_index: number }[] | null) ?? [])
+    .map(r => ({ itemIndex: Number(r.item_index ?? 0), serial: String(r.serial), amount: Number(r.amount), fuelType: r.fuel_type === "סולר" ? "סולר" as const : "בנזין" as const }));
 }

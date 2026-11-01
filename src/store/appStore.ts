@@ -583,8 +583,10 @@ export const useAppStore = create<AppState>()(
     exp.setMonth(exp.getMonth() + 3);
     const expiresAt = exp.toISOString();
     const out: VoucherRecord[] = [];
+    const itemTemplates: number[] = [];
     for (const [idx, it] of p.items.entries()) {
       for (const seed of chosen[idx] ?? []) {
+        if (!itemTemplates[idx]) itemTemplates[idx] = out.length;
         out.push({
           ...seed,
           branch: p.branch,
@@ -632,7 +634,7 @@ export const useAppStore = create<AppState>()(
       const seeds = out.slice();
       out.length = 0;
       for (const card of issued) {
-        const tmpl = seeds.find(v => v.fuelType === card.fuelType) ?? seeds[0];
+        const tmpl = seeds[itemTemplates[card.itemIndex] ?? 0];
         const base = stock.find(v => v.serial === card.serial);
         if (tmpl && base) out.push({ ...tmpl, ...{ serial: base.serial, amount: base.amount, fuelType: base.fuelType, realCode: base.realCode } });
       }
