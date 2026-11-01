@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activityLog";
 import { syncVehiclePool, importVoucherInventory, reconcilePazFeedback, type VehicleSyncResult } from "@/lib/backend";
 import { fuelStockError, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { transferInventory, issueVoucherToWorker } from "@/lib/transferInventory";
+import { cardsOfFuel, issuancePool } from "@/lib/issuanceStock";
 import { pickExact } from "@/lib/inventorySelection";
 export { pickExact } from "@/lib/inventorySelection";
 import { centralPoolOf, centralFuelLimitError } from "@/lib/centralInventory";
@@ -278,7 +279,6 @@ export function storedRole(): Role | null {
   return null;
 }
 
-import { cardsOfFuel, issuancePool } from "@/lib/issuanceStock";
 export const useAppStore = create<AppState>()(
   (set, get) => ({
   loaded: false,
@@ -610,6 +610,7 @@ export const useAppStore = create<AppState>()(
         });
       }
     }
+    let bySerial = new Map<string, VoucherRecord>();
     const link: WorkerLink = {
       id: linkId,
       total: out.reduce((t, v) => t + v.amount, 0),
@@ -619,7 +620,6 @@ export const useAppStore = create<AppState>()(
       branch: p.branch,
       ...(st.authId ? { supervisorId: st.authId } : {}),
     };
-    const bySerial = new Map(out.map((v) => [v.serial, v]));
     try {
       const issued = await issueVoucherToWorker(p.items.map((item) => ({
         amount: item.amount, fuel_type: item.fuelType,
@@ -638,6 +638,7 @@ export const useAppStore = create<AppState>()(
       }
       link.serials = [...chosenSerials];
       link.total = issued.reduce((t, c) => t + c.amount, 0);
+      bySerial = new Map(out.map((v) => [v.serial, v]));
     } catch (err) {
       // Reload stock if only the voucher write succeeded. Never expose an unsaved link.
       await get().loadFromCloud().catch(() => undefined);
