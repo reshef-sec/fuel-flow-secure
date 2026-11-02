@@ -1,0 +1,30 @@
+-- Disposable database only. All fixture changes roll back.
+BEGIN;
+INSERT INTO public.profiles(id,full_name) VALUES('10000000-0000-0000-0000-000000000001','Test Admin');
+INSERT INTO public.user_roles(user_id,role) VALUES('10000000-0000-0000-0000-000000000001','admin');
+SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
+DO $$ DECLARE r jsonb; denied boolean:=false; BEGIN
+  r:=public.sync_private_vehicles('[{"client_id":" 1001 ","site_id":" 11 ","client_name":"First"},{"client_id":"1001","site_id":"11","client_name":"Last"},{"client_id":"1001","site_id":"12","client_name":"Second"},{}]');
+  IF r->>'added'<>'2' OR r->>'duplicates'<>'1' OR r->>'blanks'<>'1' OR (SELECT client_name FROM public.regular_clients WHERE site_id='11')<>'First' THEN RAISE EXCEPTION 'First duplicate or blank handling failed'; END IF;
+  INSERT INTO public.vouchers(serial,route,client_id,site_id,link_id) VALUES('history','regular','1001','11','old-link');
+  r:=public.sync_private_vehicles('[{"client_id":"1001","site_id":"12","client_name":"Updated"}]');
+  IF r->>'updated'<>'1' OR r->>'deactivated'<>'1' OR (SELECT count(*) FROM public.regular_clients)<>2 THEN RAISE EXCEPTION 'Delta sync deleted history or wrong counts'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.vouchers v JOIN public.regular_clients c ON c.client_id=v.client_id AND c.site_id=v.site_id WHERE v.serial='history' AND NOT c.is_active) THEN RAISE EXCEPTION 'Historical inactive join failed'; END IF;
+  BEGIN INSERT INTO public.vouchers(serial,route,client_id,site_id,link_id) VALUES('blocked','regular','1001','11','new-link'); EXCEPTION WHEN raise_exception THEN denied:=true; END;
+  IF NOT denied THEN RAISE EXCEPTION 'Inactive issuance allowed'; END IF;
+  INSERT INTO public.vouchers(serial,route,client_id,site_id,link_id) VALUES('allowed','regular','1001','12','new-link');
+  denied:=false;
+  BEGIN PERFORM public.sync_private_vehicles('[{"client_id":"1001","site_id":""}]'); EXCEPTION WHEN raise_exception THEN denied:=true; END;
+  IF NOT denied OR NOT EXISTS(SELECT 1 FROM public.regular_clients WHERE site_id='12' AND is_active) THEN RAISE EXCEPTION 'Invalid snapshot changed pool'; END IF;
+  denied:=false;
+  BEGIN PERFORM public.sync_private_vehicles('[{}]'); EXCEPTION WHEN raise_exception THEN denied:=true; END;
+  IF NOT denied THEN RAISE EXCEPTION 'Empty snapshot allowed'; END IF;
+  r:=public.sync_private_vehicles('[{"client_id":"1001","site_id":"11","client_name":"Reactivated"}]');
+  IF r->>'updated'<>'1' OR NOT EXISTS(SELECT 1 FROM public.regular_clients WHERE site_id='11' AND is_active AND client_name='Reactivated') THEN RAISE EXCEPTION 'Reactivation failed'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.activity_log WHERE action='סנכרון מאגר רכב פרטי' AND target LIKE '%1 כפולים דולגו') THEN RAISE EXCEPTION 'Audit missing'; END IF;
+  PERFORM set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
+  denied:=false;
+  BEGIN PERFORM public.sync_private_vehicles('[{"client_id":"1001","site_id":"11"}]'); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
+  IF NOT denied OR has_function_privilege('anon','public.sync_private_vehicles(jsonb)','EXECUTE') THEN RAISE EXCEPTION 'Unauthorized sync allowed'; END IF;
+END $$;
+ROLLBACK;

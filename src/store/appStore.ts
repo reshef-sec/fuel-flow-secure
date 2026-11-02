@@ -7,7 +7,8 @@ import {
 
 import { logActivity } from "@/lib/activityLog";
 import { pazFeedbackCardNumbers } from "@/lib/importIntegrity";
-import { syncVehiclePool, syncWorkVehicles, importVoucherInventory, reconcilePazFeedback, type VehicleSyncResult } from "@/lib/backend";
+import { syncPrivateVehicles, syncWorkVehicles, importVoucherInventory, reconcilePazFeedback, type VehicleSyncResult } from "@/lib/backend";
+import { preparePrivateVehicles } from "@/lib/privateVehicles";
 import { prepareWorkVehicles } from "@/lib/workVehicles";
 import { fuelStockError, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { transferInventory, issueVoucherToWorker } from "@/lib/transferInventory";
@@ -499,10 +500,11 @@ export const useAppStore = create<AppState>()(
       run(db.from("regular_clients").update(clientToRow(next)).eq("client_id", clientId).eq("site_id", siteId));
   },
   importClients: async (rows) => {
-    const result = await syncVehiclePool("regular", rows.map(clientToRow));
+    const prepared = preparePrivateVehicles(rows);
+    const result = await syncPrivateVehicles(prepared.rows.map(clientToRow));
     const fresh = await loadAll();
     set({ nonB2bClients: fresh.nonB2bClients });
-    return result;
+    return { ...result, duplicates: (result.duplicates ?? 0) + prepared.duplicates, blanks: (result.blanks ?? 0) + prepared.blanks };
   },
   removeClient: (clientId, siteId) => {
     set((s) => ({

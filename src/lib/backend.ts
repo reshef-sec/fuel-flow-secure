@@ -131,6 +131,8 @@ export const resetSystemData = (confirmation: string) => rpc<void>("reset_develo
 export interface VehicleSyncResult { added: number; updated: number; deactivated: number; duplicates?: number; blanks?: number }
 export const syncWorkVehicles = (rows: Record<string, unknown>[]) =>
   rpc<VehicleSyncResult>("sync_work_vehicles", { p_rows: rows });
+export const syncPrivateVehicles = (rows: Record<string, unknown>[]) =>
+  rpc<VehicleSyncResult>("sync_private_vehicles", { p_rows: rows });
 export const syncVehiclePool = (pool: "regular" | "b2b", rows: Record<string, unknown>[]) =>
   rpc<VehicleSyncResult>("sync_vehicle_pool", { p_pool: pool, p_rows: rows });
 export const importVoucherInventory = (rows: Record<string, unknown>[]) =>

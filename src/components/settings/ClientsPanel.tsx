@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, FileSpreadsheet, Pencil, Plus, Search, Trash
 import { toast } from "sonner";
 
 import {
+  Badge,
   Button,
   Card,
   FormField,
@@ -19,6 +20,7 @@ import { Modal } from "@/components/ui/Modal";
 import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { useAppStore } from "@/store/appStore";
+import { privateVehicleKey } from "@/lib/privateVehicles";
 
 const empty = { clientId: "", clientName: "", siteId: "", siteName: "", standard: "" };
 
@@ -60,7 +62,6 @@ export function ClientsPanel() {
     try {
       const raw = stripHeader(await parseSheetFile(file), "לקוח");
       const rows = raw
-        .filter((r) => (r[0] ?? "").length > 0 && (r[2] ?? "").length > 0)
         .map((r) => ({
           clientId: String(r[0] ?? "").trim(),
           clientName: String(r[1] ?? "").trim(),
@@ -72,9 +73,9 @@ export function ClientsPanel() {
         toast.error("לא נמצאו שורות תקינות. עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן");
         return;
       }
-      const { added, updated, deactivated } = await importClients(rows);
+      const { added, updated, deactivated, duplicates = 0, blanks = 0 } = await importClients(rows);
       setPage(0);
-      toast.success(`נוספו ${added} אתרים, ${updated} עודכנו, ${deactivated} סומנו כלא פעילים`);
+      toast.success(`נוספו ${added} אתרים, ${updated} עודכנו, ${deactivated} סומנו כלא פעילים · ${duplicates} כפולים ו־${blanks} שורות ריקות דולגו`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "סנכרון הקובץ נכשל");
     }
@@ -196,23 +197,25 @@ export function ClientsPanel() {
               <TableHeaderCell>שם לקוח</TableHeaderCell>
               <TableHeaderCell>מספר אתר</TableHeaderCell>
               <TableHeaderCell>שם אתר</TableHeaderCell>
+              <TableHeaderCell>סטטוס</TableHeaderCell>
               <TableHeaderCell>פעולות</TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {visible.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   לא נמצאו לקוחות או אתרים מתאימים
                 </TableCell>
               </TableRow>
             ) : (
               visible.map((c) => (
-                <TableRow key={`${c.clientId}-${c.siteId}`} className={c.isActive === false ? "opacity-50" : undefined} title={c.isActive === false ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}>
+                <TableRow key={privateVehicleKey(c)} className={c.isActive !== true ? "work-vehicle-inactive" : undefined} title={c.isActive !== true ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}>
                   <TableCell className="tabular-nums font-semibold">{c.clientId}</TableCell>
                   <TableCell>{c.clientName}</TableCell>
                   <TableCell className="tabular-nums">{c.siteId}</TableCell>
                   <TableCell>{c.siteName}</TableCell>
+                  <TableCell><Badge variant={c.isActive === true ? "success" : "danger"}>{c.isActive === true ? "פעיל" : "לא פעיל"}</Badge></TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <button
