@@ -3,6 +3,7 @@ import { FileSpreadsheet, Pencil, Plus, Search, Trash2, UploadCloud } from "luci
 import { toast } from "sonner";
 
 import {
+  Badge,
   Button,
   Card,
   FormField,
@@ -20,6 +21,7 @@ import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { useAppStore, type B2BClientRecord } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
+import { workVehicleKey } from "@/lib/workVehicles";
 
 type Key = Exclude<keyof B2BClientRecord, "isActive">;
 /** Exact Excel column order (RTL). */
@@ -71,7 +73,7 @@ export function B2bPanel() {
     }
     try {
       const all = await parseSheetFile(file);
-      const headerIdx = all.findIndex((r) => r.some((c) => norm(c) === norm("שם חשבון")));
+      const headerIdx = all.findIndex((r) => r.some((c) => norm(c) === norm("תקן")) && r.some((c) => norm(c) === norm("קוד לקוח")));
       if (headerIdx < 0) {
         toast.error(`לא נמצאה שורת כותרות. עמודות: ${cols.join(", ")}`);
         return;
@@ -87,14 +89,13 @@ export function B2bPanel() {
             row[c.key] = position !== undefined && position >= 0 ? String(r[position] ?? "").trim() : "";
           }
           return row as unknown as B2BClientRecord;
-        })
-        .filter((r) => r.clientCode && r.accountName);
+        });
       if (!parsed.length) {
         toast.error(`לא נמצאו שורות תקינות. עמודות: ${cols.join(", ")}`);
         return;
       }
-      const { added, updated, deactivated } = await importB2b(parsed);
-      toast.success(`נוספו ${added} חדשים, ${updated} עודכנו, ${deactivated} סומנו כלא פעילים`);
+      const { added, updated, deactivated, duplicates = 0, blanks = 0 } = await importB2b(parsed);
+      toast.success(`נוספו ${added} חדשים, ${updated} עודכנו, ${deactivated} סומנו כלא פעילים · ${duplicates} כפולים ו־${blanks} שורות ריקות דולגו`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "סנכרון הקובץ נכשל");
     }
@@ -112,15 +113,15 @@ export function B2bPanel() {
     const clash = rows.some(
       (r) =>
         r.clientCode === p.clientCode &&
-        r.accountName === p.accountName &&
-        !(editing && r.clientCode === editing.clientCode && r.accountName === editing.accountName),
+        r.standard === p.standard &&
+        !(editing && r.clientCode === editing.clientCode && r.standard === editing.standard),
     );
     if (clash) {
-      setError("חשבון זה כבר קיים ללקוח");
+      setError("תקן זה כבר קיים ללקוח");
       return;
     }
     if (editing) {
-      updateB2b(editing.clientCode, editing.accountName, p);
+      updateB2b(editing.clientCode, editing.standard, p);
       toast.success("הרשומה עודכנה");
     } else {
       addB2b(p);
@@ -194,24 +195,26 @@ export function B2bPanel() {
               {cols.map((c) => (
                 <TableHeaderCell key={c}>{c}</TableHeaderCell>
               ))}
+              <TableHeaderCell>סטטוס</TableHeaderCell>
               <TableHeaderCell>פעולות</TableHeaderCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + 1} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={columns.length + 2} className="py-10 text-center text-muted-foreground">
                   אין רשומות
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((r) => (
-                <TableRow key={`${r.clientCode}|${r.accountName}`} className={r.isActive === false ? "opacity-50" : undefined} title={r.isActive === false ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}>
+                <TableRow key={workVehicleKey(r)} className={r.isActive !== true ? "work-vehicle-inactive" : undefined} title={r.isActive !== true ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}>
                   {columns.map((c) => (
                     <TableCell key={c.key} className="whitespace-nowrap">
                       {c.key === "branch" && r.branch ? branchLabel(r.branch) : r[c.key] || "—"}
                     </TableCell>
                   ))}
+                  <TableCell><Badge variant={r.isActive === true ? "success" : "danger"}>{r.isActive === true ? "פעיל" : "לא פעיל"}</Badge></TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <button
@@ -229,7 +232,7 @@ export function B2bPanel() {
                       <button
                         aria-label={`מחק ${r.accountName}`}
                         onClick={() => {
-                          removeB2b(r.clientCode, r.accountName);
+                          removeB2b(r.clientCode, r.standard);
                           toast.success("הרשומה נמחקה");
                         }}
                         className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-danger"

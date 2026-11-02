@@ -18,6 +18,12 @@ describe("import integrity", () => {
     assert.equal(historicalClientName({ route:"b2b",clientCode:"B1",accountName:"A1" },regular,b2b),"Past B2B");
     assert.equal(historicalClientName({ client:"Original snapshot",clientId:"C1",siteId:"S1" },regular,b2b),"Original snapshot");
   });
+  it("resolves inactive vehicle 80620031 by standard/client even when account name changes", () => {
+    const clients = [{ standard:"80620031",clientCode:"C1",accountName:"Renamed",clientName:"Historical vehicle",isActive:false },{ standard:"80620032",clientCode:"C1",accountName:"Renamed",clientName:"Other vehicle",isActive:true }];
+    assert.equal(historicalClientName({route:"b2b",standard:"80620031",clientCode:"C1",accountName:"Old"},[],clients),"Historical vehicle");
+    assert.equal(isActiveClient(clients[0]),false);
+    assert.equal(isActiveClient(clients[1]),true);
+  });
   it("skips historical cards and repeated file rows while preserving new numbers", () => {
     const result = partitionStockRows([["0001"],["0002"],["0002"],["0003"]], new Set(["0001"]));
     assert.deepEqual(result.accepted, [["0002"],["0003"]]);

@@ -44,6 +44,7 @@ import { issuanceAmountRules, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { pickExact } from "@/store/appStore";
 import { isActiveClient } from "@/lib/importIntegrity";
+import { workVehicleKey } from "@/lib/workVehicles";
 import { supabase } from "@/lib/supabaseClient";
 
 export const Route = createFileRoute("/supervisor")({
@@ -281,20 +282,20 @@ function ClientBlock({
     let cancelled = false;
     setActiveKeys(null);
     const table = mode === "b2b" ? "b2b_clients" : "regular_clients";
-    const columns = mode === "b2b" ? "client_code,account_name" : "client_id,site_id";
+    const columns = mode === "b2b" ? "client_code,standard" : "client_id,site_id";
     void (async () => {
       const keys = new Set<string>();
       for (let from = 0; ; from += 1000) {
         const { data, error } = await supabase.from(table).select(columns).eq("is_active", true).range(from, from + 999);
         if (error) throw error;
-        for (const row of (data ?? []) as unknown as Record<string, unknown>[]) keys.add(JSON.stringify(mode === "b2b" ? [row.client_code, row.account_name] : [row.client_id, row.site_id]));
+        for (const row of (data ?? []) as unknown as Record<string, unknown>[]) keys.add(mode === "b2b" ? workVehicleKey({ clientCode: String(row.client_code ?? ""), standard: String(row.standard ?? "") }) : JSON.stringify([row.client_id, row.site_id]));
         if (!data || data.length < 1000) break;
       }
       if (!cancelled) setActiveKeys(keys);
     })().catch(() => { /* Fail closed; inactive or unverified clients are never offered. */ });
     return () => { cancelled = true; };
   }, [mode, b2bClients, nonB2b]);
-  const verifiedActive = (c: B2BClientRecord | ClientRecord) => isActiveClient(c) && Boolean(activeKeys?.has(JSON.stringify("accountName" in c ? [c.clientCode,c.accountName] : [c.clientId,c.siteId])));
+  const verifiedActive = (c: B2BClientRecord | ClientRecord) => isActiveClient(c) && Boolean(activeKeys?.has("accountName" in c ? workVehicleKey(c) : JSON.stringify([c.clientId,c.siteId])));
 
   // Inactive clients (missing from the last import) are never offered.
   const allowedB2b = useMemo(
@@ -308,7 +309,7 @@ function ClientBlock({
   const matches = useMemo(() => {
     const q = search.trim();
     if (!q || selected) return [];
-    if (mode === "b2b") return allowedB2b.filter((c) => c.clientName.includes(q) || c.accountName.includes(q)).slice(0, 8);
+    if (mode === "b2b") return allowedB2b.filter((c) => c.clientName.includes(q) || c.accountName.includes(q) || c.standard.includes(q) || c.clientCode.includes(q)).slice(0, 8);
     return nonB2b.filter((c) => verifiedActive(c) && (c.clientName.includes(q) || c.siteName.includes(q))).slice(0, 8);
   }, [search, selected, mode, allowedB2b, nonB2b, activeKeys]);
 
@@ -358,9 +359,9 @@ function ClientBlock({
             <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-raised">
               {matches.map((c) => {
                 const isB2b = "accountName" in c;
-                const sub = isB2b ? c.accountName : (c as ClientRecord).siteName;
+                const sub = isB2b ? `${c.accountName} · ${c.standard}` : (c as ClientRecord).siteName;
                 return (
-                  <li key={isB2b ? `${c.clientCode}|${c.accountName}` : `${(c as ClientRecord).clientId}|${(c as ClientRecord).siteId}`}>
+                  <li key={isB2b ? workVehicleKey(c) : `${(c as ClientRecord).clientId}|${(c as ClientRecord).siteId}`}>
                     <button
                       type="button"
                       onClick={() =>

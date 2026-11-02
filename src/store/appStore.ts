@@ -7,7 +7,8 @@ import {
 
 import { logActivity } from "@/lib/activityLog";
 import { pazFeedbackCardNumbers } from "@/lib/importIntegrity";
-import { syncVehiclePool, importVoucherInventory, reconcilePazFeedback, type VehicleSyncResult } from "@/lib/backend";
+import { syncVehiclePool, syncWorkVehicles, importVoucherInventory, reconcilePazFeedback, type VehicleSyncResult } from "@/lib/backend";
+import { prepareWorkVehicles } from "@/lib/workVehicles";
 import { fuelStockError, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { transferInventory, issueVoucherToWorker } from "@/lib/transferInventory";
 import { cardsOfFuel, issuancePool } from "@/lib/issuanceStock";
@@ -255,10 +256,10 @@ interface AppState {
 
   b2bClients: B2BClientRecord[];
   addB2b: (row: B2BClientRecord) => void;
-  updateB2b: (clientCode: string, accountName: string, patch: Partial<B2BClientRecord>) => void;
-  /** Upsert by clientCode + accountName. */
+  updateB2b: (clientCode: string, standard: string, patch: Partial<B2BClientRecord>) => void;
+  /** Full snapshot sync by standard + clientCode. */
   importB2b: (rows: B2BClientRecord[]) => Promise<VehicleSyncResult>;
-  removeB2b: (clientCode: string, accountName: string) => void;
+  removeB2b: (clientCode: string, standard: string) => void;
 
   links: WorkerLink[];
   /** Saves ID + phone after the worker signs. */
@@ -513,31 +514,32 @@ export const useAppStore = create<AppState>()(
   b2bClients: [],
   addB2b: (row) => {
     set((s) => ({ b2bClients: [row, ...s.b2bClients] }));
-    run(db.from("b2b_clients").upsert(b2bToRow(row), { onConflict: "client_code,account_name" }));
+    run(db.from("b2b_clients").insert(b2bToRow(row)));
   },
-  updateB2b: (code, account, patch) => {
+  updateB2b: (code, standard, patch) => {
     let next: B2BClientRecord | undefined;
     set((s) => ({
       b2bClients: s.b2bClients.map((c) => {
-        if (c.clientCode !== code || c.accountName !== account) return c;
+        if (c.clientCode !== code || c.standard !== standard) return c;
         next = { ...c, ...patch };
         return next;
       }),
     }));
     if (next)
-      run(db.from("b2b_clients").update(b2bToRow(next)).eq("client_code", code).eq("account_name", account));
+      run(db.from("b2b_clients").update(b2bToRow(next)).eq("client_code", code).eq("standard", standard));
   },
   importB2b: async (rows) => {
-    const result = await syncVehiclePool("b2b", rows.map(b2bToRow));
+    const prepared = prepareWorkVehicles(rows);
+    const result = await syncWorkVehicles(prepared.rows.map(b2bToRow));
     const fresh = await loadAll();
     set({ b2bClients: fresh.b2bClients });
-    return result;
+    return { ...result, duplicates: (result.duplicates ?? 0) + prepared.duplicates, blanks: (result.blanks ?? 0) + prepared.blanks };
   },
-  removeB2b: (code, account) => {
+  removeB2b: (code, standard) => {
     set((s) => ({
-      b2bClients: s.b2bClients.filter((c) => !(c.clientCode === code && c.accountName === account)),
+      b2bClients: s.b2bClients.filter((c) => !(c.clientCode === code && c.standard === standard)),
     }));
-    run(db.from("b2b_clients").delete().eq("client_code", code).eq("account_name", account));
+    run(db.from("b2b_clients").delete().eq("client_code", code).eq("standard", standard));
   },
 
   links: [],

@@ -5,9 +5,13 @@
 
 
 @theme {
+  --color-inactive-row: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
   --font-sans: "Assistant", "Heebo", system-ui, sans-serif;
   --font-display: "Assistant", "Heebo", system-ui, sans-serif;
 }
+
+.responsive-table tbody tr.work-vehicle-inactive,
+.responsive-table tbody tr.work-vehicle-inactive:hover { background: var(--color-inactive-row); }
 
 
 @keyframes fadeIn {

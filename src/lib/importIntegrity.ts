@@ -11,9 +11,9 @@ export function pazCardMatchKey(value: unknown): string {
 export function pazFeedbackCardNumbers(rows: unknown[][]): string[] {
   return [...new Set(rows.map(row => pazCardMatchKey(row[0])).filter(Boolean))];
 }
-export function historicalClientName(voucher: { client?: string; clientId?: string; clientCode?: string; siteId?: string; accountName?: string; route?: string }, regular: { clientId: string; siteId: string; clientName: string }[], b2b: { clientCode: string; accountName: string; clientName: string }[]) {
+export function historicalClientName(voucher: { client?: string; clientId?: string; clientCode?: string; siteId?: string; accountName?: string; standard?: string; route?: string }, regular: { clientId: string; siteId: string; clientName: string }[], b2b: { clientCode: string; accountName: string; standard?: string; clientName: string }[]) {
   if (voucher.client) return voucher.client;
-  if (voucher.route === "b2b") return b2b.find(c => c.clientCode === (voucher.clientCode ?? voucher.clientId) && c.accountName === voucher.accountName)?.clientName;
+  if (voucher.route === "b2b") return b2b.find(c => c.clientCode === (voucher.clientCode ?? voucher.clientId) && (voucher.standard ? c.standard === voucher.standard : c.accountName === voucher.accountName))?.clientName;
   return regular.find(c => c.clientId === (voucher.clientId ?? voucher.clientCode) && c.siteId === voucher.siteId)?.clientName;
 }
 export function partitionStockRows(rows: string[][], existing: Set<string>) {

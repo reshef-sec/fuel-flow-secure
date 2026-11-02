@@ -1,0 +1,31 @@
+-- Disposable database only, after work_vehicle_sync.sql. Never run against live data.
+BEGIN;
+INSERT INTO public.profiles(id,full_name) VALUES('10000000-0000-0000-0000-000000000001','Test Admin');
+INSERT INTO public.user_roles(user_id,role) VALUES('10000000-0000-0000-0000-000000000001','admin');
+SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
+DO $$ DECLARE r jsonb; denied boolean:=false; BEGIN
+  r:=public.sync_work_vehicles('[{"standard":" 80620031 ","client_code":"C1","account_name":"Shared","client_name":"First"},{"standard":"80620031","client_code":"C1","account_name":"Shared","client_name":"Duplicate"},{"standard":"80620032","client_code":"C1","account_name":"Shared","client_name":"Second"},{}]');
+  IF r->>'added'<>'2' OR r->>'duplicates'<>'1' OR r->>'blanks'<>'1' OR (SELECT client_name FROM public.b2b_clients WHERE standard='80620031')<>'First' THEN RAISE EXCEPTION 'First duplicate, blank skipping or shared account failed'; END IF;
+  INSERT INTO public.vouchers(serial,route,client_code,standard,account_name,link_id) VALUES('history','b2b','C1','80620031','Shared','old-link');
+  r:=public.sync_work_vehicles('[{"standard":"80620032","client_code":"C1","account_name":"Renamed","client_name":"Updated"}]');
+  IF r->>'deactivated'<>'1' OR r->>'updated'<>'1' OR (SELECT count(*) FROM public.b2b_clients)<>2 THEN RAISE EXCEPTION 'Delta sync deleted or failed'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.b2b_clients WHERE standard='80620031' AND NOT is_active) THEN RAISE EXCEPTION '80620031 not deactivated'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.vouchers v JOIN public.b2b_clients c ON v.client_code=c.client_code AND v.standard=c.standard WHERE v.serial='history' AND NOT c.is_active) THEN RAISE EXCEPTION 'Inactive historical resolution failed'; END IF;
+  BEGIN INSERT INTO public.vouchers(serial,route,client_code,standard,account_name,link_id) VALUES('blocked','b2b','C1','80620031','Shared','new-link'); EXCEPTION WHEN raise_exception THEN denied:=true; END;
+  IF NOT denied THEN RAISE EXCEPTION 'Inactive vehicle issuance accepted'; END IF;
+  INSERT INTO public.vouchers(serial,route,client_code,standard,account_name,link_id) VALUES('allowed','b2b','C1','80620032','Renamed','new-link');
+  denied:=false;
+  BEGIN PERFORM public.sync_work_vehicles('[{"client_code":"C1","standard":""}]'); EXCEPTION WHEN raise_exception THEN denied:=true; END;
+  IF NOT denied OR NOT EXISTS(SELECT 1 FROM public.b2b_clients WHERE standard='80620032' AND is_active) THEN RAISE EXCEPTION 'Incomplete snapshot changed pool'; END IF;
+  denied:=false;
+  BEGIN PERFORM public.sync_work_vehicles('[{}]'); EXCEPTION WHEN raise_exception THEN denied:=true; END;
+  IF NOT denied THEN RAISE EXCEPTION 'Empty snapshot accepted'; END IF;
+  PERFORM public.sync_work_vehicles('[{"standard":"80620031","client_code":"C1","account_name":"Shared","client_name":"Reactivated"}]');
+  IF NOT EXISTS(SELECT 1 FROM public.b2b_clients WHERE standard='80620031' AND is_active AND client_name='Reactivated') THEN RAISE EXCEPTION 'Reactivation failed'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.activity_log WHERE action='סנכרון מאגר רכב עבודה' AND target LIKE '%1 כפולים דולגו') THEN RAISE EXCEPTION 'Audit missing'; END IF;
+  PERFORM set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
+  denied:=false;
+  BEGIN PERFORM public.sync_work_vehicles('[{"standard":"80620031","client_code":"C1"}]'); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
+  IF NOT denied OR has_function_privilege('anon','public.sync_work_vehicles(jsonb)','EXECUTE') THEN RAISE EXCEPTION 'Unauthorized sync accepted'; END IF;
+END $$;
+ROLLBACK;
