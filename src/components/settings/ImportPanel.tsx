@@ -21,7 +21,7 @@ import { FuelBadge, parseFuelType } from "@/components/fuel/fuel";
 import { Pager, usePaged } from "@/components/ui/Pager";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { validateStockSheet } from "@/lib/validateStockSheet";
-import { partitionStockRows } from "@/lib/importIntegrity";
+import { partitionStockRows, pazFeedbackCardNumbers } from "@/lib/importIntegrity";
 import { useAppStore } from "@/store/appStore";
 
 const templateColumns = [
@@ -163,11 +163,11 @@ export function ImportPanel() {
     if (!isSheetFile(file.name)) return void toast.error("יש להעלות קובץ אקסל (xlsx, xls) או CSV");
     try {
       const raw = stripHeader(await parseSheetFile(file), "כרטיס");
-      const serials = raw.map((r) => String(r[0] ?? "").trim()).filter(Boolean);
+      const serials = pazFeedbackCardNumbers(raw);
       if (!serials.length) return void toast.error("לא נמצאו מספרי כרטיסים בקובץ");
       const updated = await markSerialsRedeemed(serials);
       if (!updated) return void toast.info("מספרי הכרטיסים בקובץ לא נמצאו במאגר או שכבר מומשו");
-      toast.success(`היזון חוזר נטען · ${updated} שוברים עודכנו ל"מומש בפועל"`);
+      toast.success(`עודכנו בהצלחה ${updated} שוברים לסטטוס 'מומש סופית'`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "ייבוא היזון חוזר נכשל");
     }
@@ -219,7 +219,7 @@ export function ImportPanel() {
           </div>
           <DropZone
             title="גרור קובץ מימושים לכאן"
-            hint='התאמה לפי מספר כרטיס (עמודה A) · עדכון ל"מומש בפועל"'
+            hint='התאמה לפי מספר כרטיס (עמודה A) · עדכון ל"מומש סופית"'
             button="בחירת קובץ"
             icon={RefreshCcw}
             tone="accent"

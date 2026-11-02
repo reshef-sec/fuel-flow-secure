@@ -149,16 +149,61 @@ REVOKE ALL ON FUNCTION public.import_voucher_inventory(jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.import_voucher_inventory(jsonb) TO authenticated;
 -- No confidential code SELECT grant is introduced. Stock + code inserts + audit are one transaction.
 
+-- Canonical matching key only: retain the original stored number for audit/history.
+-- Text 019950, numeric Excel 19950 and 19950.0 share a key; nonnumeric IDs
+-- remain intact. Never cast to integer (long card numbers must stay exact).
+CREATE OR REPLACE FUNCTION public.paz_card_match_key(p_card text)
+RETURNS text LANGUAGE sql IMMUTABLE STRICT SET search_path = pg_catalog
+AS $$
+  WITH cleaned AS (
+    SELECT regexp_replace(translate(p_card, chr(160) || chr(65279), ''), '[[:space:]]', '', 'g') AS value
+  ), numeric_text AS (
+    SELECT CASE WHEN value ~ '^[0-9]+[.]0+$' THEN split_part(value, '.', 1) ELSE value END AS value FROM cleaned
+  )
+  SELECT CASE WHEN value ~ '^[0-9]+$' THEN coalesce(nullif(ltrim(value, '0'), ''), '0') ELSE value END FROM numeric_text
+$$;
+REVOKE ALL ON FUNCTION public.paz_card_match_key(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.paz_card_match_key(text) TO authenticated, service_role;
+CREATE INDEX IF NOT EXISTS vouchers_paz_match_key_idx ON public.vouchers(public.paz_card_match_key(card_number));
+
 CREATE OR REPLACE FUNCTION public.reconcile_redeemed_vouchers(card_numbers text[])
 RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public
-AS $$ DECLARE n integer; BEGIN
-  IF auth.uid() IS NULL OR NOT public.has_role(auth.uid(),'admin') THEN RAISE EXCEPTION 'Admin access required' USING ERRCODE='42501'; END IF;
-  IF card_numbers IS NULL OR cardinality(card_numbers)=0 THEN RAISE EXCEPTION 'Card numbers required'; END IF;
-  UPDATE public.vouchers SET status='redeemed',redeemed_at=now(),updated_on=to_char(now() AT TIME ZONE 'Asia/Jerusalem','YYYY-MM-DD')
-    WHERE card_number IN (SELECT trim(x) FROM unnest(card_numbers) x)
-      AND (status IS DISTINCT FROM 'redeemed' OR redeemed_at IS NULL);
-  GET DIAGNOSTICS n=ROW_COUNT;
-  PERFORM public.log_import_action('היזון חוזר מימושים מפז',n || ' שוברים עודכנו למומש בפועל');
+AS $$
+DECLARE keys text[]; changed_cards text[]; n integer;
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.has_role(auth.uid(), 'admin') THEN
+    RAISE EXCEPTION 'Admin access required' USING ERRCODE='42501';
+  END IF;
+  SELECT array_agg(DISTINCT public.paz_card_match_key(x)) INTO keys
+    FROM unnest(card_numbers) AS input(x) WHERE nullif(public.paz_card_match_key(x), '') IS NOT NULL;
+  IF coalesce(cardinality(keys), 0)=0 THEN RAISE EXCEPTION 'Card numbers required'; END IF;
+
+  -- Protect against a concurrent import/issue changing the matching set. Any
+  -- ambiguous normalized identity aborts everything, rather than redeeming
+  -- two different physical cards (e.g. both 019950 and 19950 in inventory).
+  LOCK TABLE public.vouchers IN SHARE ROW EXCLUSIVE MODE;
+  IF EXISTS (
+    SELECT 1 FROM public.vouchers v WHERE public.paz_card_match_key(v.card_number)=ANY(keys)
+    GROUP BY public.paz_card_match_key(v.card_number) HAVING count(*)>1
+  ) THEN
+    RAISE EXCEPTION 'נמצאו מספרי כרטיסים דו־משמעיים לאחר הסרת אפסים מובילים; יש לבדוק את המלאי לפני הייבוא';
+  END IF;
+
+  WITH changed AS (
+    UPDATE public.vouchers v
+      SET status='redeemed', redeemed_at=coalesce(v.redeemed_at, now()),
+          updated_on=to_char(now() AT TIME ZONE 'Asia/Jerusalem', 'YYYY-MM-DD')
+      WHERE public.paz_card_match_key(v.card_number)=ANY(keys)
+        AND (v.status IN ('available', 'issued', 'טרם שומש', 'הוקצה לעובד', 'מומש בפועל', 'מומש סופית')
+          OR (v.status='redeemed' AND v.redeemed_at IS NULL))
+      RETURNING v.card_number
+  ) SELECT count(*)::integer, array_agg(card_number ORDER BY card_number) INTO n, changed_cards FROM changed;
+
+  -- Same transaction as redemption: an audit failure rolls the update back.
+  INSERT INTO public.activity_log(user_id, user_name, role, action, target)
+    VALUES(auth.uid(), coalesce((SELECT full_name FROM public.profiles WHERE id=auth.uid()), ''),
+      'אדמין מרכזי', 'היזון חוזר מימושים מפז',
+      n || ' שוברים עודכנו למומש סופית · מספרי כרטיסים: ' || coalesce(array_to_string(changed_cards, ', '), 'ללא'));
   RETURN n;
 END $$;
 REVOKE ALL ON FUNCTION public.reconcile_redeemed_vouchers(text[]) FROM PUBLIC, anon;

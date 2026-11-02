@@ -47,7 +47,7 @@ export const Route = createFileRoute("/reports")({
   component: ReportsPage,
 });
 
-const statuses: VoucherStatus[] = ["טרם שומש", "הוקצה לעובד", "מומש בפועל", "מומש סופית", "חסום"];
+const statuses: VoucherStatus[] = ["טרם שומש", "הוקצה לעובד", "מומש סופית", "חסום"];
 const empty = { from: "", to: "", branch: "", supervisor: "", client: "", status: "" };
 
 const reportTabs = [

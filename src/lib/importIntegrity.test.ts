@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { historicalClientName, isActiveClient, normalizeVoucherStatus, partitionStockRows } from "./importIntegrity";
+import { historicalClientName, isActiveClient, normalizeVoucherStatus, partitionStockRows, pazCardMatchKey, pazFeedbackCardNumbers } from "./importIntegrity";
 import { isAvailable } from "../components/dashboard/voucherData";
 describe("import integrity", () => {
   it("maps issued database rows to employee-issued status", () => {
@@ -23,8 +23,20 @@ describe("import integrity", () => {
     assert.deepEqual(result.accepted, [["0002"],["0003"]]);
     assert.equal(result.skipped, 2);
   });
-  it("displays redeemed as actual redemption and excludes it from inventory", () => {
-    assert.equal(normalizeVoucherStatus("redeemed"), "מומש בפועל");
-    assert.equal(isAvailable({ serial:"1", realCode:"", amount:100,branch:"מאגר ראשי",status:"מומש בפועל",updatedAt:"2026-10-31" }), false);
+  it("maps redeemed and legacy actual redemption to final redemption, excluded from inventory", () => {
+    assert.equal(normalizeVoucherStatus("redeemed"), "מומש סופית");
+    assert.equal(normalizeVoucherStatus("מומש בפועל"), "מומש סופית");
+    assert.equal(isAvailable({ serial:"1", realCode:"", amount:100,branch:"מאגר ראשי",status:"מומש סופית",updatedAt:"2026-10-31" }), false);
+  });
+  it("matches Column A numeric 19950 to stored 019950 without changing stored IDs", () => {
+    assert.equal(pazCardMatchKey(" 019950 "), "19950");
+    assert.equal(pazCardMatchKey(19950), "19950");
+    assert.equal(pazCardMatchKey("\uFEFF01\u00a09950\t"), "19950");
+    assert.equal(pazCardMatchKey("19950.0"), "19950");
+    assert.equal(pazCardMatchKey("00012345678901234567890"), "12345678901234567890");
+    assert.equal(pazCardMatchKey("AB019950"), "AB019950");
+  });
+  it("deduplicates normalized Column A only and ignores blank cells", () => {
+    assert.deepEqual(pazFeedbackCardNumbers([["019950", "unrelated"], [19950], ["19950.00"], [""], [null], ["019951"]]), ["19950", "19951"]);
   });
 });

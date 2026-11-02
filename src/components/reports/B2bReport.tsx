@@ -4,6 +4,7 @@ import { FileDown } from "lucide-react";
 import { toast } from "sonner";
 
 import {
+  Badge,
   Button,
   Table,
   TableBody,
@@ -13,8 +14,8 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { Pager, usePaged } from "@/components/ui/Pager";
-import { downloadCsv } from "@/components/dashboard/statusVariant";
-import type { VoucherRecord } from "@/components/dashboard/voucherData";
+import { downloadCsv, statusVariant } from "@/components/dashboard/statusVariant";
+import type { VoucherStatus } from "@/components/dashboard/voucherData";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 import { formatIsraelDate, inDateRange } from "@/lib/israelDate";
 import { branchLabel } from "@/lib/branchLabels";
@@ -61,13 +62,13 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
 
   const detailHeaders = [
     "סניף", "ערך כרטיס", "סוג דלק", "מספר כרטיס", "שם לקוח", "קוד לקוח", "שם חשבון", "תקן",
-    "שם עובד", "ת.ז", "טלפון", "תאריך מסירה", "סיבת הפקה",
+    "שם עובד", "ת.ז", "טלפון", "תאריך מסירה", "סיבת הפקה", "סטטוס",
   ];
   const detail = rows.map(({ v, value, code }) => [
     branchLabel(v.branch), `${value} ₪`, v.fuelType ?? "בנזין", code, v.client ?? "—",
     v.clientCode ?? v.clientId ?? "—", v.accountName ?? v.siteName ?? "—", v.standard ?? v.standardName ?? "—",
     v.workerName ?? "—", v.workerId ?? "—", v.workerPhone ?? "—",
-    formatIsraelDate(v.deliveredAt ?? v.updatedAt), v.reason ?? "—",
+    formatIsraelDate(v.deliveredAt ?? v.updatedAt), v.reason ?? "—", v.status,
   ]);
 
   // One row per תקן for the filtered period.
@@ -146,7 +147,7 @@ export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
                 <TableRow key={i}>
                   {cells.map((c, j) => (
                     <TableCell key={j} className="whitespace-nowrap md:min-w-32">
-                      {view === "detail" && j === 2 ? <FuelBadge fuel={c === "סולר" ? "סולר" : "בנזין"} /> : c}
+                      {view === "detail" && j === 2 ? <FuelBadge fuel={c === "סולר" ? "סולר" : "בנזין"} /> : view === "detail" && j === 13 ? <Badge variant={statusVariant[c as VoucherStatus]} size="sm">{c}</Badge> : c}
                     </TableCell>
                   ))}
                 </TableRow>

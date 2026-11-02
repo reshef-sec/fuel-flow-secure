@@ -6,6 +6,7 @@ import {
 } from "@/lib/cloudSync";
 
 import { logActivity } from "@/lib/activityLog";
+import { pazFeedbackCardNumbers } from "@/lib/importIntegrity";
 import { syncVehiclePool, importVoucherInventory, reconcilePazFeedback, type VehicleSyncResult } from "@/lib/backend";
 import { fuelStockError, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { transferInventory, issueVoucherToWorker } from "@/lib/transferInventory";
@@ -369,7 +370,7 @@ export const useAppStore = create<AppState>()(
     return null;
   },
   markSerialsRedeemed: async (serials) => {
-    const updated = await reconcilePazFeedback([...new Set(serials.map(s => s.trim()).filter(Boolean))]);
+    const updated = await reconcilePazFeedback(pazFeedbackCardNumbers(serials.map(serial => [serial])));
     set({ vouchers: await loadIssuanceStock() });
     notifyCentralInventoryChanged();
     return updated;
