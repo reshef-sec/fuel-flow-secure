@@ -146,7 +146,9 @@ export function ProducedLinks({ limit, variant = "table" }: { limit?: number; va
 
   const actions = (r: ProducedRow, mobile = false) => {
     const l = r.link;
-    const showUnlock = r.status !== "נחתם";
+    // Always offered (signed links too): workers often return to their codes later, and a
+    // signed link can still lock after wrong ID/phone attempts. Permission = canUnlock (issuer or admin).
+    const showUnlock = true;
     const who = l.employeeName ?? "העובד";
     return (
       <>
@@ -169,7 +171,7 @@ export function ProducedLinks({ limit, variant = "table" }: { limit?: number; va
               r.status === "נעול" && "text-red-700",
             )}
           >
-            <LockOpen className="inline size-4" aria-hidden /> {r.status === "נעול" ? "שחרור נעילה" : "איפוס ניסיונות"}
+            <LockOpen className="inline size-4" aria-hidden /> שחרור נעילה
           </button>
         ) : null}
       </>

@@ -132,9 +132,24 @@ describe("sign_worker_link + open_worker_wallet", () => {
     assert.equal(r.status, 403);
     assert.equal((await rpc(owner.agent, "unlock_worker_link", { p_id: "nope" })).error, "הלינק לא נמצא");
 
+    const linkBefore = await WorkerLink.findOne({ id: "123456" }).lean();
+    const cardsBefore = await Voucher.find({}, { _id: 0, serial: 1, status: 1, link_id: 1, employee_name: 1 }).sort({ serial: 1 }).lean();
+    const sigsBefore = await SignatureArchive.countDocuments();
+
     r = await rpc(owner.agent, "unlock_worker_link", { p_id: "123456" });
     assert.equal(r.status, 200);
     assert.equal(r.data, null);
+
+    // Unlocking a SIGNED link only resets the lock — signature, worker identity, cards and archive are untouched.
+    const linkAfter = await WorkerLink.findOne({ id: "123456" }).lean();
+    assert.equal(linkAfter.locked, false);
+    assert.equal(linkAfter.failed_attempts, 0);
+    for (const k of ["signed_at", "worker_id", "phone", "employee_name", "total", "supervisor_id"]) assert.deepEqual(linkAfter[k], linkBefore[k], k);
+    assert.deepEqual(linkAfter.serials, linkBefore.serials);
+    assert.deepEqual(await Voucher.find({}, { _id: 0, serial: 1, status: 1, link_id: 1, employee_name: 1 }).sort({ serial: 1 }).lean(), cardsBefore);
+    assert.equal(await SignatureArchive.countDocuments(), sigsBefore);
+
+    // …and the worker can open the wallet again with the correct details.
     r = await rpc(a, "open_worker_wallet", { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567" });
     assert.equal(r.data.ok, true);
 
