@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { normalizeWorkVehicleHeader, parseWorkVehicleSheet } from "./workVehicleSheet";
 import { parseSheetFile } from "./parseSheet";
 import { prepareWorkVehicles } from "./workVehicles";
-const columns = [{key:"standard",label:"תקן"},{key:"clientCode",label:"קוד לקוח"},{key:"clientName",label:"שם לקוח"},{key:"balance",label:'יתרת הנה"ש'}];
+const columns = [{key:"standard",label:"תקן"},{key:"clientCode",label:"קוד לקוח"},{key:"clientName",label:"שם לקוח"},{key:"balance",label:'יתרת הנה"ש'}] as const;
 describe("work vehicle Excel headers", () => {
   it("detects the header in each of the first five rows", () => {
     for (let index=0;index<5;index++) {
