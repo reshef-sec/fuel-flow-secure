@@ -18,6 +18,13 @@ export default defineConfig(({ mode }) => ({
       "/api": { target: "http://localhost:3000", changeOrigin: false },
     },
   },
+  // Production is served by Express (`npm start` / `npm run preview` → server/index.js).
+  // This only matters if someone runs `npm run preview:vite` on a Render host.
+  preview: {
+    host: "0.0.0.0",
+    port: Number(process.env.PORT ?? 4173),
+    allowedHosts: [".onrender.com"],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

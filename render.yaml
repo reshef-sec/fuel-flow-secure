@@ -1,7 +1,7 @@
 # Render Blueprint — one Node web service: Express API + the built React SPA.
 services:
   - type: web
-    name: reshef-fuel
+    name: fuel-flow-secure
     runtime: node
     branch: DELEK
     plan: starter

@@ -43,7 +43,17 @@ export function createApp({ staticDir = path.resolve(here, "../dist/client") } =
     if (req.method === "GET" || req.method === "HEAD") return next();
     if (!req.is("application/json")) return next(new HttpError(415, "JSON required"));
     const origin = req.get("origin");
-    if (origin && new URL(origin).host !== req.get("host")) return next(new HttpError(403, "Cross-origin request blocked"));
+    if (!origin) return next();
+    let originHost;
+    try { originHost = new URL(origin).host; } catch { return next(new HttpError(403, "Cross-origin request blocked")); }
+    // Same host as the request, or this service's public hostname behind Render's proxy.
+    const allowed = new Set([
+      req.get("host"),
+      req.get("x-forwarded-host"),
+      process.env.RENDER_EXTERNAL_HOSTNAME,
+      ...String(process.env.APP_HOSTS ?? "").split(","),
+    ].map((h) => String(h ?? "").trim().toLowerCase()).filter(Boolean));
+    if (!allowed.has(originHost.toLowerCase())) return next(new HttpError(403, "Cross-origin request blocked"));
     next();
   });
   app.use("/api", loadUser);

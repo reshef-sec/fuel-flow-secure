@@ -14,7 +14,9 @@
     "start": "node server/index.js",
     "test": "node --test \"server/tests/*.test.js\" && node --import ./scripts/ts-test-hooks.mjs --test \"src/lib/*.test.ts\"",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "node server/index.js",
+    "preview:vite": "vite preview",
+    "serve": "node server/index.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
