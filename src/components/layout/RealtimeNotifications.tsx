@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 
 import { useAuthContext } from "@/lib/auth-context";
-import { supabase } from "@/lib/supabaseClient";
+import { apiFetch } from "@/lib/apiClient";
 import { useAppStore } from "@/store/appStore";
 
 function browserNotify(title: string, body: string) {
@@ -21,9 +21,18 @@ function notify(title: string, body: string) {
   browserNotify(title, body);
 }
 
+interface NotificationsResponse {
+  now: string;
+  requests: { requester?: string; branch?: string; amount?: number }[];
+  assigned: { count: number; total: number };
+}
+
+const POLL_MS = 20 * 1000;
+
 /**
  * Live alerts based on the signed-in account (not the preview role):
  * admins hear about new voucher requests, supervisors about vouchers allocated to them.
+ * Polls GET /api/notifications every 20s while the tab is visible (replaces Realtime channels).
  */
 export function RealtimeNotifications() {
   const { profile } = useAuthContext();
@@ -32,47 +41,50 @@ export function RealtimeNotifications() {
 
   useEffect(() => {
     if (!role || !uid) return;
+    if (role !== "admin" && role !== "supervisor") return;
     if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
 
-    const channel = supabase.channel(`notify-${uid}`);
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let pending = 0;
+    let cancelled = false;
+    let inFlight = false;
+    // Server clock cursor: only events after the moment this listener started count.
+    let since: string | null = null;
 
-    if (role === "admin") {
-      channel.on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "voucher_requests" },
-        (payload) => {
-          const r = payload.new as { requester?: string; branch?: string; amount?: number };
-          notify("דרישת שוברים חדשה", `${r.requester ?? ""} · ${r.branch ?? ""} · ${Number(r.amount ?? 0).toLocaleString("he-IL")} ₪`);
+    const poll = async () => {
+      if (cancelled || inFlight) return;
+      if (since && document.visibilityState !== "visible") return;
+      inFlight = true;
+      try {
+        const query = since ? `?since=${encodeURIComponent(since)}` : "";
+        const { body } = await apiFetch<NotificationsResponse>(`/api/notifications${query}`);
+        if (cancelled || !body) return;
+        const first = since === null;
+        since = body.now;
+        if (first) return;
+
+        if (role === "admin" && body.requests.length) {
+          for (const r of body.requests) {
+            notify("דרישת שוברים חדשה", `${r.requester ?? ""} · ${r.branch ?? ""} · ${Number(r.amount ?? 0).toLocaleString("he-IL")} ₪`);
+          }
           void useAppStore.getState().loadFromCloud();
-        },
-      );
-    }
+        }
 
-    if (role === "supervisor") {
-      channel.on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "vouchers", filter: `supervisor_id=eq.${uid}` },
-        (payload) => {
-          const before = payload.old as { supervisor_id?: string | null };
-          // Only count vouchers newly assigned to me (old row may be partial without REPLICA IDENTITY FULL).
-          if (before && "supervisor_id" in before && before.supervisor_id === uid) return;
-          pending += Number((payload.new as { amount?: number }).amount ?? 100);
-          clearTimeout(timer);
-          timer = setTimeout(() => {
-            notify("הוקצו לך שוברים חדשים", `סה"כ ${pending.toLocaleString("he-IL")} ₪ זמינים להפקה`);
-            pending = 0;
-            void useAppStore.getState().loadFromCloud();
-          }, 1500);
-        },
-      );
-    }
+        if (role === "supervisor" && body.assigned.count > 0) {
+          notify("הוקצו לך שוברים חדשים", `סה"כ ${Number(body.assigned.total).toLocaleString("he-IL")} ₪ זמינים להפקה`);
+          void useAppStore.getState().loadFromCloud();
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
 
-    channel.subscribe();
+    void poll();
+    const interval = window.setInterval(() => void poll(), POLL_MS);
+    const onVisible = () => { if (document.visibilityState === "visible") void poll(); };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
-      clearTimeout(timer);
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [role, uid]);
 

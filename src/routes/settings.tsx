@@ -14,6 +14,7 @@ import { B2bPanel } from "@/components/settings/B2bPanel";
 import { UploadCloud } from "lucide-react";
 import { ImportPanel } from "@/components/settings/ImportPanel";
 import { DevelopmentPanel } from "@/components/settings/DevelopmentPanel";
+import { isReadOnlyRole, useAppStore } from "@/store/appStore";
 
 
 export const Route = createFileRoute("/settings")({
@@ -45,14 +46,20 @@ const tabs = [
   { id: "audit", label: "יומן פעילות", icon: ScrollText },
 ] as const;
 
+/** Tabs hidden from the read-only viewer: importing is a write; the audit log is admin-only on the server. */
+const writeOnlyTabs = new Set<string>(["import", "audit"]);
 
 function SettingsPage() {
+  const readOnly = useAppStore((s) => isReadOnlyRole(s.role));
+  const visibleTabs = readOnly ? tabs.filter((t) => !writeOnlyTabs.has(t.id)) : tabs;
+  const fallback = visibleTabs[0].id;
   const initialTab = Route.useSearch().tab;
-  const [tab, setTab] = useState<string>(tabs.some(t => t.id === initialTab) ? initialTab ?? "import" : "import");
+  const [selected, setTab] = useState<string>(visibleTabs.some(t => t.id === initialTab) ? initialTab ?? fallback : fallback);
+  const tab = visibleTabs.some(t => t.id === selected) ? selected : fallback;
 
   return (
     <InternalLayout title="הגדרות מערכת">
-      <Tabs items={tabs} value={tab} onChange={setTab} scrollable />
+      <Tabs items={visibleTabs} value={tab} onChange={setTab} scrollable />
       <div className="mt-6">
         {tab === "import" ? <ImportPanel /> : null}
         {tab === "reasons" ? <ReasonsPanel /> : null}

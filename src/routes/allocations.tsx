@@ -6,7 +6,7 @@ import { InternalLayout } from "@/components/layout/InternalLayout";
 import { NoAccess } from "@/components/layout/NoAccess";
 import { AllocationDialog } from "@/components/dashboard/AllocationDialog";
 import { Badge, Button, Card } from "@/design-system/delek-1ea111";
-import { useAppStore } from "@/store/appStore";
+import { isReadOnlyRole, seesAllData, useAppStore } from "@/store/appStore";
 import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { FuelBreakdown } from "@/components/fuel/fuel";
@@ -33,12 +33,15 @@ function AllocationsPage() {
   const branchList = useAppStore((s) => s.branchList);
   const vouchers = useAppStore((s) => s.vouchers);
   const role = useAppStore((s) => s.role);
-  const { summary, totalAvailableBalance, error: inventoryError, refresh } = useCentralInventorySummary(role === "admin");
-  useLiveInventory(role === "admin");
+  // The read-only viewer sees the same stock overview, without allocation actions.
+  const adminView = seesAllData(role);
+  const readOnly = isReadOnlyRole(role);
+  const { summary, totalAvailableBalance, error: inventoryError, refresh } = useCentralInventorySummary(adminView);
+  useLiveInventory(adminView);
   const [allocOpen, setAllocOpen] = useState(false);
   const [presetBranch, setPresetBranch] = useState<string | undefined>(undefined);
 
-  if (role !== "admin") return <NoAccess title="הקצאות לסניפים" />;
+  if (!adminView) return <NoAccess title="הקצאות לסניפים" />;
 
   function openAllocation(branch?: string) {
     setPresetBranch(branch);
@@ -70,10 +73,10 @@ function AllocationsPage() {
         </p>
         {summary ? <FuelBreakdown totals={{ "בנזין": summary.gasoline_amount, "סולר": summary.diesel_amount }} className="mt-2" /> : <p className="mt-2 text-sm text-danger">{inventoryError ?? "טוען יתרת מלאי…"}</p>}
         </div>
-        <Button onClick={() => openAllocation(undefined)}>
+        {readOnly ? null : <Button onClick={() => openAllocation(undefined)}>
           <Send className="size-4" />
           ביצוע הקצאה יזומה
-        </Button>
+        </Button>}
       </div>
 
 
@@ -125,12 +128,12 @@ function AllocationsPage() {
                   </Badge>
                 </div>
 
-                <div className="mt-4 flex justify-end">
+                {readOnly ? null : <div className="mt-4 flex justify-end">
                   <Button size="sm" variant="outline" onClick={() => openAllocation(b.name)}>
                     <Send className="size-4" />
                     הקצה
                   </Button>
-                </div>
+                </div>}
               </Card>
             ))
           )}
@@ -139,7 +142,7 @@ function AllocationsPage() {
 
 
       <AllocationDialog
-        open={allocOpen}
+        open={allocOpen && !readOnly}
         onClose={() => setAllocOpen(false)}
         presetTarget={presetBranch}
         onAllocated={refresh}

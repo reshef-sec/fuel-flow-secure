@@ -1,7 +1,22 @@
 {
+  "name": "custom_design_system_tanstack",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite dev",
+    "dev:server": "node --watch server/index.js",
+    "build": "vite build",
+    "build:dev": "vite build --mode development",
+    "start": "node server/index.js",
+    "test": "node --test \"server/tests/*.test.js\" && node --import ./scripts/ts-test-hooks.mjs --test \"src/lib/*.test.ts\"",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
   "dependencies": {
-    "@cloudflare/vite-plugin": "^1.25.5",
-    "@supabase/supabase-js": "^2.117.1",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.101.1",
     "@tanstack/react-router": "1.170.41",
@@ -9,10 +24,17 @@
     "@tanstack/react-table": "^8",
     "@tanstack/router-plugin": "1.168.42",
     "@types/react-signature-canvas": "^1.0.7",
+    "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "compression": "^1.7.5",
+    "cookie-parser": "^1.4.7",
     "date-fns": "^4.1.0",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^1.41.0",
+    "mongoose": "^8.9.5",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-signature-canvas": "^1.1.0-alpha.2",
@@ -31,27 +53,15 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
-    "drizzle-kit": "0.x",
-    "drizzle-orm": "0.x",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "lovable-tagger": "^1.2.0",
-    "postgres": "^3.4.9",
+    "mongodb-memory-server": "^10.1.3",
+    "supertest": "^7.0.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "^8.0.16"
-  },
-  "name": "custom_design_system_tanstack",
-  "private": true,
-  "scripts": {
-    "build": "vite build",
-    "build:dev": "vite build --mode development",
-    "dev": "vite dev",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "sideEffects": false,
-  "type": "module"
+  }
 }

@@ -3,7 +3,7 @@ import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge, Button, Card, CardHeader, CardTitle, Input, Select } from "@/design-system/delek-1ea111";
-import { reasonCategoryLabels, useAppStore, type ReasonCategory } from "@/store/appStore";
+import { isReadOnlyRole, reasonCategoryLabels, useAppStore, type ReasonCategory } from "@/store/appStore";
 
 function CategorySelect({ value, onChange }: { value: ReasonCategory; onChange: (v: ReasonCategory) => void }) {
   return (
@@ -24,6 +24,7 @@ export function ReasonsPanel() {
   const addReason = useAppStore((s) => s.addReason);
   const updateReason = useAppStore((s) => s.updateReason);
   const removeReason = useAppStore((s) => s.removeReason);
+  const readOnly = useAppStore((s) => isReadOnlyRole(s.role));
   const [draft, setDraft] = useState("");
   const [draftCat, setDraftCat] = useState<ReasonCategory>("Regular");
   const [editIndex, setEditIndex] = useState<number | null>(null);
@@ -36,7 +37,7 @@ export function ReasonsPanel() {
         <CardTitle>סיבות הנפקה</CardTitle>
       </CardHeader>
 
-      <form
+      {readOnly ? null : <form
         className="mt-5 flex flex-wrap gap-2"
         onSubmit={(e) => {
           e.preventDefault();
@@ -59,7 +60,7 @@ export function ReasonsPanel() {
           <Plus className="size-4" />
           הוספה
         </Button>
-      </form>
+      </form>}
 
       <ul className="mt-5 divide-y divide-border rounded-lg border border-border">
         {reasons.length === 0 ? (
@@ -67,7 +68,7 @@ export function ReasonsPanel() {
         ) : (
           reasons.map((reason, index) => (
             <li key={`${reason.name}-${index}`} className="flex items-center gap-2 px-4 py-3">
-              {editIndex === index ? (
+              {editIndex === index && !readOnly ? (
                 <>
                   <Input
                     value={editValue}
@@ -105,6 +106,7 @@ export function ReasonsPanel() {
                   <Badge variant={reason.category === "B2B" ? "info" : "neutral"}>
                     {reason.category === "B2B" ? "B2B" : "רגיל"} · {reasonCategoryLabels[reason.category]}
                   </Badge>
+                  {readOnly ? null : <>
                   <button
                     aria-label={`ערוך ${reason.name}`}
                     onClick={() => {
@@ -126,6 +128,7 @@ export function ReasonsPanel() {
                   >
                     <Trash2 className="size-4" />
                   </button>
+                  </>}
                 </>
               )}
             </li>

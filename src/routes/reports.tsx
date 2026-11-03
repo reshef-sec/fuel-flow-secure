@@ -28,7 +28,7 @@ import {
 } from "@/design-system/delek-1ea111";
 import { downloadCsv, statusVariant } from "@/components/dashboard/statusVariant";
 import { formatAssignment, type VoucherStatus } from "@/components/dashboard/voucherData";
-import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
+import { fullName, seesAllData, useAppStore, useCurrentUser } from "@/store/appStore";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({
@@ -69,7 +69,7 @@ function ReportsPage() {
   const branches = branchOptions([MAIN_POOL, ...branchList.map(b => b.name)]);
 
   // Branch managers are locked to their own branch — no "all branches" option.
-  const lockedBranch = role === "admin" ? null : (me?.branch ?? "");
+  const lockedBranch = seesAllData(role) ? null : (me?.branch ?? "");
   // Supervisors are locked to vouchers assigned to them personally.
   const lockedSupervisor = role === "supervisor" ? (me ? fullName(me) : "") : null;
 

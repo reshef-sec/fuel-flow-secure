@@ -1,0 +1,24 @@
+# Render Blueprint — one Node web service: Express API + the built React SPA.
+services:
+  - type: web
+    name: reshef-fuel
+    runtime: node
+    branch: DELEK
+    plan: starter
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false # mongodb+srv://USER:PASS@cluster.xxxx.mongodb.net/reshef?retryWrites=true&w=majority
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DEV_TOOLS_OWNER_NATIONAL_ID
+        sync: false # ת.ז של מאיה קורן — only this admin sees demo/reset tools
+      - key: DEV_TOOLS_OWNER_PHONE
+        sync: false # optional second factor for the dev-tools owner

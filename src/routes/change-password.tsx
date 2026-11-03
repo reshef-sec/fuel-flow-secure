@@ -4,8 +4,9 @@ import { KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, FormField, Input, Logo } from "@/design-system/delek-1ea111";
-import { completePasswordChange } from "@/lib/backend";
 import { useAuthContext } from "@/lib/auth-context";
+import { changePassword } from "@/lib/useAuth";
+import { passwordPolicyError } from "@/lib/passwordPolicy";
 
 export const Route = createFileRoute("/change-password")({
   head: () => ({
@@ -22,8 +23,7 @@ export const Route = createFileRoute("/change-password")({
 });
 
 function ChangePasswordPage() {
-  const save = completePasswordChange;
-  const { refresh, session } = useAuthContext();
+  const { refresh, session, profile } = useAuthContext();
   const navigate = useNavigate();
   const [pw, setPw] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -32,12 +32,13 @@ function ChangePasswordPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (pw.length < 8) return setError("הסיסמה חייבת להכיל לפחות 8 תווים");
+    const policyError = passwordPolicyError(pw, profile);
+    if (policyError) return setError(policyError);
     if (pw !== confirm) return setError("הסיסמאות אינן תואמות");
     setError(null);
     setBusy(true);
     try {
-      await save({ data: { password: pw } });
+      await changePassword(pw);
       toast.success("הסיסמה עודכנה בהצלחה");
       await refresh();
       navigate({ to: "/", replace: true });
@@ -58,6 +59,7 @@ function ChangePasswordPage() {
           <KeyRound className="size-6 text-primary" />
           <h1 className="font-display text-xl font-extrabold text-secondary">עדכון סיסמה</h1>
           <p className="text-sm text-muted-foreground">יש לבחור סיסמה חדשה לפני הכניסה למערכת.</p>
+          <p className="text-xs text-muted-foreground">לפחות 8 תווים, הכוללים אותיות וספרות. אין להשתמש בת.ז או במספר הנייד.</p>
         </div>
         <FormField label="סיסמה חדשה">
           <Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" dir="ltr" className="text-right" aria-label="סיסמה חדשה" />

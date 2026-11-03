@@ -19,7 +19,7 @@ import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
-import { useAppStore } from "@/store/appStore";
+import { isReadOnlyRole, useAppStore } from "@/store/appStore";
 import { privateVehicleKey } from "@/lib/privateVehicles";
 
 const empty = { clientId: "", clientName: "", siteId: "", siteName: "", standard: "" };
@@ -30,6 +30,7 @@ export function ClientsPanel() {
   const updateClient = useAppStore((s) => s.updateClient);
   const importClients = useAppStore((s) => s.importClients);
   const removeClient = useAppStore((s) => s.removeClient);
+  const readOnly = useAppStore((s) => isReadOnlyRole(s.role));
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<{ clientId: string; siteId: string } | null>(null);
@@ -160,6 +161,7 @@ export function ClientsPanel() {
             <FileSpreadsheet className="size-4" />
             הורד תבנית
           </Button>
+          {readOnly ? null : <>
           <Button variant="outline" onClick={() => inputRef.current?.click()}>
             <UploadCloud className="size-4" />
             ייבוא מאקסל
@@ -186,6 +188,7 @@ export function ClientsPanel() {
             <Plus className="size-4" />
             הוספה
           </Button>
+          </>}
         </div>
       </div>
 
@@ -217,7 +220,7 @@ export function ClientsPanel() {
                   <TableCell>{c.siteName}</TableCell>
                   <TableCell><Badge variant={c.isActive === true ? "success" : "danger"}>{c.isActive === true ? "פעיל" : "לא פעיל"}</Badge></TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
+                    {readOnly ? "—" : <div className="flex items-center gap-1">
                       <button
                         aria-label={`ערוך ${c.siteName}`}
                         onClick={() => {
@@ -246,7 +249,7 @@ export function ClientsPanel() {
                       >
                         <Trash2 className="size-4" />
                       </button>
-                    </div>
+                    </div>}
                   </TableCell>
                 </TableRow>
               ))

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   Ticket,
@@ -21,18 +21,18 @@ import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { useAuthContext } from "@/lib/auth-context";
 import { userDisplayName } from "@/lib/userDisplay";
 import { useIsSuperAdmin } from "@/lib/superAdmin";
-import { supabase } from "@/lib/supabaseClient";
+import { signOut } from "@/lib/useAuth";
 import { RealtimeNotifications } from "@/components/layout/RealtimeNotifications";
 import { roleLabels, storedRole, useAppStore, type Role } from "@/store/appStore";
 
 const navItems = [
-  { to: "/", label: "דשבורד", icon: LayoutDashboard, roles: ["admin", "branch", "supervisor"] },
-  { to: "/allocations", label: "הקצאות לסניפים", icon: Building2, roles: ["admin"] },
+  { to: "/", label: "דשבורד", icon: LayoutDashboard, roles: ["admin", "branch", "supervisor", "viewer"] },
+  { to: "/allocations", label: "הקצאות לסניפים", icon: Building2, roles: ["admin", "viewer"] },
   { to: "/supervisor", label: "הפקת שוברי דלק", icon: UserCheck, roles: ["admin", "branch", "supervisor"] },
-  { to: "/produced", label: "שוברים שהופקו", icon: History, roles: ["admin", "branch", "supervisor"] },
-  { to: "/reports", label: "דוחות", icon: FileBarChart, roles: ["admin", "branch", "supervisor"] },
-  { to: "/signatures", label: "ארכיון חתימות", icon: PenLine, roles: ["admin", "branch", "supervisor"] },
-  { to: "/settings", label: "הגדרות", icon: Settings, roles: ["admin"] },
+  { to: "/produced", label: "שוברים שהופקו", icon: History, roles: ["admin", "branch", "supervisor", "viewer"] },
+  { to: "/reports", label: "דוחות", icon: FileBarChart, roles: ["admin", "branch", "supervisor", "viewer"] },
+  { to: "/signatures", label: "ארכיון חתימות", icon: PenLine, roles: ["admin", "branch", "supervisor", "viewer"] },
+  { to: "/settings", label: "הגדרות", icon: Settings, roles: ["admin", "viewer"] },
 ] as const;
 
 
@@ -44,6 +44,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
   const setRole = useAppStore((s) => s.setRole);
   const { profile } = useAuthContext();
   const canSimulate = useIsSuperAdmin();
+  const navigate = useNavigate();
 
   // Restore the simulated role after hydration so permissions survive a reload.
   useEffect(() => {
@@ -145,7 +146,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
               <span className="text-sm font-semibold text-secondary">{userDisplayName(profile)}</span>
             </span>
             <button
-              onClick={() => void supabase.auth.signOut()}
+              onClick={() => void signOut().then(() => navigate({ to: "/login", replace: true }))}
               aria-label="התנתקות"
               title="התנתקות"
               className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-danger"

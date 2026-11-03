@@ -20,13 +20,15 @@ export interface StockCard {
   fuelType?: string; supervisor?: string; linkId?: string; workerId?: string; workerName?: string;
 }
 
-export interface Issuer { role: "admin" | "branch" | "supervisor"; branch?: string; supervisorName?: string }
+export interface Issuer { role: "admin" | "branch" | "supervisor" | "viewer"; branch?: string; supervisorName?: string }
 
 export const isUnissuedAvailable = (v: StockCard) =>
   (v.status === "טרם שומש" || v.status === "available") && !v.linkId && !v.workerId && !v.workerName;
 
 /** Cards the issuer may hand out. Admin → central pool; branch → own unassigned branch stock; supervisor → own stock. */
 export function issuancePool<T extends StockCard>(stock: T[], who: Issuer): T[] {
+  // The read-only viewer never issues.
+  if (who.role === "viewer") return [];
   const myBranch = canonicalBranch(who.branch);
   const me = clean(who.supervisorName);
   return stock.filter((v) => {

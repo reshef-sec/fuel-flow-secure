@@ -16,7 +16,7 @@ import {
   TableHeaderCell,
   TableRow,
 } from "@/design-system/delek-1ea111";
-import { supabase } from "@/lib/supabaseClient";
+import { api } from "@/lib/apiClient";
 import { Pager, usePaged } from "@/components/ui/Pager";
 import { formatIsraelDate } from "@/lib/israelDate";
 
@@ -50,7 +50,7 @@ export function AuditPanel() {
 
   useEffect(() => {
     let cancelled = false;
-    void supabase
+    void api
       .from("activity_log")
       .select("id, created_at, user_name, role, action, target, ip_address")
       .order("created_at", { ascending: false })
@@ -60,7 +60,8 @@ export function AuditPanel() {
         if (error) setError(error.message);
         else
           setAuditLog(
-            (data ?? []).map((r) => ({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ((data ?? []) as Record<string, any>[]).map((r) => ({
               id: String(r.id),
               user: String(r.user_name ?? ""),
               role: String(r.role ?? ""),
@@ -117,6 +118,7 @@ export function AuditPanel() {
           <option value="אדמין מרכזי">אדמין מרכזי</option>
           <option value="מנהל סניף">מנהל סניף</option>
           <option value="מפקח">מפקח</option>
+          <option value="צופה">צופה</option>
         </Select>
       </div>
 

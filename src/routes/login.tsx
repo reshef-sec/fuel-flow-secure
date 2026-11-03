@@ -1,13 +1,11 @@
-import { logActivity } from "@/lib/activityLog";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Lock, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, FormField, Input, Logo } from "@/design-system/delek-1ea111";
-import { supabase } from "@/lib/supabaseClient";
-import { activateAccount, bootstrapAdmin, getSetupStatus } from "@/lib/backend";
-import { phoneToLoginEmail } from "@/lib/phoneLogin";
+import { bootstrapAdmin, getSetupStatus } from "@/lib/backend";
+import { signIn } from "@/lib/useAuth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -51,17 +49,9 @@ function LoginPage() {
         await bootstrap({ data: { phone, nationalId: password, fullName, branch: "" } });
         toast.success("חשבון מנהל ראשי נוצר");
       }
-      // Clear any stale session left in this browser before trying again.
-      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
-      try {
-        Object.keys(localStorage).filter((k) => k.startsWith("sb-") && k.endsWith("-auth-token"))
-          .forEach((k) => localStorage.removeItem(k));
-      } catch { /* storage unavailable */ }
-      // Activate first (creates/repairs the login for first-time users); never blocks sign-in.
-      if (/^\d{9}$/.test(password)) await activateAccount(phone, password);
-      const { error: err } = await supabase.auth.signInWithPassword({ email: phoneToLoginEmail(phone), password });
-      if (err) throw new Error("מספר נייד או סיסמה שגויים");
-      logActivity({ name: phone, role: "" }, "כניסה למערכת", phone);
+      // The server activates first-time staff (initial password = ת.ז), sets the
+      // httpOnly session cookie and records "כניסה למערכת" in the activity log.
+      await signIn(phone, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : "הכניסה נכשלה");
     } finally {

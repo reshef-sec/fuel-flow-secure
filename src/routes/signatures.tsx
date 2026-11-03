@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { InternalLayout } from "@/components/layout/InternalLayout";
-import { supabase } from "@/lib/supabaseClient";
+import { api } from "@/lib/apiClient";
 import { useAppStore } from "@/store/appStore";
 import { formatIsraelDate } from "@/lib/israelDate";
 
@@ -59,7 +59,7 @@ function SignaturesPage() {
 
   useEffect(() => {
     // The database only returns rows the viewer may see (own branch / own records).
-    void (supabase as any)
+    void api
       .from("signatures_archive")
       .select("*")
       .order("created_at", { ascending: false })

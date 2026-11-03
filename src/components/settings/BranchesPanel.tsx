@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { useAppStore, type BranchRecord } from "@/store/appStore";
+import { isReadOnlyRole, useAppStore, type BranchRecord } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
 
 const empty = { name: "", manager: "", city: "" };
@@ -24,6 +24,7 @@ export function BranchesPanel() {
   const addBranch = useAppStore((s) => s.addBranch);
   const updateBranch = useAppStore((s) => s.updateBranch);
   const removeBranch = useAppStore((s) => s.removeBranch);
+  const readOnly = useAppStore((s) => isReadOnlyRole(s.role));
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<BranchRecord | null>(null);
@@ -67,7 +68,7 @@ export function BranchesPanel() {
     <section>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-xl font-extrabold text-secondary">ניהול סניפים</h2>
-        <Button
+        {readOnly ? null : <Button
           onClick={() => {
             setEditing(null);
             setOpen(true);
@@ -75,7 +76,7 @@ export function BranchesPanel() {
         >
           <Plus className="size-4" />
           הוספת סניף
-        </Button>
+        </Button>}
       </div>
 
       <div className="mt-4">
@@ -102,7 +103,7 @@ export function BranchesPanel() {
                   <TableCell>{b.manager || "—"}</TableCell>
                   <TableCell>{b.city || "—"}</TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
+                    {readOnly ? "—" : <div className="flex items-center gap-1">
                       <button
                         aria-label={`ערוך ${branchLabel(b.name)}`}
                         onClick={() => {
@@ -123,7 +124,7 @@ export function BranchesPanel() {
                       >
                         <Trash2 className="size-4" />
                       </button>
-                    </div>
+                    </div>}
                   </TableCell>
                 </TableRow>
               ))

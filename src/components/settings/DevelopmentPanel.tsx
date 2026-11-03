@@ -1,33 +1,23 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { FlaskConical, Trash2, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Input, Label } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { useAuthContext } from "@/lib/auth-context";
-import { generateDemoData, getDevelopmentToolsAccess, resetSystemData } from "@/lib/backend";
-import { canUseDevelopmentTools, isResetConfirmed, RESET_CONFIRMATION } from "@/lib/developmentAccess";
+import { generateDemoData, resetSystemData } from "@/lib/backend";
+import { isResetConfirmed, RESET_CONFIRMATION } from "@/lib/developmentAccess";
+import { useDevelopmentToolsAccess } from "@/lib/superAdmin";
 import { notifyCentralInventoryChanged } from "@/lib/centralInventorySummary";
 import { useAppStore } from "@/store/appStore";
 
 export function DevelopmentPanel() {
-  const { session } = useAuthContext();
-  const userId = session?.user.id;
-  const [verifiedUserId, setVerifiedUserId] = useState<string | null>(null);
+  // Visible only when the server RPC can_use_development_tools says so (fails closed).
+  const allowed = useDevelopmentToolsAccess();
   const [modal, setModal] = useState<"demo" | "reset" | null>(null);
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
   const loadFromCloud = useAppStore(s => s.loadFromCloud);
 
-  useEffect(() => {
-    let cancelled = false;
-    setVerifiedUserId(null);
-    if (userId) void getDevelopmentToolsAccess().then(allowed => {
-      if (!cancelled) setVerifiedUserId(allowed === true ? userId : null);
-    }).catch(() => { /* Missing SQL or denied access: render nothing. */ });
-    return () => { cancelled = true; };
-  }, [userId]);
-
-  if (!canUseDevelopmentTools(userId, verifiedUserId)) return null;
+  if (!allowed) return null;
 
   const close = () => { if (!busy) { setModal(null); setConfirmation(""); } };
   const execute = async () => {

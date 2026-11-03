@@ -25,13 +25,19 @@ import {
   type VoucherRecord,
 } from "@/components/dashboard/voucherData";
 
-export type Role = "admin" | "branch" | "supervisor";
+export type Role = "admin" | "branch" | "supervisor" | "viewer";
 
 export const roleLabels: Record<Role, string> = {
   admin: "אדמין",
   branch: "מנהל סניף",
   supervisor: "מפקח",
+  viewer: "צופה",
 };
+
+/** Admin and the read-only viewer see the organisation-wide (admin) read views. */
+export const seesAllData = (role: Role) => role === "admin" || role === "viewer";
+/** Viewer is read-only: every create/edit/delete/issue/import/allocate control is hidden. */
+export const isReadOnlyRole = (role: Role) => role === "viewer";
 
 export interface UserRecord {
   /** ת.ז */

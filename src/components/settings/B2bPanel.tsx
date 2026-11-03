@@ -20,7 +20,7 @@ import { Modal } from "@/components/ui/Modal";
 import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile } from "@/lib/parseSheet";
 import { parseWorkVehicleSheet } from "@/lib/workVehicleSheet";
-import { useAppStore, type B2BClientRecord } from "@/store/appStore";
+import { isReadOnlyRole, useAppStore, type B2BClientRecord } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
 import { workVehicleKey } from "@/lib/workVehicles";
 
@@ -50,6 +50,7 @@ export function B2bPanel() {
   const updateB2b = useAppStore((s) => s.updateB2b);
   const importB2b = useAppStore((s) => s.importB2b);
   const removeB2b = useAppStore((s) => s.removeB2b);
+  const readOnly = useAppStore((s) => isReadOnlyRole(s.role));
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<B2BClientRecord | null>(null);
@@ -147,6 +148,7 @@ export function B2bPanel() {
             <FileSpreadsheet className="size-4" />
             הורד תבנית
           </Button>
+          {readOnly ? null : <>
           <Button variant="outline" onClick={() => inputRef.current?.click()}>
             <UploadCloud className="size-4" />
             ייבוא מאקסל
@@ -173,6 +175,7 @@ export function B2bPanel() {
             <Plus className="size-4" />
             הוספה
           </Button>
+          </>}
         </div>
       </div>
 
@@ -204,7 +207,7 @@ export function B2bPanel() {
                   ))}
                   <TableCell><Badge variant={r.isActive === true ? "success" : "danger"}>{r.isActive === true ? "פעיל" : "לא פעיל"}</Badge></TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
+                    {readOnly ? "—" : <div className="flex items-center gap-1">
                       <button
                         aria-label={`ערוך ${r.accountName}`}
                         onClick={() => {
@@ -227,7 +230,7 @@ export function B2bPanel() {
                       >
                         <Trash2 className="size-4" />
                       </button>
-                    </div>
+                    </div>}
                   </TableCell>
                 </TableRow>
               ))

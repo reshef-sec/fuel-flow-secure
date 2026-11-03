@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabaseClient";
+import { api } from "@/lib/apiClient";
 
 export interface CentralInventorySummary {
   total_available_amount: number;
@@ -30,7 +30,7 @@ export function parseCentralInventorySummary(data: unknown): CentralInventorySum
 }
 
 export async function fetchCentralInventorySummary(): Promise<CentralInventorySummary> {
-  const { data, error } = await supabase.rpc("get_central_inventory_snapshot");
+  const { data, error } = await api.rpc("get_central_inventory_snapshot");
   if (error) throw new Error("טעינת יתרת המלאי נכשלה — יש לוודא שתסריט SQL הותקן במאגר המחובר לאפליקציה");
   return parseCentralInventorySnapshot(data);
 }

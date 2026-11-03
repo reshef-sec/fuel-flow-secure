@@ -11,7 +11,7 @@ import { RequestDialog } from "@/components/requests/RequestDialog";
 import { PendingRequests } from "@/components/requests/PendingRequests";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
 import { Button, Card, Select, StatCard } from "@/design-system/delek-1ea111";
-import { fullName, MAIN_POOL, useAppStore, useCurrentUser } from "@/store/appStore";
+import { fullName, isReadOnlyRole, MAIN_POOL, seesAllData, useAppStore, useCurrentUser } from "@/store/appStore";
 import { BudgetUtilization, SupervisorDistribution } from "@/components/dashboard/BudgetUtilization";
 import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
 import { useLiveInventory } from "@/lib/useLiveInventory";
@@ -59,8 +59,11 @@ function periodStart(period: Period): string | null {
 function Dashboard() {
   const allVouchers = useAppStore((s) => s.vouchers);
   const role = useAppStore((s) => s.role);
-  useLiveInventory(role === "admin");
-  const { summary, totalAvailableBalance, error: inventoryError } = useCentralInventorySummary(role === "admin");
+  // Admin and the read-only viewer share the organisation-wide dashboard.
+  const adminView = seesAllData(role);
+  const readOnly = isReadOnlyRole(role);
+  useLiveInventory(adminView);
+  const { summary, totalAvailableBalance, error: inventoryError } = useCentralInventorySummary(adminView);
   const me = useCurrentUser();
   const [requestOpen, setRequestOpen] = useState(false);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
@@ -120,7 +123,7 @@ function Dashboard() {
         </Select>
       </div>
 
-      {me?.canRequest && !isSupervisor && !isBranchManager ? (
+      {me?.canRequest && !isSupervisor && !isBranchManager && !readOnly ? (
         <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="font-display text-lg font-extrabold text-secondary">
@@ -137,7 +140,7 @@ function Dashboard() {
         </Card>
       ) : null}
 
-      {role === "admin" ? (
+      {adminView ? (
         <div className="grid gap-5 sm:grid-cols-3">
           <StatCard
             label="יתרת תקציב מרכזי"
@@ -217,9 +220,9 @@ function Dashboard() {
       {!isBranchManager ? (
         <Card className="py-3">
           <p className="text-sm font-semibold text-muted-foreground">
-            פירוט יתרה זמינה לפי סוג דלק{role === "admin" ? " (מאגר מרכזי)" : ""}
+            פירוט יתרה זמינה לפי סוג דלק{adminView ? " (מאגר מרכזי)" : ""}
           </p>
-          {role === "admin" ? summary ? (
+          {adminView ? summary ? (
             <FuelBreakdown totals={{ "בנזין": summary.gasoline_amount, "סולר": summary.diesel_amount }} className="mt-1 text-sm" />
           ) : <p className="mt-1 text-sm text-danger">{inventoryError ?? "טוען יתרת מלאי…"}</p> : (
             <FuelBreakdown list={available} className="mt-1 text-sm" />
@@ -227,17 +230,17 @@ function Dashboard() {
         </Card>
       ) : null}
 
-      {role === "admin" ? <PoolDenominations summary={summary} error={inventoryError} /> : null}
+      {adminView ? <PoolDenominations summary={summary} error={inventoryError} /> : null}
 
       {isBranchManager ? <SupervisorDistribution vouchers={available} issued={issuedValue} /> : null}
 
       <BudgetUtilization vouchers={allVouchers as never} since={since} role={role} myBranch={myBranch} periodLabel={periodLabels[period]} />
 
-      {role === "admin" ? <PendingRequests /> : null}
+      {adminView ? <PendingRequests readOnly={readOnly} /> : null}
 
       <VoucherTable since={since} periodLabel={periodLabels[period]} />
 
-      {!isSupervisor && <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} />}
+      {!isSupervisor && !readOnly && <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} />}
 
       {isBranchManager ? (
         <SupervisorAllocationDialog

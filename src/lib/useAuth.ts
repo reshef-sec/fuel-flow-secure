@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabaseClient";
+import { apiFetch, emitAuthChange, onAuthChange } from "@/lib/apiClient";
 import { cleanUserName } from "./userDisplay";
+
+export type ProfileRole = "admin" | "branch" | "supervisor" | "viewer";
 
 export interface Profile {
   id: string;
@@ -9,8 +10,38 @@ export interface Profile {
   national_id: string;
   full_name: string;
   branch: string;
-  role: "admin" | "branch" | "supervisor";
+  role: ProfileRole;
   requires_password_change: boolean;
+  is_first_login?: boolean;
+}
+
+/** Truthy marker for "signed in" (the real session is an httpOnly cookie). */
+export interface Session { user: { id: string } }
+
+export { emitAuthChange };
+
+/** POST /api/auth/login → profile. Throws with the server's Hebrew message. */
+export async function signIn(phone: string, password: string): Promise<Profile> {
+  const { body, error } = await apiFetch<{ profile: Profile }>("/api/auth/login", { body: { phone, password } });
+  if (error || !body?.profile) throw new Error(error?.message || "הכניסה נכשלה");
+  emitAuthChange();
+  return body.profile;
+}
+
+/** POST /api/auth/logout; always notifies listeners so the UI returns to /login. */
+export async function signOut() {
+  await apiFetch("/api/auth/logout", { body: {} });
+  emitAuthChange();
+  // Full reload drops the in-memory store so the next user never sees the previous user's data.
+  if (typeof window !== "undefined") window.location.assign("/login");
+}
+
+/** POST /api/auth/change-password. Throws with the server's Hebrew policy message. */
+export async function changePassword(password: string): Promise<Profile | null> {
+  const { body, error } = await apiFetch<{ ok: boolean; profile: Profile }>("/api/auth/change-password", { body: { password } });
+  if (error) throw new Error(error.message);
+  emitAuthChange();
+  return body?.profile ?? null;
 }
 
 export function useAuth() {
@@ -18,38 +49,22 @@ export function useAuth() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = useCallback(async (s: Session | null) => {
-    if (!s) {
-      setProfile(null);
-      setLoading(false);
-      return;
-    }
-    const { data } = await supabase.from("profiles").select("*").eq("id", s.user.id).maybeSingle();
-    const next = data as Profile | null;
-    if (next) {
-      const { data: account } = await supabase.from("app_users")
-        .select("first_name,last_name").eq("national_id", next.national_id).maybeSingle();
-      const accountName = account ? cleanUserName(`${account.first_name ?? ""} ${account.last_name ?? ""}`) : "";
-      next.full_name = accountName || cleanUserName(next.full_name);
-    }
+  const loadProfile = useCallback(async () => {
+    const { body } = await apiFetch<{ profile: Profile | null }>("/api/auth/me");
+    const next = body?.profile ?? null;
+    if (next) next.full_name = cleanUserName(next.full_name);
+    setSession(next ? { user: { id: next.id } } : null);
     setProfile(next);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
-      setSession(s);
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
-        setLoading(true);
-        setTimeout(() => void loadProfile(s), 0);
-      }
+    void loadProfile();
+    return onAuthChange(() => {
+      setLoading(true);
+      void loadProfile();
     });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      void loadProfile(data.session);
-    });
-    return () => sub.subscription.unsubscribe();
   }, [loadProfile]);
 
-  return { session, profile, loading, refresh: () => loadProfile(session) };
+  return { session, profile, loading, refresh: loadProfile };
 }

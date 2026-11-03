@@ -19,23 +19,25 @@ import {
 import { Modal } from "@/components/ui/Modal";
 import { deleteAccount, resetAccountPassword, syncAccount } from "@/lib/backend";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
-import { roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
+import { isReadOnlyRole, roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
 
 const roleFromLabel = (value: string): Role => {
   const v = value.trim();
   if (v === "אדמין" || v === "admin" || v.includes("אדמין")) return "admin";
   if (v === "מנהל סניף" || v === "branch" || v.includes("סניף")) return "branch";
+  if (v === "צופה" || v === "viewer") return "viewer";
   return "supervisor";
 };
 
 const truthy = (value: string) =>
   ["כן", "true", "1", "v", "yes", "✓"].includes(value.trim().toLowerCase());
 
-const roleVariant: Record<Role, "brand" | "info" | "purple"> = {
+const roleVariant: Record<Role, "brand" | "info" | "purple" | "neutral"> = {
   admin: "brand",
   branch: "info",
   supervisor: "purple",
+  viewer: "neutral",
 };
 
 export function UsersPanel() {
@@ -49,6 +51,7 @@ export function UsersPanel() {
   const setUserCanRequest = useAppStore((s) => s.setUserCanRequest);
   const role = useAppStore((s) => s.role);
   const isAdmin = role === "admin";
+  const readOnly = isReadOnlyRole(role);
   const fileRef = useRef<HTMLInputElement>(null);
   const resetFn = resetAccountPassword;
   const syncFn = syncAccount;
@@ -215,6 +218,7 @@ export function UsersPanel() {
               </option>
             ))}
           </Select>
+          {readOnly ? null : <>
           <input
             ref={fileRef}
             type="file"
@@ -250,6 +254,7 @@ export function UsersPanel() {
             <Plus className="size-4" />
             הוספת משתמש
           </Button>
+          </>}
         </div>
       </div>
 
@@ -295,7 +300,7 @@ export function UsersPanel() {
                   />
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1">
+                  {readOnly ? "—" : <div className="flex items-center gap-1">
                     <button
                       onClick={() => {
                         setEditingId(u.id);
@@ -338,7 +343,7 @@ export function UsersPanel() {
                     >
                       <Trash2 className="size-4" />
                     </button>
-                  </div>
+                  </div>}
                 </TableCell>
               </TableRow>
             ))}

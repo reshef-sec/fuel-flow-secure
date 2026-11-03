@@ -45,7 +45,8 @@ import { useLiveInventory } from "@/lib/useLiveInventory";
 import { pickExact } from "@/store/appStore";
 import { isActiveClient } from "@/lib/importIntegrity";
 import { workVehicleKey } from "@/lib/workVehicles";
-import { supabase } from "@/lib/supabaseClient";
+import { api } from "@/lib/apiClient";
+import { NoAccess } from "@/components/layout/NoAccess";
 
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
@@ -83,6 +84,13 @@ const newBlock = (mode: Mode = "b2b"): Block => ({
 });
 
 function SupervisorPage() {
+  // Issuing is a write action; the read-only viewer has no access to this screen.
+  const role = useAppStore((s) => s.role);
+  if (role === "viewer") return <NoAccess title="הפקת שוברי דלק" />;
+  return <SupervisorIssuePage />;
+}
+
+function SupervisorIssuePage() {
   const role = useAppStore((s) => s.role);
   const issueWorkerVoucher = useAppStore((s) => s.issueWorkerVoucher);
   const me = useCurrentUser();
@@ -286,7 +294,7 @@ function ClientBlock({
     void (async () => {
       const keys = new Set<string>();
       for (let from = 0; ; from += 1000) {
-        const { data, error } = await supabase.from(table).select(columns).eq("is_active", true).range(from, from + 999);
+        const { data, error } = await api.from(table).select(columns).eq("is_active", true).range(from, from + 999);
         if (error) throw error;
         for (const row of (data ?? []) as unknown as Record<string, unknown>[]) keys.add(mode === "b2b" ? workVehicleKey({ clientCode: String(row.client_code ?? ""), standard: String(row.standard ?? "") }) : JSON.stringify([row.client_id, row.site_id]));
         if (!data || data.length < 1000) break;

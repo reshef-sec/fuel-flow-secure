@@ -1,10 +1,9 @@
 /**
- * Browser-only backend calls (Netlify-compatible: no app server).
- * Security lives in the database (security-definer RPCs from netlify_backend.sql)
- * and in the `admin-accounts` function deployed on the same database project.
+ * Backend calls to the same-origin Express API (server/app.js).
+ * Security lives on the server (RPC ports in server/rpc, accounts in server/routes/accounts.js).
  * Every export keeps the old `fn({ data })` call shape.
  */
-import { supabase } from "./supabaseClient";
+import { api, apiFetch } from "./apiClient";
 import { normalizePhone } from "./phoneLogin";
 
 type FuelType = "בנזין" | "סולר";
@@ -12,7 +11,7 @@ export type Code = { serial: string; realCode: string; amount: number; fuelType:
 type Args<T> = { data: T };
 
 async function rpc<T>(name: string, params: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.rpc(name, params);
+  const { data, error } = await api.rpc(name, params);
   if (error) throw new Error(error.message);
   return data as T;
 }
@@ -78,35 +77,19 @@ export async function getSetupStatus() {
   return { needsSetup: Boolean(needs) };
 }
 
-// ---------- Accounts (need the secret key → admin-accounts function) ----------
+// ---------- Accounts (POST /api/accounts) ----------
 
 type AccountInput = { phone: string; nationalId: string; fullName?: string; branch?: string; role?: string };
 
 async function accounts(action: string, payload: Record<string, unknown>) {
-  const call = (token?: string) => supabase.functions.invoke("admin-accounts", {
-    body: { action, ...payload },
-    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
-  });
-  // Validate the stored session with the server (a stale token would be rejected with 401).
-  const { data: u } = await supabase.auth.getUser();
-  let token = u.user ? (await supabase.auth.getSession()).data.session?.access_token : undefined;
-  if (!token) token = (await supabase.auth.refreshSession()).data.session?.access_token;
-  let { data, error } = await call(token);
-  if (error && (error as any).context?.status === 401 && action !== "bootstrap" && action !== "activate") {
-    token = (await supabase.auth.refreshSession()).data.session?.access_token;
-    if (!token) {
-      await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
-      throw new Error("פג תוקף ההתחברות — יש להתחבר מחדש");
-    }
-    ({ data, error } = await call(token));
-  }
+  // Same-origin call; the httpOnly session cookie authenticates it.
+  const { body, error } = await apiFetch<{ ok?: boolean; error?: string }>("/api/accounts", { body: { action, ...payload } });
   if (error) {
-    let msg = error.message;
-    try { msg = (await (error as any).context?.json())?.error ?? msg; } catch { /* keep */ }
-    throw new Error(msg);
+    if (error.status === 401 && action !== "bootstrap" && action !== "activate") throw new Error("פג תוקף ההתחברות — יש להתחבר מחדש");
+    throw new Error(error.message);
   }
-  if (data?.error) throw new Error(data.error);
-  return data as { ok: boolean };
+  if (body?.error) throw new Error(body.error);
+  return body as { ok: boolean };
 }
 
 const norm = (d: AccountInput) => ({ ...d, phone: normalizePhone(d.phone) });
@@ -123,7 +106,7 @@ export const resetAccountPassword = ({ data }: Args<AccountInput>) => accounts("
 export const deleteAccount = ({ data }: Args<{ nationalId: string }>) => accounts("delete", data);
 export const completePasswordChange = ({ data }: Args<{ password: string }>) => accounts("change_password", data);
 
-// Authorization is pinned to one immutable user UUID in the external database.
+// Authorization is decided server-side (can_use_development_tools).
 export const getDevelopmentToolsAccess = () => rpc<boolean>("can_use_development_tools", {});
 export const generateDemoData = () => rpc<{ vouchers_created: number }>("generate_demo_data", {});
 export const resetSystemData = (confirmation: string) => rpc<void>("reset_development_data", { p_confirmation: confirmation });

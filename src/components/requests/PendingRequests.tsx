@@ -19,7 +19,7 @@ import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 import { branchLabel } from "@/lib/branchLabels";
 
 /** Admin-only queue of voucher requests awaiting approval. */
-export function PendingRequests() {
+export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {}) {
   const requests = useAppStore((s) => s.requests);
   const { summary } = useCentralInventorySummary();
   const approveRequest = useAppStore((s) => s.approveRequest);
@@ -94,6 +94,7 @@ export function PendingRequests() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{r.reason}</TableCell>
                   <TableCell>
+                    {readOnly ? <span className="block text-center text-muted-foreground">—</span> : (
                     <div className="flex flex-wrap items-center justify-center gap-2">
                       <Button size="sm" onClick={() => approve(r.id, r.amount)}>
                         <Check className="size-4" />
@@ -140,6 +141,7 @@ export function PendingRequests() {
                         דחה
                       </Button>
                     </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

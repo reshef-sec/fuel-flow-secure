@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabaseClient";
+import { api } from "@/lib/apiClient";
 import { notifyCentralInventoryChanged } from "@/lib/centralInventorySummary";
 import { normalizeVoucherStatus } from "@/lib/importIntegrity";
 import type { VoucherRecord } from "@/components/dashboard/voucherData";
@@ -14,7 +14,7 @@ import type {
 } from "@/store/appStore";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any;
+const db = api as any;
 type Row = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? undefined : String(v));
 
