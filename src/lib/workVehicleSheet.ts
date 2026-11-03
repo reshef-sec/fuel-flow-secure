@@ -8,7 +8,7 @@ const coreAliases: Record<string, string[]> = {
 };
 
 export function parseWorkVehicleSheet<K extends string>(sheet: string[][], columns: readonly { key: K; label: string }[]): Record<K, string>[] {
-  const matches = (cell: string, key: string, label: string) => [label, ...(coreAliases[key] ?? [])].some(alias => normalizeWorkVehicleHeader(cell) === normalizeWorkVehicleHeader(alias));
+  const matches = (cell: string, key: string, label: string) => [label, ...(coreAliases[key] ?? [])].filter(Boolean).some(alias => normalizeWorkVehicleHeader(cell) === normalizeWorkVehicleHeader(alias));
   const headerIndex = sheet.slice(0, 5).findIndex(row => Object.keys(coreAliases).every(key => row.some(cell => matches(cell, key, ""))));
   const header = sheet[headerIndex];
   if (headerIndex < 0 || !header) throw new Error("לא נמצאה שורת כותרות בחמש השורות הראשונות; נדרשות העמודות: תקן, קוד לקוח, שם לקוח");

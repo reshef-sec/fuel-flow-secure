@@ -128,7 +128,7 @@ export const getDevelopmentToolsAccess = () => rpc<boolean>("can_use_development
 export const generateDemoData = () => rpc<{ vouchers_created: number }>("generate_demo_data", {});
 export const resetSystemData = (confirmation: string) => rpc<void>("reset_development_data", { p_confirmation: confirmation });
 
-export interface VehicleSyncResult { added: number; updated: number; deactivated: number; duplicates?: number; blanks?: number; invalid?: number; skipped?: number; active?: number }
+export interface VehicleSyncResult { added: number; updated: number; deactivated: number; duplicates?: number; blanks?: number; invalid?: number; skipped?: number; active?: number; reactivated?: number; remained_active?: number }
 export const syncWorkVehicles = (rows: Record<string, unknown>[]) =>
   rpc<VehicleSyncResult>("sync_work_vehicles", { p_rows: rows });
 export const syncPrivateVehicles = (rows: Record<string, unknown>[]) =>

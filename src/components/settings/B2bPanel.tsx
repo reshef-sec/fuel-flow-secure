@@ -18,7 +18,8 @@ import {
 } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
 import { downloadCsv } from "@/components/dashboard/statusVariant";
-import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
+import { isSheetFile, parseSheetFile } from "@/lib/parseSheet";
+import { parseWorkVehicleSheet } from "@/lib/workVehicleSheet";
 import { useAppStore, type B2BClientRecord } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
 import { workVehicleKey } from "@/lib/workVehicles";
@@ -41,7 +42,6 @@ const columns: { key: Key; label: string; required?: boolean }[] = [
 ];
 const cols = columns.map((c) => c.label);
 const empty = Object.fromEntries(columns.map((c) => [c.key, ""])) as unknown as Required<B2BClientRecord>;
-const norm = (h: string) => h.replace(/["'״׳\s\[\]\/]/g, "");
 
 export function B2bPanel() {
   const rows = useAppStore((s) => s.b2bClients);
@@ -73,30 +73,16 @@ export function B2bPanel() {
     }
     try {
       const all = await parseSheetFile(file);
-      const headerIdx = all.findIndex((r) => r.some((c) => norm(c) === norm("תקן")) && r.some((c) => norm(c) === norm("קוד לקוח")));
-      if (headerIdx < 0) {
-        toast.error(`לא נמצאה שורת כותרות. עמודות: ${cols.join(", ")}`);
-        return;
-      }
-      const header = (all[headerIdx] ?? []).map(norm);
-      const index = Object.fromEntries(columns.map((c) => [c.key, header.indexOf(norm(c.label))]));
-      const parsed = all
-        .slice(headerIdx + 1)
-        .map((r) => {
-          const row = {} as Record<Key, string>;
-          for (const c of columns) {
-            const position = index[c.key];
-            row[c.key] = position !== undefined && position >= 0 ? String(r[position] ?? "").trim() : "";
-          }
-          return row as unknown as B2BClientRecord;
-        });
+      const parsed = parseWorkVehicleSheet(all, columns);
       if (!parsed.length) {
         toast.error(`לא נמצאו שורות תקינות. עמודות: ${cols.join(", ")}`);
         return;
       }
-      const { active = 0, deactivated, skipped = 0, duplicates = 0 } = await importB2b(parsed);
-      toast.success(`עודכנו בהצלחה: ${active} פעילים, ${deactivated} סומנו כלא פעילים, ${skipped} שורות ריקות/לא תקינות דולגו`, {
-        ...(duplicates > 0 ? { description: `${duplicates} שורות כפולות דולגו` } : {}),
+      const { active = 0, added, reactivated, remained_active, deactivated, skipped = 0, duplicates = 0 } = await importB2b(parsed);
+      toast.success(reactivated !== undefined && remained_active !== undefined
+        ? `עודכנו בהצלחה: ${reactivated} רכבים הוחזרו לפעיל, ${remained_active} נותרו פעילים, ${deactivated} סומנו כלא פעילים`
+        : `עודכנו בהצלחה: ${active} פעילים, ${deactivated} סומנו כלא פעילים`, {
+        description: `${added} רכבים חדשים, ${skipped} שורות ריקות/לא תקינות ו־${duplicates} שורות כפולות דולגו`,
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "סנכרון הקובץ נכשל");
