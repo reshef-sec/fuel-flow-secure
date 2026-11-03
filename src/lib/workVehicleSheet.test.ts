@@ -5,6 +5,22 @@ import { parseSheetFile } from "./parseSheet";
 import { prepareWorkVehicles } from "./workVehicles";
 const columns = [{key:"standard",label:"תקן"},{key:"clientCode",label:"קוד לקוח"},{key:"clientName",label:"שם לקוח"},{key:"balance",label:'יתרת הנה"ש'}] as const;
 describe("work vehicle Excel headers", () => {
+  it("maps column A account code to standard with client code in D and name in E", () => {
+    for (const standardHeader of ["קוד חשבון", "תקן", " \u200Fקוד־חשבון: "]) {
+      const prepared = prepareWorkVehicles(parseWorkVehicleSheet([
+        [standardHeader,"שם חשבון",'יתרת הנה"ש',"קוד לקוח","שם לקוח"],
+        ["80620031","חשבון","500","C1","לקוח ראשון"],
+        ["80620032","חשבון","100","C1","לקוח שני"],
+        ["","","","",""],
+        [],
+      ],columns));
+      assert.deepEqual(prepared.rows.map(row => [row.standard,row.clientCode,row.clientName]),[
+        ["80620031","C1","לקוח ראשון"],["80620032","C1","לקוח שני"],
+      ]);
+      assert.equal(prepared.blanks,2);
+      assert.equal(prepared.invalid,0);
+    }
+  });
   it("detects the header in each of the first five rows", () => {
     for (let index=0;index<5;index++) {
       const rows = parseWorkVehicleSheet([...Array.from({length:index},()=>["דוח רכבים"]),["תקן","קוד לקוח","שם לקוח"],["80620031","C1","לקוח"]],columns);

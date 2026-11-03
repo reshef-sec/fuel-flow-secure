@@ -1,4 +1,5 @@
 # Roadmap — master system update
+- [x] Accept קוד חשבון as the work-vehicle standard header alias; cover actual A/D/E layout and trailing empty rows, preserving existing atomic reactivation/deactivation sync.
 - [x] Make work-vehicle header matching resilient within five rows with Unicode punctuation/quote/direction-mark normalization and core aliases; show transactional reactivated/remained-active/new/deactivated counts. Real XLSX parsing and 68 application tests plus isolated PostgreSQL re-upload/repeat/authorization/history/issuance/reinstall checks passed.
 - [ ] Install work_vehicle_sync_reactivation_v2.sql and verify signed-in re-upload feedback and green status read-back (blocker: external SQL installation by user; external authenticated browser session unavailable).
 - [x] Skip blank/incomplete work-vehicle rows in preparation and guarded RPC, preserve full active/inactive delta sync and return active/deactivated/skipped counts; updated SQL supplied first, 63 app tests and disposable PostgreSQL skipping/deactivation/history/reactivation/authorization/issuance/reinstall checks passed; build OK.
