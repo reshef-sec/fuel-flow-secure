@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Lock, Smartphone } from "lucide-react";
+import { AlertCircle, ArrowLeft, Info, Lock, LogIn, Smartphone, User } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button, FormField, Input, Logo } from "@/design-system/delek-1ea111";
 import { bootstrapAdmin, getSetupStatus } from "@/lib/backend";
 import { signIn } from "@/lib/useAuth";
+import { AuthAlert, AuthCard, AuthLayout, authInputClass } from "@/components/layout/AuthLayout";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -59,62 +59,98 @@ function LoginPage() {
     }
   }
 
+  const iconCls = "pointer-events-none absolute right-3.5 top-1/2 size-[18px] -translate-y-1/2 text-slate-400";
+
   return (
-    <main className="grid min-h-screen place-items-center bg-background px-4 py-10">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm space-y-5 rounded-xl border border-border bg-surface p-6 shadow-card"
-        noValidate
-      >
-        <div className="flex flex-col items-center gap-2 text-center">
-          <Logo className="h-24 sm:h-28" />
-          <h1 className="font-display text-xl font-extrabold text-secondary">
+    <AuthLayout>
+      <AuthCard onSubmit={onSubmit} noValidate aria-labelledby="login-title">
+        <div className="flex flex-col gap-1.5">
+          <span aria-hidden className="mb-1.5 grid size-12 place-items-center rounded-[14px] bg-waiting-bg text-blue-500">
+            <LogIn className="size-[22px]" />
+          </span>
+          <h1 id="login-title" className="m-0 text-[26px] font-extrabold tracking-[-.01em]">
             {needsSetup ? "הגדרת מנהל ראשי" : "כניסה למערכת"}
           </h1>
+          <p className="m-0 text-[14.5px] text-slate-600">
+            {needsSetup ? "המערכת טרם הוגדרה. צרו את חשבון המנהל הראשי כדי להתחיל." : "הזינו מספר נייד וסיסמה כדי להמשיך."}
+          </p>
         </div>
 
         {needsSetup ? (
-          <FormField label="שם מלא">
-            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          </FormField>
+          <>
+            <AuthAlert tone="info" title="התקנה ראשונה" icon={<Info className="size-[18px]" aria-hidden />}>
+              החשבון הראשון שנוצר יקבל הרשאת אדמין מרכזי. בהגדרה הראשונית יש להזין ת.ז בת 9 ספרות.
+            </AuthAlert>
+            <label className="flex flex-col gap-[7px] text-[13.5px] font-semibold text-ink-soft">
+              שם מלא
+              <span className="relative block">
+                <User className={iconCls} aria-hidden />
+                <input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  autoComplete="name"
+                  placeholder="שם פרטי ומשפחה"
+                  className={authInputClass}
+                />
+              </span>
+            </label>
+          </>
         ) : null}
 
-        <FormField label="מספר נייד">
-          <div className="relative">
-            <Smartphone className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
+        <label className="flex flex-col gap-[7px] text-[13.5px] font-semibold text-ink-soft">
+          מספר נייד
+          <span className="relative block">
+            <Smartphone className={iconCls} aria-hidden />
+            <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               inputMode="tel"
+              type="tel"
               autoComplete="username"
               dir="ltr"
-              className="px-10 text-right"
+              placeholder="05X-XXXXXXX"
               aria-label="מספר נייד"
+              aria-invalid={error ? true : undefined}
+              className={authInputClass}
             />
-          </div>
-        </FormField>
+          </span>
+        </label>
 
-        <FormField label={needsSetup ? "ת.ז" : "סיסמה"}>
-          <div className="relative">
-            <Lock className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
+        <label className="flex flex-col gap-[7px] text-[13.5px] font-semibold text-ink-soft">
+          {needsSetup ? "ת.ז" : "סיסמה"}
+          <span className="relative block">
+            <Lock className={iconCls} aria-hidden />
+            <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               dir="ltr"
-              className="px-10 text-right"
+              placeholder={needsSetup ? "9 ספרות" : undefined}
               aria-label="סיסמה"
+              aria-invalid={error ? true : undefined}
+              className={authInputClass}
             />
-          </div>
-        </FormField>
+          </span>
+        </label>
 
-        {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+        {error ? (
+          <AuthAlert tone="error" icon={<AlertCircle className="size-[18px]" aria-hidden />}>
+            {error}
+          </AuthAlert>
+        ) : null}
 
-        <Button type="submit" block disabled={busy}>
+        <button type="submit" disabled={busy} aria-busy={busy || undefined} className="ds-btn ds-btn-primary min-h-[50px] w-full text-[15px]">
           {busy ? "מתחבר…" : needsSetup ? "צור מנהל והתחבר" : "כניסה"}
-        </Button>
-      </form>
-    </main>
+          {busy ? null : <ArrowLeft className="size-[18px]" aria-hidden />}
+        </button>
+
+        {needsSetup ? null : (
+          <p className="m-0 border-t border-table-line pt-3.5 text-center text-[13.5px] text-slate-600">
+            כניסה ראשונה? הזינו ת.ז כסיסמה
+          </p>
+        )}
+      </AuthCard>
+    </AuthLayout>
   );
 }

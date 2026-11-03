@@ -17,8 +17,9 @@ import {
 } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { Modal } from "@/components/ui/Modal";
-import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
+import { mapPrivateVehicleRows } from "@/lib/importTemplates";
+import { downloadImportTemplate } from "@/lib/excel";
 import { isReadOnlyRole, useAppStore } from "@/store/appStore";
 import { privateVehicleKey } from "@/lib/privateVehicles";
 
@@ -62,14 +63,7 @@ export function ClientsPanel() {
     }
     try {
       const raw = stripHeader(await parseSheetFile(file), "לקוח");
-      const rows = raw
-        .map((r) => ({
-          clientId: String(r[0] ?? "").trim(),
-          clientName: String(r[1] ?? "").trim(),
-          siteId: String(r[2] ?? "").trim(),
-          siteName: String(r[3] ?? "").trim(),
-          standard: String(r[4] ?? "").trim(),
-        }));
+      const rows = mapPrivateVehicleRows(raw);
       if (rows.length === 0) {
         toast.error("לא נמצאו שורות תקינות. עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן");
         return;
@@ -150,12 +144,9 @@ export function ClientsPanel() {
           <Button
             variant="outline"
             onClick={() => {
-              downloadCsv(
-                "clients-template.csv",
-                ["מס' לקוח", "שם לקוח", "מספר אתר", "שם אתר", "תקן"],
-                [["1001", "שם לקוח לדוגמה", "11", "שם אתר לדוגמה", "תקן 1001"]],
-              );
-              toast.success("תבנית הלקוחות הורדה");
+              void downloadImportTemplate("privateVehicles")
+                .then(() => toast.success("תבנית הלקוחות הורדה"))
+                .catch(() => toast.error("הורדת התבנית נכשלה"));
             }}
           >
             <FileSpreadsheet className="size-4" />

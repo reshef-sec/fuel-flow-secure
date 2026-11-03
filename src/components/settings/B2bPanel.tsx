@@ -17,29 +17,17 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { downloadCsv } from "@/components/dashboard/statusVariant";
 import { isSheetFile, parseSheetFile } from "@/lib/parseSheet";
 import { parseWorkVehicleSheet } from "@/lib/workVehicleSheet";
 import { isReadOnlyRole, useAppStore, type B2BClientRecord } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
 import { workVehicleKey } from "@/lib/workVehicles";
+import { workVehicleColumns } from "@/lib/importTemplates";
+import { downloadImportTemplate } from "@/lib/excel";
 
 type Key = Exclude<keyof B2BClientRecord, "isActive">;
-/** Exact Excel column order (RTL). */
-const columns: { key: Key; label: string; required?: boolean }[] = [
-  { key: "standard", label: "תקן", required: true },
-  { key: "accountName", label: "שם חשבון", required: true },
-  { key: "balance", label: 'יתרת הנה"ש' },
-  { key: "clientCode", label: "קוד לקוח", required: true },
-  { key: "clientName", label: "שם לקוח", required: true },
-  { key: "loadType", label: "סוג העמסה" },
-  { key: "branch", label: "סניף", required: true },
-  { key: "budgetSection", label: "סעיף תקציבי" },
-  { key: "accountKey", label: "מפתח חשבון אב" },
-  { key: "itemFamily", label: "משפחת פריטים" },
-  { key: "accountStatus", label: "חשבון [פעיל/כותרת]" },
-  { key: "accountType", label: "סוג חשבון" },
-];
+/** Exact Excel column order (RTL) — shared with the template download (src/lib/importTemplates.ts). */
+const columns: { key: Key; label: string; required?: boolean }[] = workVehicleColumns;
 const cols = columns.map((c) => c.label);
 const empty = Object.fromEntries(columns.map((c) => [c.key, ""])) as unknown as Required<B2BClientRecord>;
 
@@ -141,9 +129,7 @@ export function B2bPanel() {
           </div>
           <Button
             variant="outline"
-            onClick={() =>
-              downloadCsv("b2b-template.csv", cols, [columns.map((c) => (c.key === "branch" ? "צפון" : ""))])
-            }
+            onClick={() => void downloadImportTemplate("workVehicles").catch(() => toast.error("הורדת התבנית נכשלה"))}
           >
             <FileSpreadsheet className="size-4" />
             הורד תבנית

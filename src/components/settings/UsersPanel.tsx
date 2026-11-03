@@ -21,17 +21,7 @@ import { deleteAccount, resetAccountPassword, syncAccount } from "@/lib/backend"
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { isReadOnlyRole, roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
-
-const roleFromLabel = (value: string): Role => {
-  const v = value.trim();
-  if (v === "אדמין" || v === "admin" || v.includes("אדמין")) return "admin";
-  if (v === "מנהל סניף" || v === "branch" || v.includes("סניף")) return "branch";
-  if (v === "צופה" || v === "viewer") return "viewer";
-  return "supervisor";
-};
-
-const truthy = (value: string) =>
-  ["כן", "true", "1", "v", "yes", "✓"].includes(value.trim().toLowerCase());
+import { parseUserRows } from "@/lib/importTemplates";
 
 const roleVariant: Record<Role, "brand" | "info" | "purple" | "neutral"> = {
   admin: "brand",
@@ -97,22 +87,8 @@ export function UsersPanel() {
     }
     try {
       const raw = stripHeader(await parseSheetFile(file), "ת.ז");
-      const parsed: UserRecord[] = [];
-      for (const r of raw) {
-        const [branch = "", id = "", lastName = "", firstName = "", roleCell = "", title = "", phone = "", canReq = ""] = r;
-        const cleanId = id.replace(/\D/g, "");
-        if (cleanId.length !== 9 || !lastName.trim()) continue;
-        parsed.push({
-          branch: branch.trim(),
-          id: cleanId,
-          lastName: lastName.trim(),
-          firstName: firstName.trim(),
-          role: roleFromLabel(roleCell),
-          title: title.trim(),
-          phone: phone.trim(),
-          canRequest: truthy(canReq),
-        });
-      }
+      // Row parsing lives in src/lib/importTemplates.ts (moved unchanged; covered by excel.test.ts).
+      const parsed: UserRecord[] = parseUserRows(raw);
       if (!parsed.length) {
         toast.error("לא נמצאו שורות תקינות בקובץ");
         return;

@@ -14,22 +14,72 @@ export function usePaged<T>(items: T[], size = PAGE_SIZE) {
   return { page: p, pages, setPage, slice: items.slice(p * size, p * size + size), offset: p * size, total: items.length };
 }
 
-export function Pager({ page, pages, setPage, total }: { page: number; pages: number; setPage: (n: number) => void; total: number }) {
-  if (pages <= 1) return null;
-  const from = page * PAGE_SIZE + 1;
-  const to = Math.min(total, from + PAGE_SIZE - 1);
+/** Page numbers to show: first, last, current ±1, with null for an ellipsis gap. */
+function pageList(page: number, pages: number): (number | null)[] {
+  const keep = new Set([0, pages - 1, page - 1, page, page + 1]);
+  const out: (number | null)[] = [];
+  for (let i = 0; i < pages; i++) {
+    if (keep.has(i)) out.push(i);
+    else if (out[out.length - 1] !== null) out.push(null);
+  }
+  return out;
+}
+
+/**
+ * Pager — table footer: "מציג 1–50 מתוך 312" + numbered page buttons (design: Main.dc.html pagination).
+ * API unchanged for existing callers: spread `usePaged()` into it. Hidden when there is a single page,
+ * unless `always` is set. Pass `size` when usePaged was given a custom page size.
+ */
+export function Pager({
+  page,
+  pages,
+  setPage,
+  total,
+  size = PAGE_SIZE,
+  always = false,
+}: {
+  page: number;
+  pages: number;
+  setPage: (n: number) => void;
+  total: number;
+  size?: number;
+  always?: boolean;
+}) {
+  if (pages <= 1 && !always) return null;
+  const from = total ? page * size + 1 : 0;
+  const to = Math.min(total, page * size + size);
   return (
-    <div className="mt-3 flex items-center justify-between gap-3 text-sm text-muted-foreground">
-      <span className="tabular-nums">{from}–{to} מתוך {total.toLocaleString("he-IL")}</span>
-      <div className="flex items-center gap-1">
-        <button aria-label="הקודם" disabled={page === 0} onClick={() => setPage(page - 1)} className="grid size-8 place-items-center rounded-md border border-border text-primary disabled:opacity-40">
-          <ChevronRight className="size-4" />
-        </button>
-        <span className="px-2 tabular-nums">עמוד {page + 1} מתוך {pages}</span>
-        <button aria-label="הבא" disabled={page >= pages - 1} onClick={() => setPage(page + 1)} className="grid size-8 place-items-center rounded-md border border-border text-primary disabled:opacity-40">
-          <ChevronLeft className="size-4" />
-        </button>
-      </div>
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[13.5px] text-slate-600">
+      <span>
+        מציג <span className="ds-num font-semibold text-navy-900">{from.toLocaleString("he-IL")}–{to.toLocaleString("he-IL")}</span> מתוך{" "}
+        <span className="ds-num font-semibold text-navy-900">{total.toLocaleString("he-IL")}</span>
+      </span>
+      {pages > 1 ? (
+        <nav aria-label="עימוד" className="flex flex-wrap items-center gap-1.5">
+          <button type="button" className="ds-pg" aria-label="הקודם" disabled={page === 0} onClick={() => setPage(page - 1)}>
+            <ChevronRight className="size-4" />
+          </button>
+          {pageList(page, pages).map((n, i) =>
+            n === null ? (
+              <span key={`gap-${i}`} aria-hidden className="px-1 text-slate-400">…</span>
+            ) : (
+              <button
+                key={n}
+                type="button"
+                className="ds-pg ds-num"
+                aria-current={n === page ? "page" : undefined}
+                aria-label={`עמוד ${n + 1}`}
+                onClick={() => setPage(n)}
+              >
+                {n + 1}
+              </button>
+            ),
+          )}
+          <button type="button" className="ds-pg" aria-label="הבא" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>
+            <ChevronLeft className="size-4" />
+          </button>
+        </nav>
+      ) : null}
     </div>
   );
 }

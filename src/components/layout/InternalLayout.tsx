@@ -1,22 +1,23 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard,
-  Ticket,
-  Building2,
-  Users,
-  FileBarChart,
-  ScrollText,
-  Settings,
-  UserCheck,
-  PenLine,
-
-  Menu,
+  BarChart3,
   Bell,
-  UserCircle2,
-  X, LogOut, History } from "lucide-react";
+  ChevronLeft,
+  LayoutDashboard,
+  Link2,
+  LogOut,
+  Menu,
+  PenLine,
+  Settings,
+  Ticket,
+  UserCheck,
+  Waypoints,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 
-import { Logo, Select } from "@/design-system/delek-1ea111";
+import { Logo } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { useAuthContext } from "@/lib/auth-context";
 import { userDisplayName } from "@/lib/userDisplay";
@@ -25,18 +26,45 @@ import { signOut } from "@/lib/useAuth";
 import { RealtimeNotifications } from "@/components/layout/RealtimeNotifications";
 import { roleLabels, storedRole, useAppStore, type Role } from "@/store/appStore";
 
-const navItems = [
-  { to: "/", label: "דשבורד", icon: LayoutDashboard, roles: ["admin", "branch", "supervisor", "viewer"] },
-  { to: "/allocations", label: "הקצאות לסניפים", icon: Building2, roles: ["admin", "viewer"] },
-  { to: "/supervisor", label: "הפקת שוברי דלק", icon: UserCheck, roles: ["admin", "branch", "supervisor"] },
-  { to: "/produced", label: "שוברים שהופקו", icon: History, roles: ["admin", "branch", "supervisor", "viewer"] },
-  { to: "/reports", label: "דוחות", icon: FileBarChart, roles: ["admin", "branch", "supervisor", "viewer"] },
+type NavTo = "/" | "/vouchers" | "/allocations" | "/supervisor" | "/produced" | "/reports" | "/signatures" | "/settings";
+
+interface NavItem {
+  to: NavTo;
+  label: string;
+  /** Short label for the mobile bottom tab bar (only items that appear there). */
+  tab?: string;
+  icon: LucideIcon;
+  roles: readonly Role[];
+}
+
+/**
+ * Main navigation, in the approved order. Role lists are the permission source for VISIBILITY only
+ * (routes enforce their own access). "/vouchers" uses the same roles that see the dashboard voucher table.
+ */
+const navItems: readonly NavItem[] = [
+  { to: "/", label: "דשבורד", tab: "דשבורד", icon: LayoutDashboard, roles: ["admin", "branch", "supervisor", "viewer"] },
+  { to: "/vouchers", label: "מלאי שוברים", tab: "מלאי", icon: Ticket, roles: ["admin", "branch", "supervisor", "viewer"] },
+  { to: "/allocations", label: "הקצאות לסניפים", icon: Waypoints, roles: ["admin", "viewer"] },
+  { to: "/supervisor", label: "הנפקה לעובד", tab: "הנפקה", icon: UserCheck, roles: ["admin", "branch", "supervisor"] },
+  { to: "/produced", label: "שוברים שהופקו", icon: Link2, roles: ["admin", "branch", "supervisor", "viewer"] },
+  { to: "/reports", label: "דוחות", tab: "דוחות", icon: BarChart3, roles: ["admin", "branch", "supervisor", "viewer"] },
   { to: "/signatures", label: "ארכיון חתימות", icon: PenLine, roles: ["admin", "branch", "supervisor", "viewer"] },
   { to: "/settings", label: "הגדרות", icon: Settings, roles: ["admin", "viewer"] },
-] as const;
+];
 
+const SHELL_BG = "radial-gradient(120% 60% at 100% 0%, rgba(31,95,208,0.35), transparent 60%)";
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0]![0]! + parts[1]![0]! : (parts[0] ?? "").slice(0, 2)) || "?";
+}
 
+/**
+ * InternalLayout — app shell for every signed-in page (design: Main.dc.html).
+ * Desktop (≥900px): navy sidebar (white logo, caption, nav, user footer) + light breadcrumb bar.
+ * Mobile (<900px): navy sticky top bar (menu · logo · bell), slide-in drawer, fixed bottom tab bar.
+ * `title` is the page name shown in the breadcrumb; pages render their own <PageHero> (h1) as the first child.
+ */
 export function InternalLayout({ title, children }: { title: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -57,109 +85,186 @@ export function InternalLayout({ title, children }: { title: string; children: R
     if (saved && saved !== useAppStore.getState().role) setRole(saved);
   }, [setRole, canSimulate, profile]);
 
-  const items = navItems.filter((item) => (item.roles as readonly string[]).includes(role));
+  // Drawer: close on Escape and on navigation; lock page scroll while open.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+  useEffect(() => setOpen(false), [pathname]);
+
+  const items = navItems.filter((item) => item.roles.includes(role));
+  const tabs = items.filter((item) => item.tab);
+  const name = userDisplayName(profile);
+  const accountRole = (profile?.role as Role | undefined) ?? role;
+  const roleText = roleLabels[accountRole] ?? "";
+  const isActive = (to: NavTo) => (to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`));
+  const logout = () => void signOut().then(() => navigate({ to: "/login", replace: true }));
+
+  const roleSelect = canSimulate ? (
+    <label className="relative flex items-center">
+      <span className="sr-only">תפקיד לצפייה</span>
+      <select
+        value={role}
+        onChange={(e) => setRole(e.target.value as Role)}
+        aria-label="תפקיד לצפייה"
+        className="h-9 rounded-[10px] border border-slate-200 bg-white px-3 text-xs font-semibold text-ink-soft outline-none focus-visible:shadow-focus-mint"
+      >
+        {(Object.keys(roleLabels) as Role[]).map((r) => (
+          <option key={r} value={r}>
+            תצוגה: {roleLabels[r]}
+          </option>
+        ))}
+      </select>
+    </label>
+  ) : null;
+
+  const bell = (dark: boolean) => (
+    <button type="button" aria-label="התראות" className={cn("ds-iconbtn", dark && "is-dark")}>
+      <Bell className="size-[18px]" aria-hidden />
+    </button>
+  );
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div dir="rtl" className="flex min-h-screen w-full bg-page text-navy-900">
       <RealtimeNotifications />
-      {open ? (
-        <button
-          aria-label="סגור תפריט"
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-30 bg-navy-900/40 lg:hidden"
-        />
-      ) : null}
 
+      {/* ── Desktop sidebar ── */}
       <aside
-        className={cn(
-          "fixed inset-y-0 right-0 z-40 flex w-64 shrink-0 flex-col overflow-y-auto border-s border-border bg-surface transition-transform lg:static lg:translate-x-0",
-          open ? "translate-x-0" : "translate-x-full",
-        )}
+        className="sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col gap-[22px] overflow-y-auto bg-shell px-4 pb-[22px] pt-[26px] text-white min-[900px]:flex"
+        style={{ backgroundImage: SHELL_BG }}
       >
-        <div className="flex h-24 items-center justify-between gap-2 border-b border-border px-5">
-          <Logo className="h-16 lg:h-20" />
-          <button
-            onClick={() => setOpen(false)}
-            aria-label="סגור תפריט"
-            className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted lg:hidden"
+        <Link to="/" activeOptions={{ exact: true }} aria-label="רשף ביטחון — דף הבית" className="flex justify-center border-b border-white/[.08] px-2.5 pb-3.5 pt-1.5">
+          <Logo variant="reversed" className="h-[92px]" alt="רשף ביטחון" />
+        </Link>
+        <div className="px-3.5 text-center text-[15px] font-bold tracking-[.08em] text-shell-text">מערכת לניהול שוברי דלק</div>
+        <nav aria-label="ניווט ראשי" className="flex flex-col gap-1">
+          {items.map(({ to, label, icon: Icon }) => (
+            <Link key={to} to={to} activeOptions={{ exact: to === "/" }} className="ds-navlink" aria-current={isActive(to) ? "page" : undefined}>
+              <Icon className="size-5 shrink-0" strokeWidth={1.8} aria-hidden />
+              <span className="truncate">{label}</span>
+            </Link>
+          ))}
+        </nav>
+        <div className="mt-auto flex items-center gap-3 border-t border-white/10 px-1.5 pt-4">
+          <span
+            aria-hidden
+            className="grid size-10 shrink-0 place-items-center rounded-xl text-[15px] font-extrabold"
+            style={{ background: "linear-gradient(135deg, #45cdba, #1f5fd0)" }}
           >
-            <X className="size-5" />
+            {initials(name)}
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-sm font-bold">{name}</span>
+            <span className="truncate text-xs text-shell-muted">{roleText}</span>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            aria-label="יציאה מהמערכת"
+            title="יציאה מהמערכת"
+            className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-[10px] bg-white/[.06] text-shell-text hover:bg-white/[.12] hover:text-white focus-visible:shadow-focus-mint focus-visible:outline-none"
+          >
+            <LogOut className="size-[18px]" aria-hidden />
           </button>
         </div>
-
-        <nav className="flex flex-col gap-1 px-4 py-4">
-          {items.map(({ to, label, icon: Icon }) => {
-            const active = pathname === to;
-            return (
-              <Link
-                key={to}
-                to={to}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground shadow-card"
-                    : "text-secondary hover:bg-blue-100 hover:text-blue-700",
-                )}
-              >
-                <Icon className="size-5 shrink-0" />
-                <span className="truncate">{label}</span>
-              </Link>
-            );
-          })}
-        </nav>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 grid h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 border-b border-border bg-surface px-4 sm:px-6">
-          <button
-            onClick={() => setOpen(true)}
-            aria-label="פתח תפריט"
-            className="grid size-9 place-items-center rounded-md text-secondary hover:bg-surface-muted lg:hidden"
-          >
-            <Menu className="size-5" />
+        {/* ── Mobile top bar ── */}
+        <header
+          className="sticky top-0 z-20 flex items-center justify-between gap-3 bg-shell px-3.5 py-2.5 text-white shadow-topbar min-[900px]:hidden"
+          style={{ backgroundImage: "radial-gradient(120% 140% at 100% 0%, rgba(31,95,208,0.45), transparent 60%)" }}
+        >
+          <button type="button" className="ds-iconbtn is-dark" aria-label="פתיחת תפריט" aria-expanded={open} onClick={() => setOpen(true)}>
+            <Menu className="size-5" aria-hidden />
           </button>
-          <h1 className="min-w-0 truncate font-display text-lg font-extrabold text-secondary">
-            {title}
-          </h1>
-          <div className="flex shrink-0 items-center gap-2">
-            {canSimulate ? <Select
-              value={role}
-              onChange={(e) => setRole(e.target.value as Role)}
-              aria-label="תפקיד לצפייה"
-              className="h-9 w-auto text-xs font-semibold"
+          <Link to="/" activeOptions={{ exact: true }} aria-label="רשף ביטחון — דף הבית">
+            <Logo variant="reversed" className="h-[42px]" alt="רשף ביטחון" />
+          </Link>
+          {bell(true)}
+        </header>
+
+        {/* ── Mobile drawer ── */}
+        {open ? (
+          <div className="fixed inset-0 z-50 min-[900px]:hidden">
+            <button type="button" aria-label="סגירת תפריט" onClick={() => setOpen(false)} className="absolute inset-0 cursor-pointer bg-navy-900/55" />
+            <nav
+              aria-label="תפריט ראשי"
+              className="ds-drawer-in absolute inset-y-0 right-0 flex w-[82%] max-w-[320px] flex-col gap-1.5 overflow-y-auto bg-shell px-3.5 py-5 text-white shadow-[-20px_0_40px_rgba(0,0,0,0.3)]"
+              style={{ backgroundImage: "radial-gradient(120% 50% at 100% 0%, rgba(31,95,208,0.4), transparent 60%)" }}
             >
-              {(Object.keys(roleLabels) as Role[]).map((r) => (
-                <option key={r} value={r}>
-                  תצוגה: {roleLabels[r]}
-                </option>
+              <div className="mb-2 flex items-center justify-between border-b border-white/10 px-1 pb-4">
+                <Logo variant="reversed" className="h-14" alt="רשף ביטחון" />
+                <button type="button" className="ds-iconbtn is-dark" aria-label="סגירה" onClick={() => setOpen(false)}>
+                  <X className="size-[18px]" aria-hidden />
+                </button>
+              </div>
+              {items.map(({ to, label, icon: Icon }) => (
+                <Link key={to} to={to} activeOptions={{ exact: to === "/" }} className="ds-navlink" aria-current={isActive(to) ? "page" : undefined} onClick={() => setOpen(false)}>
+                  <Icon className="size-5 shrink-0" strokeWidth={1.8} aria-hidden />
+                  {label}
+                </Link>
               ))}
-            </Select> : null}
-            <button
-              aria-label="התראות"
-              className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted"
-            >
-              <Bell className="size-5" />
-            </button>
-            <span className="hidden items-center gap-2 rounded-pill bg-surface-muted px-3 py-1.5 sm:flex">
-              <UserCircle2 className="size-5 text-secondary" />
-              <span className="text-sm font-semibold text-secondary">{userDisplayName(profile)}</span>
-            </span>
-            <button
-              onClick={() => void signOut().then(() => navigate({ to: "/login", replace: true }))}
-              aria-label="התנתקות"
-              title="התנתקות"
-              className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-danger"
-            >
-              <LogOut className="size-5" />
-            </button>
+              <div className="mt-auto flex flex-col gap-3 border-t border-white/10 px-1.5 pt-3.5">
+                {roleSelect}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate text-sm font-bold">{name}</span>
+                    <span className="truncate text-xs text-shell-muted">{roleText}</span>
+                  </div>
+                  <button type="button" onClick={logout} className="ds-navlink cursor-pointer border-0 bg-transparent px-3 py-2 text-[13.5px]">
+                    <LogOut className="size-4" aria-hidden />
+                    יציאה
+                  </button>
+                </div>
+              </div>
+            </nav>
+          </div>
+        ) : null}
+
+        {/* ── Desktop breadcrumb bar ── */}
+        <header className="hidden flex-wrap items-center justify-between gap-4 border-b border-slate-200 bg-white/90 px-8 py-3.5 min-[900px]:flex">
+          <nav aria-label="פירורי לחם" className="flex items-center gap-2 text-[13.5px] text-slate-600">
+            <Link to="/" activeOptions={{ exact: true }} className="text-slate-600 no-underline hover:text-navy-900">רשף ביטחון</Link>
+            <ChevronLeft className="size-3.5" aria-hidden />
+            <span aria-current="page" className="font-semibold text-navy-900">{title}</span>
+          </nav>
+          <div className="flex items-center gap-2.5">
+            {roleSelect}
+            {bell(false)}
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-5 sm:px-6 sm:py-6 lg:px-10 lg:py-8">
-          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+        <main className="flex w-full min-w-0 max-w-[1320px] flex-1 flex-col gap-[22px] px-3.5 pb-24 pt-4 min-[900px]:px-8 min-[900px]:pb-10 min-[900px]:pt-[26px]">
+          {children}
+          <footer className="mt-auto hidden items-center justify-center gap-2.5 pt-1.5 text-[12.5px] text-slate-400 min-[900px]:flex">
+            <Logo variant="emblem" alt="" aria-hidden className="h-5 opacity-80" />
+            <span>רשף ביטחון · מערכת ניהול שוברי דלק</span>
+          </footer>
         </main>
       </div>
+
+      {/* ── Mobile bottom tab bar ── */}
+      {tabs.length ? (
+        <nav
+          aria-label="ניווט מהיר"
+          className="fixed inset-x-0 bottom-0 z-30 flex border-t border-white/[.08] bg-shell px-1.5 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(11,17,64,0.25)] min-[900px]:hidden"
+        >
+          {tabs.map(({ to, tab, icon: Icon }) => (
+            <Link key={to} to={to} activeOptions={{ exact: to === "/" }} className="ds-tabitem" aria-current={isActive(to) ? "page" : undefined}>
+              <Icon className="size-[22px]" strokeWidth={1.8} aria-hidden />
+              {tab}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
     </div>
   );
 }

@@ -26,20 +26,20 @@ export function SuccessView({ code }: { code: string }) {
 
   return (
     <div className="flex animate-[fadeIn_.35s_ease-out] flex-col items-center gap-5 px-6 py-10 text-center">
-      <span className="grid size-20 place-items-center rounded-pill bg-mint-100">
-        <CheckCircle2 className="size-12 text-teal-600" />
+      <span className="grid size-20 place-items-center rounded-pill bg-available-bg">
+        <CheckCircle2 className="size-12 text-available" aria-hidden />
       </span>
 
       <div className="flex flex-col gap-1">
-        <h2 className="font-display text-2xl font-extrabold text-secondary">השובר אושר בהצלחה</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="m-0 text-2xl font-extrabold text-navy-900">השובר אושר בהצלחה</h2>
+        <p className="m-0 text-sm text-slate-600">
           הציגו את הקוד בתחנת הדלק לקבלת השובר.
         </p>
       </div>
 
-      <div className="w-full rounded-lg border-2 border-primary bg-blue-100/60 px-4 py-5">
+      <div className="w-full rounded-2xl border-2 border-dashed border-[#7fa6e6] bg-[#f2f6fe] px-4 py-5">
         <span className="block text-xs font-semibold text-blue-700">קוד השובר</span>
-        <span dir="ltr" className="mt-1 block font-display text-3xl font-extrabold tracking-widest tabular-nums text-secondary">
+        <span dir="ltr" className="ds-num mt-1 block text-3xl font-semibold tracking-widest text-navy-900">
           {code}
         </span>
       </div>
@@ -51,7 +51,7 @@ export function SuccessView({ code }: { code: string }) {
 
       <div aria-live="polite" className="min-h-6">
         {toast ? (
-          <span className="inline-flex items-center gap-2 rounded-pill bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground shadow-raised">
+          <span className="inline-flex items-center gap-2 rounded-pill bg-navy-900 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-raised">
             <Check className="size-4" />
             {toast}
           </span>

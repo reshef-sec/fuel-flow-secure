@@ -14,6 +14,13 @@ const badgeVariants = cva(
         success: "bg-mint-100 text-teal-600",
         warning: "bg-[color-mix(in_srgb,var(--color-warning)_18%,white)] text-[#8a6210]",
         danger: "bg-[color-mix(in_srgb,var(--color-danger)_14%,white)] text-danger",
+        // Redesign 2026 status families (see theme.css): card / link / vehicle / request states.
+        available: "bg-available-bg text-available-fg",
+        issued: "bg-issued-bg text-issued-fg",
+        redeemed: "bg-redeemed-bg text-redeemed-fg",
+        pending: "bg-pending-bg text-pending-fg",
+        waiting: "bg-waiting-bg text-waiting-fg",
+        muted: "bg-neutral-bg text-neutral-fg",
       },
       size: { sm: "px-2 py-0.5 text-xs", md: "px-3 py-1 text-sm" },
     },

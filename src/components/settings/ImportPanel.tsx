@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
-import { downloadCsv, statusVariant } from "@/components/dashboard/statusVariant";
+import { statusVariant } from "@/components/dashboard/statusVariant";
 import { MAIN_POOL, formatAssignment } from "@/components/dashboard/voucherData";
 import { FuelBadge, parseFuelType } from "@/components/fuel/fuel";
 import { Pager, usePaged } from "@/components/ui/Pager";
@@ -23,14 +23,9 @@ import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { validateStockSheet } from "@/lib/validateStockSheet";
 import { partitionStockRows, pazFeedbackCardNumbers } from "@/lib/importIntegrity";
 import { useAppStore } from "@/store/appStore";
+import { templateColumns } from "@/lib/importTemplates";
+import { downloadImportTemplate } from "@/lib/excel";
 
-const templateColumns = [
-  { name: "מספר כרטיס", example: "019949" },
-  { name: "קוד", example: "••••••" },
-  { name: "ערך", example: "100" },
-  { name: "סוג", example: "בנזין 95 / סולר" },
-  { name: "תוקף", example: "2027-12-31" },
-];
 
 /** Compact drop zone used by both import tools. */
 function DropZone({
@@ -121,8 +116,9 @@ export function ImportPanel() {
   const paged = usePaged(rows);
 
   function downloadTemplate() {
-    downloadCsv("vouchers-template.csv", templateColumns.map((c) => c.name), [templateColumns.map((c) => c.example)]);
-    toast.success("תבנית האקסל הורדה");
+    void downloadImportTemplate("stock")
+      .then(() => toast.success("תבנית האקסל הורדה"))
+      .catch(() => toast.error("הורדת התבנית נכשלה"));
   }
 
   async function handleStock(files: FileList | null) {
