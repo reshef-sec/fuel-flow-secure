@@ -36,3 +36,8 @@ src/.generated/
 
 # Lovable sandbox workspace directory
 .workspace/
+
+# Secrets
+.env
+.env.*
+!.env.example
