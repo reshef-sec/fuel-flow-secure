@@ -14,7 +14,6 @@ import { Button, Card, Select, StatCard } from "@/design-system/delek-1ea111";
 import { fullName, MAIN_POOL, useAppStore, useCurrentUser } from "@/store/appStore";
 import { BudgetUtilization, SupervisorDistribution } from "@/components/dashboard/BudgetUtilization";
 import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
-import { centralPoolOf } from "@/lib/centralInventory";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 import { branchLabel } from "@/lib/branchLabels";
@@ -83,7 +82,6 @@ function Dashboard() {
   const value = (list: typeof vouchers) => list.reduce((t, v) => t + v.amount, 0);
   const available = vouchers.filter(isAvailable);
   // Branch-manager budget = branch vouchers not yet given to a supervisor.
-  const centralPool = centralPoolOf(vouchers);
   const branchAvailable = available.filter((v) => !v.supervisor);
   const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : totalAvailableBalance ?? 0;
   const branchesBudget = value(available.filter((v) => mainBranch(v.branch) !== MAIN_POOL));
@@ -229,7 +227,7 @@ function Dashboard() {
         </Card>
       ) : null}
 
-      {role === "admin" ? <PoolDenominations pool={centralPool} /> : null}
+      {role === "admin" ? <PoolDenominations summary={summary} error={inventoryError} /> : null}
 
       {isBranchManager ? <SupervisorDistribution vouchers={available} issued={issuedValue} /> : null}
 
