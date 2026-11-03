@@ -1,6 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { normalizeWorkVehicleHeader, parseWorkVehicleSheet } from "./workVehicleSheet";
+import { parseSheetFile } from "./parseSheet";
+import { prepareWorkVehicles } from "./workVehicles";
 const columns = [{key:"standard",label:"תקן"},{key:"clientCode",label:"קוד לקוח"},{key:"clientName",label:"שם לקוח"},{key:"balance",label:'יתרת הנה"ש'}];
 describe("work vehicle Excel headers", () => {
   it("detects the header in each of the first five rows", () => {
@@ -21,5 +23,15 @@ describe("work vehicle Excel headers", () => {
   it("rejects a header past row five and missing core columns", () => {
     assert.throws(()=>parseWorkVehicleSheet([...Array.from({length:5},()=>[""]),["תקן","קוד לקוח","שם לקוח"]],columns));
     assert.throws(()=>parseWorkVehicleSheet([["תקן","קוד לקוח"]],columns));
+  });
+  it("reads a real Excel upload with a title, punctuation and skipped missing keys", async () => {
+    const XLSX = await import("xlsx");
+    const workbook=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([["רשימת רכבי עבודה"],[],["\u200Fתקן:","קוד-לקוח","שם לקוח","יתרת הנה״ש"],["80620031","C1","לקוח","500"],["","C1","חסר תקן"],["80620032","C1","לקוח","100"]]),"רכבים");
+    const file=new File([XLSX.write(workbook,{type:"array",bookType:"xlsx"})],"vehicles.xlsx");
+    const prepared=prepareWorkVehicles(parseWorkVehicleSheet(await parseSheetFile(file),columns));
+    assert.equal(prepared.rows.length,2);
+    assert.equal(prepared.invalid,1);
+    assert.equal(prepared.rows[0]?.balance,"500");
   });
 });

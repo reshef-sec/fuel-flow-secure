@@ -23,7 +23,7 @@ DO $$ DECLARE r jsonb; denied boolean:=false; BEGIN
   IF NOT denied THEN RAISE EXCEPTION 'Empty snapshot accepted'; END IF;
   r:=public.sync_work_vehicles('[{"standard":"80620031","client_code":"C1","account_name":"Shared","client_name":"Reactivated"},{"standard":"80620032","client_code":"C1","account_name":"Shared","client_name":"Still active"},{"standard":"80620033","client_code":"C1","client_name":"New"}]');
   IF r->>'reactivated'<>'1' OR r->>'remained_active'<>'1' OR r->>'added'<>'1' OR r->>'active'<>'3' OR r->>'deactivated'<>'0' THEN RAISE EXCEPTION 'Re-upload counts failed'; END IF;
-  r:=public.sync_work_vehicles('[{"standard":"80620031","client_code":"C1"},{"standard":"80620032","client_code":"C1"},{"standard":"80620033","client_code":"C1"}]');
+  r:=public.sync_work_vehicles('[{"standard":"80620031","client_code":"C1","client_name":"Reactivated"},{"standard":"80620032","client_code":"C1"},{"standard":"80620033","client_code":"C1"}]');
   IF r->>'reactivated'<>'0' OR r->>'remained_active'<>'3' THEN RAISE EXCEPTION 'Repeated re-upload counted reactivation twice'; END IF;
   IF NOT EXISTS(SELECT 1 FROM public.b2b_clients WHERE standard='80620031' AND is_active AND client_name='Reactivated') THEN RAISE EXCEPTION 'Reactivation failed'; END IF;
   IF NOT EXISTS(SELECT 1 FROM public.activity_log WHERE action='סנכרון מאגר רכב עבודה' AND target LIKE '%1 כפולים דולגו') THEN RAISE EXCEPTION 'Audit missing'; END IF;
