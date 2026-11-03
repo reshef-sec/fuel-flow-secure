@@ -230,20 +230,17 @@ CREATE INDEX IF NOT EXISTS b2b_active_vehicle_lookup ON public.b2b_clients(clien
 CREATE OR REPLACE FUNCTION public.sync_work_vehicles(p_rows jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog, public
 AS $$
-DECLARE cleaned jsonb; added integer; updated integer; deactivated integer; duplicates integer; blanks integer;
+DECLARE cleaned jsonb; added integer; updated integer; deactivated integer; duplicates integer; blanks integer; invalid integer;
 BEGIN
   IF auth.uid() IS NULL OR NOT public.has_role(auth.uid(),'admin') THEN RAISE EXCEPTION 'Admin access required' USING ERRCODE='42501'; END IF;
   IF jsonb_typeof(p_rows) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'Invalid work vehicle file'; END IF;
   IF EXISTS(SELECT 1 FROM jsonb_array_elements(p_rows) x WHERE jsonb_typeof(x) IS DISTINCT FROM 'object') THEN RAISE EXCEPTION 'Invalid work vehicle row'; END IF;
   SELECT count(*) INTO blanks FROM jsonb_array_elements(p_rows) x
     WHERE NOT EXISTS(SELECT 1 FROM jsonb_each_text(x) f WHERE nullif(btrim(f.value),'') IS NOT NULL);
-  -- Ignore wholly blank rows, but abort incomplete nonblank identities before
-  -- deactivating anything: silently skipping these could hide real vehicles.
-  IF EXISTS(SELECT 1 FROM jsonb_array_elements(p_rows) x
+  -- Skip incomplete identities as well as blanks; only valid keys form the snapshot.
+  SELECT count(*) INTO invalid FROM jsonb_array_elements(p_rows) x
     WHERE EXISTS(SELECT 1 FROM jsonb_each_text(x) f WHERE nullif(btrim(f.value),'') IS NOT NULL)
-      AND (nullif(btrim(x->>'standard'),'') IS NULL OR nullif(btrim(x->>'client_code'),'') IS NULL)) THEN
-    RAISE EXCEPTION 'יש למלא תקן וקוד לקוח בכל שורה שאינה ריקה';
-  END IF;
+      AND (nullif(btrim(x->>'standard'),'') IS NULL OR nullif(btrim(x->>'client_code'),'') IS NULL);
   WITH incoming AS (
     SELECT value || jsonb_build_object('standard',btrim(value->>'standard'),'client_code',btrim(value->>'client_code')) AS row, ord
     FROM jsonb_array_elements(p_rows) WITH ORDINALITY x(value,ord)
@@ -252,7 +249,7 @@ BEGIN
     SELECT DISTINCT ON (row->>'standard',row->>'client_code') row,ord FROM incoming ORDER BY row->>'standard',row->>'client_code',ord
   ) SELECT jsonb_agg(row ORDER BY ord) INTO cleaned FROM first_rows;
   IF coalesce(jsonb_array_length(cleaned),0)=0 THEN RAISE EXCEPTION 'לא נמצאו רכבי עבודה תקינים; המאגר לא שונה'; END IF;
-  duplicates:=jsonb_array_length(p_rows)-blanks-jsonb_array_length(cleaned);
+  duplicates:=jsonb_array_length(p_rows)-blanks-invalid-jsonb_array_length(cleaned);
   LOCK TABLE public.b2b_clients IN SHARE ROW EXCLUSIVE MODE;
   SELECT count(*) INTO updated FROM jsonb_to_recordset(cleaned) x(standard text,client_code text)
     JOIN public.b2b_clients c ON btrim(c.standard)=x.standard AND btrim(c.client_code)=x.client_code;
@@ -268,8 +265,8 @@ BEGIN
     SELECT x.standard,x.client_code,coalesce(x.account_name,''),coalesce(x.client_name,''),coalesce(x.branch,''),x.balance,x.load_type,x.budget_section,x.account_key,x.item_family,x.account_status,x.account_type,true
     FROM jsonb_to_recordset(cleaned) x(standard text,client_code text,account_name text,client_name text,branch text,balance text,load_type text,budget_section text,account_key text,item_family text,account_status text,account_type text)
     WHERE NOT EXISTS(SELECT 1 FROM public.b2b_clients c WHERE btrim(c.standard)=x.standard AND btrim(c.client_code)=x.client_code);
-  PERFORM public.log_import_action('סנכרון מאגר רכב עבודה',added || ' חדשים, ' || updated || ' עודכנו, ' || deactivated || ' לא פעילים, ' || duplicates || ' כפולים דולגו');
-  RETURN jsonb_build_object('added',added,'updated',updated,'deactivated',deactivated,'duplicates',duplicates,'blanks',blanks);
+  PERFORM public.log_import_action('סנכרון מאגר רכב עבודה',jsonb_array_length(cleaned) || ' פעילים, ' || deactivated || ' לא פעילים, ' || (blanks+invalid) || ' שורות ריקות/לא תקינות דולגו, ' || duplicates || ' כפולים דולגו');
+  RETURN jsonb_build_object('added',added,'updated',updated,'active',jsonb_array_length(cleaned),'deactivated',deactivated,'duplicates',duplicates,'blanks',blanks,'invalid',invalid,'skipped',blanks+invalid);
 END $$;
 REVOKE ALL ON FUNCTION public.sync_work_vehicles(jsonb) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.sync_work_vehicles(jsonb) TO authenticated;

@@ -535,7 +535,9 @@ export const useAppStore = create<AppState>()(
     const result = await syncWorkVehicles(prepared.rows.map(b2bToRow));
     const fresh = await loadAll();
     set({ b2bClients: fresh.b2bClients });
-    return { ...result, duplicates: (result.duplicates ?? 0) + prepared.duplicates, blanks: (result.blanks ?? 0) + prepared.blanks };
+    const blanks = (result.blanks ?? 0) + prepared.blanks;
+    const invalid = (result.invalid ?? 0) + prepared.invalid;
+    return { ...result, active: result.active ?? result.added + result.updated, duplicates: (result.duplicates ?? 0) + prepared.duplicates, blanks, invalid, skipped: blanks + invalid };
   },
   removeB2b: (code, standard) => {
     set((s) => ({
