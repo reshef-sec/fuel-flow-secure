@@ -94,8 +94,10 @@ export function B2bPanel() {
         toast.error(`לא נמצאו שורות תקינות. עמודות: ${cols.join(", ")}`);
         return;
       }
-      const { added, updated, deactivated, duplicates = 0, blanks = 0 } = await importB2b(parsed);
-      toast.success(`נוספו ${added} חדשים, ${updated} עודכנו, ${deactivated} סומנו כלא פעילים · ${duplicates} כפולים ו־${blanks} שורות ריקות דולגו`);
+      const { active = 0, deactivated, skipped = 0, duplicates = 0 } = await importB2b(parsed);
+      toast.success(`עודכנו בהצלחה: ${active} פעילים, ${deactivated} סומנו כלא פעילים, ${skipped} שורות ריקות/לא תקינות דולגו`, {
+        ...(duplicates > 0 ? { description: `${duplicates} שורות כפולות דולגו` } : {}),
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "סנכרון הקובץ נכשל");
     }

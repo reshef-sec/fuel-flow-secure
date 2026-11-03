@@ -7,7 +7,8 @@ DO $$ DECLARE r jsonb; denied boolean:=false; BEGIN
   r:=public.sync_work_vehicles('[{"standard":" 80620031 ","client_code":"C1","account_name":"Shared","client_name":"First"},{"standard":"80620031","client_code":"C1","account_name":"Shared","client_name":"Duplicate"},{"standard":"80620032","client_code":"C1","account_name":"Shared","client_name":"Second"},{}]');
   IF r->>'added'<>'2' OR r->>'duplicates'<>'1' OR r->>'blanks'<>'1' OR (SELECT client_name FROM public.b2b_clients WHERE standard='80620031')<>'First' THEN RAISE EXCEPTION 'First duplicate, blank skipping or shared account failed'; END IF;
   INSERT INTO public.vouchers(serial,route,client_code,standard,account_name,link_id) VALUES('history','b2b','C1','80620031','Shared','old-link');
-  r:=public.sync_work_vehicles('[{"standard":"80620032","client_code":"C1","account_name":"Renamed","client_name":"Updated"}]');
+  r:=public.sync_work_vehicles('[{"standard":"80620032","client_code":"C1","account_name":"Renamed","client_name":"Updated"},{"standard":" ","client_code":"C1"},{"standard":"80620033","client_code":null},{}]');
+  IF r->>'active'<>'1' OR r->>'invalid'<>'2' OR r->>'blanks'<>'1' OR r->>'skipped'<>'3' OR r->>'duplicates'<>'0' THEN RAISE EXCEPTION 'Incomplete keys did not skip with accurate counts'; END IF;
   IF r->>'deactivated'<>'1' OR r->>'updated'<>'1' OR (SELECT count(*) FROM public.b2b_clients)<>2 THEN RAISE EXCEPTION 'Delta sync deleted or failed'; END IF;
   IF NOT EXISTS(SELECT 1 FROM public.b2b_clients WHERE standard='80620031' AND NOT is_active) THEN RAISE EXCEPTION '80620031 not deactivated'; END IF;
   IF NOT EXISTS(SELECT 1 FROM public.vouchers v JOIN public.b2b_clients c ON v.client_code=c.client_code AND v.standard=c.standard WHERE v.serial='history' AND NOT c.is_active) THEN RAISE EXCEPTION 'Inactive historical resolution failed'; END IF;
@@ -16,7 +17,7 @@ DO $$ DECLARE r jsonb; denied boolean:=false; BEGIN
   INSERT INTO public.vouchers(serial,route,client_code,standard,account_name,link_id) VALUES('allowed','b2b','C1','80620032','Renamed','new-link');
   denied:=false;
   BEGIN PERFORM public.sync_work_vehicles('[{"client_code":"C1","standard":""}]'); EXCEPTION WHEN raise_exception THEN denied:=true; END;
-  IF NOT denied OR NOT EXISTS(SELECT 1 FROM public.b2b_clients WHERE standard='80620032' AND is_active) THEN RAISE EXCEPTION 'Incomplete snapshot changed pool'; END IF;
+  IF NOT denied OR NOT EXISTS(SELECT 1 FROM public.b2b_clients WHERE standard='80620032' AND is_active) THEN RAISE EXCEPTION 'All-invalid snapshot changed pool'; END IF;
   denied:=false;
   BEGIN PERFORM public.sync_work_vehicles('[{}]'); EXCEPTION WHEN raise_exception THEN denied:=true; END;
   IF NOT denied THEN RAISE EXCEPTION 'Empty snapshot accepted'; END IF;
