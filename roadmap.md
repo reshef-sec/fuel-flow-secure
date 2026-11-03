@@ -1,4 +1,5 @@
 # Roadmap — master system update
+- [ ] Make work-vehicle header matching resilient within five rows and show reactivated/remained-active counts; update external SQL and regression-test re-upload.
 - [x] Skip blank/incomplete work-vehicle rows in preparation and guarded RPC, preserve full active/inactive delta sync and return active/deactivated/skipped counts; updated SQL supplied first, 63 app tests and disposable PostgreSQL skipping/deactivation/history/reactivation/authorization/issuance/reinstall checks passed; build OK.
 - [ ] Install updated work_vehicle_sync_skip_invalid.sql and verify signed-in import feedback/read-back (blocker: user installs external SQL; available Settings browser session redirects to login, authenticated import unverified).
 - [x] Apply dedicated private-vehicle atomic delta sync, first-row deduplication/blank skipping, explicit inactive styling and active-only issuance/history rules; SQL supplied first, 61 app tests and isolated PostgreSQL deduplication/deactivation/history/reactivation/empty-snapshot/authorization/issuance/reinstall tests passed; build OK.
