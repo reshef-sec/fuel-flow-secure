@@ -1,17 +1,18 @@
 import { useState } from "react";
-import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { Badge, Button, Card, CardHeader, CardTitle, Input, Select } from "@/design-system/delek-1ea111";
+import { Badge, Input, Select } from "@/design-system/delek-1ea111";
 import { isReadOnlyRole, reasonCategoryLabels, useAppStore, type ReasonCategory } from "@/store/appStore";
+import { EmptyNote, SettingsCard } from "./shared";
 
 function CategorySelect({ value, onChange }: { value: ReasonCategory; onChange: (v: ReasonCategory) => void }) {
   return (
     <Select
-      aria-label="קטגוריית סיבה"
+      aria-label="סוג רכב"
       value={value}
       onChange={(e) => onChange(e.target.value as ReasonCategory)}
-      className="w-40"
+      className="h-11 w-full rounded-control min-[900px]:w-40"
     >
       <option value="B2B">רכב עבודה</option>
       <option value="Regular">רכב פרטי</option>
@@ -32,52 +33,56 @@ export function ReasonsPanel() {
   const [editCat, setEditCat] = useState<ReasonCategory>("Regular");
 
   return (
-    <Card padding="lg" className="max-w-3xl">
-      <CardHeader>
-        <CardTitle>סיבות הנפקה</CardTitle>
-      </CardHeader>
+    <SettingsCard
+      label="סיבות הנפקה"
+      title="סיבות הנפקה"
+      sub={<><span className="ds-num">{reasons.length}</span> סיבות</>}
+      className="max-w-4xl"
+    >
+      {readOnly ? null : (
+        <form
+          className="flex flex-wrap items-center gap-2 border-b border-table-line px-[18px] py-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const value = draft.trim();
+            if (!value) return;
+            addReason({ name: value, category: draftCat });
+            setDraft("");
+            toast.success("סיבת ההנפקה נוספה");
+          }}
+        >
+          <Input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="סיבת הנפקה חדשה"
+            aria-label="סיבת הנפקה חדשה"
+            className="h-11 min-w-0 flex-1 basis-56 rounded-control"
+          />
+          <CategorySelect value={draftCat} onChange={setDraftCat} />
+          <button type="submit" className="ds-btn ds-btn-primary max-[899.98px]:w-full" disabled={!draft.trim()}>
+            <Plus className="size-4" aria-hidden />
+            הוספה
+          </button>
+        </form>
+      )}
 
-      {readOnly ? null : <form
-        className="mt-5 flex flex-wrap gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const value = draft.trim();
-          if (!value) return;
-          addReason({ name: value, category: draftCat });
-          setDraft("");
-          toast.success("סיבת ההנפקה נוספה");
-        }}
-      >
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="סיבת הנפקה חדשה"
-          aria-label="סיבת הנפקה חדשה"
-          className="min-w-0 flex-1"
-        />
-        <CategorySelect value={draftCat} onChange={setDraftCat} />
-        <Button type="submit">
-          <Plus className="size-4" />
-          הוספה
-        </Button>
-      </form>}
-
-      <ul className="mt-5 divide-y divide-border rounded-lg border border-border">
-        {reasons.length === 0 ? (
-          <li className="p-5 text-center text-sm text-muted-foreground">לא הוגדרו סיבות הנפקה</li>
-        ) : (
-          reasons.map((reason, index) => (
-            <li key={`${reason.name}-${index}`} className="flex items-center gap-2 px-4 py-3">
+      {reasons.length === 0 ? (
+        <EmptyNote>לא הוגדרו סיבות הנפקה</EmptyNote>
+      ) : (
+        <ul className="m-0 list-none divide-y divide-table-line p-0">
+          {reasons.map((reason, index) => (
+            <li key={`${reason.name}-${index}`} className="flex flex-wrap items-center gap-2 px-[18px] py-2.5">
               {editIndex === index && !readOnly ? (
                 <>
                   <Input
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     aria-label="עריכת סיבת הנפקה"
-                    className="min-w-0 flex-1"
+                    className="h-11 min-w-0 flex-1 basis-56 rounded-control"
                   />
                   <CategorySelect value={editCat} onChange={setEditCat} />
                   <button
+                    type="button"
                     aria-label="שמור"
                     onClick={() => {
                       const value = editValue.trim();
@@ -86,55 +91,53 @@ export function ReasonsPanel() {
                       setEditIndex(null);
                       toast.success("סיבת ההנפקה עודכנה");
                     }}
-                    className="grid size-9 place-items-center rounded-md text-teal-600 hover:bg-surface-muted"
+                    className="ds-iconbtn text-available-fg"
                   >
                     <Check className="size-4" />
                   </button>
-                  <button
-                    aria-label="בטל עריכה"
-                    onClick={() => setEditIndex(null)}
-                    className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted"
-                  >
+                  <button type="button" aria-label="בטל עריכה" onClick={() => setEditIndex(null)} className="ds-iconbtn">
                     <X className="size-4" />
                   </button>
                 </>
               ) : (
                 <>
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-secondary">
-                    {reason.name}
-                  </span>
-                  <Badge variant={reason.category === "B2B" ? "info" : "neutral"}>
-                    {reason.category === "B2B" ? "B2B" : "רגיל"} · {reasonCategoryLabels[reason.category]}
+                  <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold text-navy-900">{reason.name}</span>
+                  <Badge variant={reason.category === "B2B" ? "info" : "muted"} size="md" className="font-bold">
+                    {reasonCategoryLabels[reason.category]}
                   </Badge>
-                  {readOnly ? null : <>
-                  <button
-                    aria-label={`ערוך ${reason.name}`}
-                    onClick={() => {
-                      setEditIndex(index);
-                      setEditValue(reason.name);
-                      setEditCat(reason.category);
-                    }}
-                    className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-primary"
-                  >
-                    <Pencil className="size-4" />
-                  </button>
-                  <button
-                    aria-label={`מחק ${reason.name}`}
-                    onClick={() => {
-                      removeReason(index);
-                      toast.success("סיבת ההנפקה נמחקה");
-                    }}
-                    className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-danger"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                  </>}
+                  {readOnly ? null : (
+                    <span className="flex gap-1">
+                      <button
+                        type="button"
+                        className="ds-rowact"
+                        aria-label={`עריכת ${reason.name}`}
+                        onClick={() => {
+                          setEditIndex(index);
+                          setEditValue(reason.name);
+                          setEditCat(reason.category);
+                        }}
+                      >
+                        עריכה
+                      </button>
+                      <button
+                        type="button"
+                        className="ds-rowact !text-redeemed-fg"
+                        aria-label={`הסרת ${reason.name}`}
+                        onClick={() => {
+                          removeReason(index);
+                          toast.success("סיבת ההנפקה נמחקה");
+                        }}
+                      >
+                        הסרה
+                      </button>
+                    </span>
+                  )}
                 </>
               )}
             </li>
-          ))
-        )}
-      </ul>
-    </Card>
+          ))}
+        </ul>
+      )}
+    </SettingsCard>
   );
 }

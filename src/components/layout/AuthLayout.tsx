@@ -3,60 +3,59 @@ import { Logo } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 
 /**
- * AuthLayout — split screen for /login and /change-password (design: Login.dc.html).
- * Navy brand panel with ONLY the white logo, the big white "מערכת ניהול שוברי דלק" and a mint accent line;
- * the form card sits on the light side. Under 900px the brand panel collapses to a logo band and the card overlaps it.
+ * AuthLayout — immersive full-screen navy stage for /login and /change-password.
+ * Decorative layers (glows, fine grid, slowly turning ring emblem) sit behind a two-column
+ * composition: the white wordmark + "מערכת ניהול שוברי דלק" headline, and the floating form card.
+ * Under 900px it stacks: logo on top, card below. All motion respects prefers-reduced-motion.
  */
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div dir="rtl" className="flex min-h-screen flex-wrap items-stretch bg-page font-sans text-navy-900">
-      <section
-        aria-label="רשף ביטחון"
-        className="relative flex flex-[1_1_100%] items-center justify-center overflow-hidden bg-shell px-5 pb-[46px] pt-[22px] text-white min-[900px]:flex-[1_1_460px] min-[900px]:flex-col min-[900px]:items-start min-[900px]:justify-between min-[900px]:gap-9 min-[900px]:px-14 min-[900px]:py-11"
-        style={{
-          backgroundImage:
-            "radial-gradient(90% 70% at 100% 0%, rgba(31,95,208,.55), transparent 60%), radial-gradient(70% 60% at 0% 100%, rgba(69,205,186,.20), transparent 60%)",
-        }}
-      >
-        <Logo
-          variant="emblem-reversed"
-          alt=""
-          aria-hidden
-          className="pointer-events-none absolute -bottom-[110px] -left-[90px] h-[300px] opacity-[.12] min-[900px]:-bottom-[120px] min-[900px]:-left-[140px] min-[900px]:h-[560px]"
-        />
-        <Logo variant="reversed" alt="רשף ביטחון" className="relative h-[76px] min-[900px]:h-[150px]" />
-        <div className="relative hidden max-w-[520px] min-[900px]:block">
-          <p className="m-0 text-[52px] font-extrabold leading-[1.12] tracking-[-.015em] text-white">
+    <div dir="rtl" className="auth-stage relative isolate min-h-screen overflow-hidden font-sans text-white">
+      {/* Decorative background — hidden from assistive tech */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="auth-grid absolute inset-0" />
+        <div className="auth-orb auth-orb-blue" />
+        <div className="auth-orb auth-orb-mint" />
+        <div className="auth-orb auth-orb-indigo" />
+        <Logo variant="emblem-reversed" alt="" className="auth-ring" />
+        <div className="auth-vignette absolute inset-0" />
+      </div>
+
+      <div className="mx-auto flex min-h-screen w-full max-w-[1240px] flex-col items-center justify-center gap-8 px-4 py-8 min-[900px]:flex-row min-[900px]:justify-between min-[900px]:gap-16 min-[900px]:px-12 min-[900px]:py-12">
+        <section aria-label="רשף ביטחון" className="auth-rise flex flex-col items-center text-center min-[900px]:max-w-[540px] min-[900px]:items-start min-[900px]:text-right">
+          <Logo variant="reversed" alt="רשף ביטחון" className="h-[84px] drop-shadow-[0_10px_30px_rgba(0,0,0,.35)] min-[900px]:h-[170px]" />
+          <h2 className="m-0 mt-5 hidden text-[60px] font-extrabold leading-[1.06] tracking-[-.02em] text-white min-[900px]:block">
             מערכת ניהול
             <br />
-            שוברי דלק
-          </p>
-          <span aria-hidden className="mt-[22px] block h-1 w-[72px] rounded-pill bg-mint-500" />
-        </div>
-        <div aria-hidden className="hidden h-px min-[900px]:block" />
-      </section>
+            <span className="auth-headline-accent">שוברי דלק</span>
+          </h2>
+          <p className="m-0 mt-2 text-[15px] font-bold tracking-[.04em] text-shell-text min-[900px]:hidden">מערכת ניהול שוברי דלק</p>
+          <span aria-hidden className="mt-6 hidden h-[5px] w-24 rounded-pill bg-gradient-to-l from-mint-500 to-blue-500 min-[900px]:block" />
+        </section>
 
-      <main className="relative flex flex-[1_1_100%] flex-col items-center justify-start gap-[18px] px-3.5 pb-7 min-[900px]:flex-[1_1_460px] min-[900px]:justify-center min-[900px]:px-6 min-[900px]:py-10">
-        {children}
-        <div className="flex items-center gap-2 text-[12.5px] text-slate-400">
-          <Logo variant="emblem" alt="" aria-hidden className="h-[18px] opacity-80" />
-          <span>רשף ביטחון · מערכת ניהול שוברי דלק</span>
-        </div>
-      </main>
+        <main className="flex w-full flex-col items-center gap-5 min-[900px]:w-auto">
+          {children}
+          <p className="m-0 flex items-center gap-2 text-[12.5px] text-shell-muted">
+            <Logo variant="emblem-reversed" alt="" aria-hidden className="h-[16px] opacity-80" />
+            רשף ביטחון · כניסה מאובטחת
+          </p>
+        </main>
+      </div>
     </div>
   );
 }
 
-/** AuthCard — the white form card used inside AuthLayout. */
+/** AuthCard — the floating white form card used inside AuthLayout. */
 export function AuthCard({ children, className, ...props }: React.FormHTMLAttributes<HTMLFormElement>) {
   return (
     <form
       className={cn(
-        "relative z-[2] -mt-7 flex w-full max-w-[440px] flex-col gap-[18px] rounded-[18px] border border-line bg-white px-[18px] py-6 shadow-auth min-[900px]:mt-0 min-[900px]:rounded-dialog min-[900px]:p-8",
+        "auth-card auth-rise-late relative flex w-full max-w-[440px] flex-col gap-[18px] overflow-hidden rounded-[22px] bg-white px-5 pb-6 pt-7 text-navy-900 min-[900px]:w-[440px] min-[900px]:px-9 min-[900px]:pb-9 min-[900px]:pt-10",
         className,
       )}
       {...props}
     >
+      <span aria-hidden className="absolute inset-x-0 top-0 h-[5px] bg-gradient-to-l from-mint-500 via-blue-500 to-navy-700" />
       {children}
     </form>
   );
@@ -91,6 +90,6 @@ export function AuthAlert({
   );
 }
 
-/** Input with a leading icon, 48px tall (auth pages). */
+/** Input with a leading icon, 50px tall (auth pages). */
 export const authInputClass =
-  "h-12 w-full rounded-control border border-line-strong bg-white pl-3.5 pr-[42px] text-right text-[15px] text-navy-900 outline-none transition placeholder:text-slate-400 focus:shadow-focus-mint aria-[invalid=true]:border-redeemed aria-[invalid=true]:bg-[#fffafa]";
+  "h-[50px] w-full rounded-[13px] border border-line-strong bg-slate-50 pl-3.5 pr-[44px] text-right text-[15px] text-navy-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-mint-500 focus:bg-white focus:shadow-focus-mint aria-[invalid=true]:border-redeemed aria-[invalid=true]:bg-[#fffafa]";

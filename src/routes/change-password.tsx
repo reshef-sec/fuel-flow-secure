@@ -68,7 +68,7 @@ function ChangePasswordPage() {
     <AuthLayout>
       <AuthCard onSubmit={onSubmit} noValidate aria-labelledby="cp-title">
         <div className="flex flex-col gap-1.5">
-          <span aria-hidden className="mb-1.5 grid size-12 place-items-center rounded-[14px] bg-waiting-bg text-blue-500">
+          <span aria-hidden className="mb-2 grid size-12 place-items-center rounded-[14px] bg-gradient-to-br from-blue-500 to-navy-700 text-white shadow-[0_8px_20px_rgba(31,95,208,.35)]">
             <KeyRound className="size-[22px]" />
           </span>
           <h1 id="cp-title" className="m-0 text-[26px] font-extrabold tracking-[-.01em]">עדכון סיסמה</h1>
@@ -163,7 +163,7 @@ function ChangePasswordPage() {
           </AuthAlert>
         ) : null}
 
-        <button type="submit" disabled={busy} aria-busy={busy || undefined} className="ds-btn ds-btn-primary min-h-[50px] w-full text-[15px]">
+        <button type="submit" disabled={busy} aria-busy={busy || undefined} className="auth-btn mt-1 inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[13px] border-0 text-[15.5px] font-bold disabled:cursor-not-allowed disabled:opacity-60 focus-visible:shadow-focus-mint focus-visible:outline-none">
           {busy ? "שומר…" : "שמור סיסמה"}
           {busy ? null : <ArrowLeft className="size-[18px]" aria-hidden />}
         </button>

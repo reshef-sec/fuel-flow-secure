@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { FileSpreadsheet, KeyRound, Pencil, Plus, Search, Trash2, UserPlus } from "lucide-react";
+import { FileSpreadsheet, Plus, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -9,26 +9,58 @@ import {
   FormField,
   Input,
   Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
 } from "@/design-system/delek-1ea111";
+import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { Modal } from "@/components/ui/Modal";
+import { DataTable, EmptyRow, KV, MobileCardList } from "@/components/ui/DataTable";
+import { ResultDialog, type ResultSummary } from "@/components/ui/ResultDialog";
 import { deleteAccount, resetAccountPassword, syncAccount } from "@/lib/backend";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
-import { isReadOnlyRole, roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
+import { fullName, isReadOnlyRole, roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
 import { parseUserRows } from "@/lib/importTemplates";
+import { downloadImportTemplate } from "@/lib/excel";
+import { SearchField, SettingsCard } from "./shared";
 
-const roleVariant: Record<Role, "brand" | "info" | "purple" | "neutral"> = {
+const roleVariant: Record<Role, "brand" | "info" | "purple" | "muted"> = {
   admin: "brand",
   branch: "info",
   supervisor: "purple",
-  viewer: "neutral",
+  viewer: "muted",
 };
+
+function RoleBadge({ role }: { role: Role }) {
+  return (
+    <Badge variant={roleVariant[role]} size="md" className="whitespace-nowrap font-bold">
+      {roleLabels[role]}
+    </Badge>
+  );
+}
+
+/** "רשאי להקים דרישה" — checkbox + explicit yes/no pill so the state reads at a glance. */
+function CanRequestToggle({ user, disabled, onChange }: { user: UserRecord; disabled: boolean; onChange: (v: boolean) => void }) {
+  const on = Boolean(user.canRequest);
+  return (
+    <label className={cn("inline-flex min-h-11 items-center gap-2", disabled ? "cursor-default" : "cursor-pointer")}>
+      <input
+        type="checkbox"
+        className="size-[18px] accent-[var(--color-blue-500)]"
+        checked={on}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        aria-label={`רשאי להקים דרישה - ${user.lastName} ${user.firstName}`}
+      />
+      <span
+        className={cn(
+          "rounded-pill px-2.5 py-0.5 text-xs font-bold",
+          on ? "bg-available-bg text-available-fg" : "bg-neutral-bg text-neutral-fg",
+        )}
+      >
+        {on ? "רשאי" : "לא רשאי"}
+      </span>
+    </label>
+  );
+}
 
 export function UsersPanel() {
   const users = useAppStore((s) => s.users);
@@ -68,6 +100,7 @@ export function UsersPanel() {
   const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [result, setResult] = useState<ResultSummary | null>(null);
   const [form, setForm] = useState({
     branch: branchNames[0] ?? "",
     id: "",
@@ -82,7 +115,7 @@ export function UsersPanel() {
 
   async function handleFile(file: File) {
     if (!isSheetFile(file.name)) {
-      toast.error("יש להעלות קובץ אקסל (xlsx/xls) או CSV");
+      setResult({ tone: "error", title: "קובץ לא נתמך", line: "יש להעלות קובץ אקסל (xlsx/xls) או CSV", detail: file.name });
       return;
     }
     try {
@@ -90,13 +123,13 @@ export function UsersPanel() {
       // Row parsing lives in src/lib/importTemplates.ts (moved unchanged; covered by excel.test.ts).
       const parsed: UserRecord[] = parseUserRows(raw);
       if (!parsed.length) {
-        toast.error("לא נמצאו שורות תקינות בקובץ");
+        setResult({ tone: "error", title: "לא נמצאו שורות תקינות בקובץ", detail: file.name });
         return;
       }
       const { added, skipped } = importUsers(parsed);
-      toast.success(`נוספו ${added} משתמשים, ${skipped} דולגו (ת.ז קיימת)`);
+      setResult({ tone: "success", title: "ייבוא המשתמשים הושלם", line: `נוספו ${added} משתמשים, ${skipped} דולגו (ת.ז קיימת)`, detail: file.name });
     } catch {
-      toast.error("שגיאה בקריאת הקובץ");
+      setResult({ tone: "error", title: "שגיאה בקריאת הקובץ", detail: file.name });
     }
   }
 
@@ -110,6 +143,18 @@ export function UsersPanel() {
       );
     });
   }, [users, query, roleFilter]);
+  const requesters = users.filter((u) => u.canRequest).length;
+
+  const blankForm = () => ({
+    branch: branchNames[0] ?? "",
+    id: "",
+    lastName: "",
+    firstName: "",
+    role: "supervisor" as Role,
+    title: "",
+    phone: "",
+    canRequest: false,
+  });
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -149,43 +194,43 @@ export function UsersPanel() {
     );
     setOpen(false);
     setEditingId(null);
-    setForm({
-      branch: branchNames[0] ?? "",
-      id: "",
-      lastName: "",
-      firstName: "",
-      role: "supervisor",
-      title: "",
-      phone: "",
-      canRequest: false,
-    });
+    setForm(blankForm());
   }
 
+  const startEdit = (u: UserRecord) => {
+    setEditingId(u.id);
+    setError(null);
+    setForm({
+      branch: u.branch,
+      id: u.id,
+      lastName: u.lastName,
+      firstName: u.firstName,
+      role: u.role,
+      title: u.title,
+      phone: u.phone,
+      canRequest: Boolean(u.canRequest),
+    });
+    setOpen(true);
+  };
+  const remove = (u: UserRecord) => {
+    deleteFn({ data: { nationalId: u.id } }).catch(() => undefined);
+    removeUser(u.id);
+    toast.success("המשתמש הוסר");
+  };
+
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-extrabold text-secondary">
-          משתמשי המערכת
-          <span className="ms-2 text-sm font-semibold text-muted-foreground">
-            {rows.length} מתוך {users.length}
-          </span>
-        </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="חיפוש לפי ת.ז, שם, תפקיד או סניף"
-              aria-label="חיפוש משתמשים"
-              className="w-64 pe-9"
-            />
-          </div>
+    <>
+      <SettingsCard
+        label="משתמשי המערכת"
+        title={<>משתמשי המערכת <span className="ms-1 text-sm font-semibold text-slate-600"><span className="ds-num">{rows.length}</span> מתוך <span className="ds-num">{users.length}</span></span></>}
+        sub={<><span className="ds-num font-bold text-navy-900">{requesters}</span> רשאים להקים דרישה (יכולים לקבל הקצאות)</>}
+        tools={<>
+          <SearchField value={query} onChange={setQuery} placeholder="ת.ז, שם, תפקיד או סניף" label="חיפוש משתמשים" />
           <Select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as Role | "all")}
             aria-label="סינון לפי הרשאה"
-            className="w-40"
+            className="h-11 w-full rounded-control min-[900px]:w-40"
           >
             <option value="all">כל ההרשאות</option>
             {(Object.keys(roleLabels) as Role[]).map((r) => (
@@ -195,160 +240,132 @@ export function UsersPanel() {
             ))}
           </Select>
           {readOnly ? null : <>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) void handleFile(file);
-            }}
-          />
-          <Button variant="outline" onClick={() => fileRef.current?.click()}>
-            <FileSpreadsheet className="size-4" />
-            ייבוא מאקסל
-          </Button>
-          <Button
-            onClick={() => {
-              setEditingId(null);
-              setError(null);
-              setForm({
-                branch: branchNames[0] ?? "",
-                id: "",
-                lastName: "",
-                firstName: "",
-                role: "supervisor",
-                title: "",
-                phone: "",
-                canRequest: false,
-              });
-              setOpen(true);
-            }}
-          >
-            <Plus className="size-4" />
-            הוספת משתמש
-          </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              aria-label="קובץ משתמשים"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void handleFile(file);
+              }}
+            />
+            <span className="inline-flex flex-wrap items-center gap-1">
+              <button type="button" className="ds-btn ds-btn-light" onClick={() => fileRef.current?.click()}>
+                <UploadCloud className="size-4" aria-hidden />
+                ייבוא מאקסל
+              </button>
+              <button
+                type="button"
+                className="ds-rowact inline-flex min-h-11 items-center gap-1.5"
+                onClick={() => void downloadImportTemplate("users").catch(() => toast.error("הורדת התבנית נכשלה"))}
+              >
+                <FileSpreadsheet className="size-4" aria-hidden />
+                הורדת קובץ לדוגמה
+              </button>
+            </span>
+            <button
+              type="button"
+              className="ds-btn ds-btn-primary"
+              onClick={() => {
+                setEditingId(null);
+                setError(null);
+                setForm(blankForm());
+                setOpen(true);
+              }}
+            >
+              <Plus className="size-4" aria-hidden />
+              הוספת משתמש
+            </button>
           </>}
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>סניף</TableHeaderCell>
-              <TableHeaderCell>ת.ז</TableHeaderCell>
-              <TableHeaderCell>משפחה</TableHeaderCell>
-              <TableHeaderCell>פרטי</TableHeaderCell>
-              <TableHeaderCell>הרשאה</TableHeaderCell>
-              <TableHeaderCell>תפקיד</TableHeaderCell>
-              <TableHeaderCell className="text-center">נייד</TableHeaderCell>
-              <TableHeaderCell className="text-center">רשאי להקים דרישה</TableHeaderCell>
-              <TableHeaderCell>פעולות</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((u) => (
-              <TableRow key={u.id}>
-                <TableCell>{u.branch ? branchLabel(u.branch) : "—"}</TableCell>
-                <TableCell className="tabular-nums">{u.id}</TableCell>
-                <TableCell className="font-semibold">{u.lastName}</TableCell>
-                <TableCell>{u.firstName}</TableCell>
-                <TableCell>
-                  <Badge variant={roleVariant[u.role]} size="md">
-                    {roleLabels[u.role]}
-                  </Badge>
-                </TableCell>
-                <TableCell>{u.title}</TableCell>
-                <TableCell className="text-center">
-                  <span className="tabular-nums" dir="ltr">
-                    {u.phone}
-                  </span>
-                </TableCell>
-                <TableCell className="text-center">
-                  <Checkbox
-                    checked={Boolean(u.canRequest)}
-                    disabled={!isAdmin}
-                    onChange={(e) => setUserCanRequest(u.id, e.target.checked)}
-                    aria-label={`רשאי להקים דרישה - ${u.lastName} ${u.firstName}`}
-                  />
-                </TableCell>
-                <TableCell>
-                  {readOnly ? "—" : <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        setEditingId(u.id);
-                        setError(null);
-                        setForm({
-                          branch: u.branch,
-                          id: u.id,
-                          lastName: u.lastName,
-                          firstName: u.firstName,
-                          role: u.role,
-                          title: u.title,
-                          phone: u.phone,
-                          canRequest: Boolean(u.canRequest),
-                        });
-                        setOpen(true);
-                      }}
-                      aria-label={`ערוך את ${u.lastName} ${u.firstName}`}
-                      className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-primary focus-visible:shadow-focus"
-                    >
-                      <Pencil className="size-4" />
-                    </button>
-                    {isAdmin ? (
-                      <button
-                        onClick={() => void resetPassword(u)}
-                        aria-label={`איפוס סיסמה ל${u.lastName} ${u.firstName}`}
-                        title="איפוס סיסמה"
-                        className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-primary focus-visible:shadow-focus"
-                      >
-                        <KeyRound className="size-4" />
-                      </button>
-                    ) : null}
-                    <button
-                      onClick={() => {
-                        deleteFn({ data: { nationalId: u.id } }).catch(() => undefined);
-                        removeUser(u.id);
-                        toast.success("המשתמש הוסר");
-                      }}
-                      aria-label={`מחק את ${u.lastName} ${u.firstName}`}
-                      className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-danger focus-visible:shadow-focus"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  </div>}
-                </TableCell>
-              </TableRow>
-            ))}
+        </>}
+      >
+        <DataTable minWidth={1100} caption="משתמשי המערכת">
+          <thead>
+            <tr>
+              <th scope="col">ת.ז</th>
+              <th scope="col">שם</th>
+              <th scope="col">הרשאה</th>
+              <th scope="col">רשאי להקים דרישה</th>
+              <th scope="col">תפקיד</th>
+              <th scope="col">סניף</th>
+              <th scope="col">נייד</th>
+              {readOnly ? null : <th scope="col"><span className="sr-only">פעולות</span></th>}
+            </tr>
+          </thead>
+          <tbody>
             {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
-                  לא נמצאו משתמשים מתאימים
-                </TableCell>
-              </TableRow>
-            ) : null}
-          </TableBody>
-        </Table>
-      </div>
+              <EmptyRow colSpan={readOnly ? 7 : 8}>לא נמצאו משתמשים מתאימים</EmptyRow>
+            ) : (
+              rows.map((u) => (
+                <tr key={u.id}>
+                  <td><span className="ds-num">{u.id}</span></td>
+                  <td className="font-semibold text-navy-900">{fullName(u)}</td>
+                  <td><RoleBadge role={u.role} /></td>
+                  <td><CanRequestToggle user={u} disabled={!isAdmin} onChange={(v) => setUserCanRequest(u.id, v)} /></td>
+                  <td>{u.title}</td>
+                  <td>{u.branch ? branchLabel(u.branch) : "—"}</td>
+                  <td><span className="ds-num" dir="ltr">{u.phone}</span></td>
+                  {readOnly ? null : (
+                    <td>
+                      <span className="flex gap-1">
+                        {isAdmin ? (
+                          <button type="button" className="ds-rowact" aria-label={`איפוס סיסמה ל${u.lastName} ${u.firstName}`} onClick={() => void resetPassword(u)}>
+                            איפוס סיסמה
+                          </button>
+                        ) : null}
+                        <button type="button" className="ds-rowact" aria-label={`עריכת ${u.lastName} ${u.firstName}`} onClick={() => startEdit(u)}>
+                          עריכה
+                        </button>
+                        <button type="button" className="ds-rowact !text-redeemed-fg" aria-label={`מחיקת ${u.lastName} ${u.firstName}`} onClick={() => remove(u)}>
+                          מחיקה
+                        </button>
+                      </span>
+                    </td>
+                  )}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </DataTable>
+        <MobileCardList
+          items={rows}
+          keyOf={(u) => u.id}
+          empty="לא נמצאו משתמשים מתאימים"
+          render={(u) => (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-navy-900">{fullName(u)}</span>
+                <RoleBadge role={u.role} />
+              </div>
+              <KV label="ת.ז"><span className="ds-num">{u.id}</span></KV>
+              <KV label="תפקיד · סניף">{u.title} · {u.branch ? branchLabel(u.branch) : "—"}</KV>
+              <KV label="נייד"><span className="ds-num" dir="ltr">{u.phone}</span></KV>
+              <div className="flex items-center justify-between gap-2 border-t border-table-line pt-1 text-[13.5px]">
+                <span className="font-semibold text-ink">רשאי להקים דרישה</span>
+                <CanRequestToggle user={u} disabled={!isAdmin} onChange={(v) => setUserCanRequest(u.id, v)} />
+              </div>
+              {readOnly ? null : (
+                <div className={cn("grid gap-2", isAdmin ? "grid-cols-3" : "grid-cols-2")}>
+                  {isAdmin ? <button type="button" className="ds-btn ds-btn-light !px-2" onClick={() => void resetPassword(u)}>איפוס סיסמה</button> : null}
+                  <button type="button" className="ds-btn ds-btn-light !px-2" onClick={() => startEdit(u)}>עריכה</button>
+                  <button type="button" className="ds-btn ds-btn-light !px-2 !text-redeemed-fg" onClick={() => remove(u)}>מחיקה</button>
+                </div>
+              )}
+            </>
+          )}
+        />
+      </SettingsCard>
 
       <Modal
         open={open}
         onClose={() => setOpen(false)}
         title={editingId ? "עריכת משתמש" : "הוספת משתמש חדש"}
+        description="ההרשאות נקבעות לפי ההרשאה והסניף שנבחרו."
       >
-        <form onSubmit={submit} className="space-y-5">
-          <div className="flex items-center gap-3 rounded-lg bg-blue-100 p-4">
-            <span className="grid size-10 shrink-0 place-items-center rounded-md bg-surface text-blue-700">
-              <UserPlus className="size-5" />
-            </span>
-            <p className="text-sm font-semibold text-secondary">
-              המשתמש יקבל הרשאות בהתאם להרשאה ולסניף שייבחרו
-            </p>
-          </div>
-
+        <form onSubmit={submit} className="space-y-4">
           <FormField label="סניף">
             <Select
               value={form.branch}
@@ -423,18 +440,19 @@ export function UsersPanel() {
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
               inputMode="tel"
+              dir="ltr"
               placeholder="050-0000000"
               aria-label="נייד"
               className="tabular-nums"
             />
           </FormField>
 
-          <div className="rounded-lg border border-border p-3">
+          <div className="rounded-control border border-line-strong bg-table-head p-3">
             <Checkbox
               checked={form.canRequest}
               disabled={!isAdmin}
               onChange={(e) => setForm({ ...form, canRequest: e.target.checked })}
-              label="רשאי להקים דרישה"
+              label={<span className="font-semibold">רשאי להקים דרישה</span>}
             />
             {!isAdmin ? (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -442,8 +460,9 @@ export function UsersPanel() {
               </p>
             ) : null}
           </div>
+          {editingId ? null : <p className="text-xs text-slate-600">סיסמה ראשונית: ת.ז</p>}
 
-          {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+          {error ? <p role="alert" className="text-sm font-semibold text-danger">{error}</p> : null}
 
           <div className="flex flex-wrap justify-end gap-2 pt-1">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
@@ -453,6 +472,8 @@ export function UsersPanel() {
           </div>
         </form>
       </Modal>
-    </section>
+
+      <ResultDialog result={result} onClose={() => setResult(null)} />
+    </>
   );
 }

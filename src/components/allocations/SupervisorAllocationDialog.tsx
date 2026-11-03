@@ -1,16 +1,24 @@
-import { useEffect, useState } from "react";
-import { Wallet } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { FuelBreakdown, FuelSplitFields, emptySplit, fuelOf, readSplit, type FuelType } from "@/components/fuel/fuel";
+import { ResultDialog, type ResultSummary } from "@/components/ui/ResultDialog";
+import { emptySplit, fuelOf, readSplit, type FuelType } from "@/components/fuel/fuel";
 import { isAvailable } from "@/components/dashboard/voucherData";
 import { fullName, groupStock, pickExact, useAppStore } from "@/store/appStore";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { branchLabel } from "@/lib/branchLabels";
+import { AllocationFormFields, cardsText } from "./AllocationForm";
 
+const fmt = (n: number) => n.toLocaleString("he-IL");
+const fuelWord = (f: FuelType) => (f === "בנזין" ? "בנזין 95" : "סולר");
+
+/**
+ * Branch manager → supervisor of HIS branch. Permission/stock logic unchanged: only supervisors whose
+ * branch equals the manager's branch are listed; stock = the branch's unassigned "טרם שומש" cards;
+ * `assignToSupervisor(branch, supervisor, amount, fuel)` per fuel.
+ */
 export function SupervisorAllocationDialog({
   open,
   onClose,
@@ -26,7 +34,11 @@ export function SupervisorAllocationDialog({
   const stockReady = useLiveInventory(open);
   const assignToSupervisor = useAppStore((s) => s.assignToSupervisor);
   const allVouchers = useAppStore((s) => s.vouchers);
-  const free = allVouchers.filter((v) => v.branch === branch && !v.supervisor && isAvailable(v) && v.status === "טרם שומש");
+  const free = useMemo(
+    () => allVouchers.filter((v) => v.branch === branch && !v.supervisor && isAvailable(v) && v.status === "טרם שומש"),
+    [allVouchers, branch],
+  );
+  const pools = useMemo(() => ({ "בנזין": free.filter((v) => fuelOf(v) === "בנזין"), "סולר": free.filter((v) => fuelOf(v) === "סולר") }), [free]);
   const avail = { "בנזין": 0, "סולר": 0 } as Record<FuelType, number>;
   for (const v of free) avail[fuelOf(v)] += v.amount;
 
@@ -35,10 +47,10 @@ export function SupervisorAllocationDialog({
   const [split, setSplit] = useState(emptySplit);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<ResultSummary | null>(null);
   const currentSplit = readSplit(split);
   const stockError = typeof currentSplit === "string" ? null : (["בנזין", "סולר"] as const).some(f =>
     currentSplit[f] > 0 && !pickExact(free.filter(v => fuelOf(v) === f), currentSplit[f])) ? STOCK_SHORTAGE : null;
-  useEffect(() => { if (open && stockReady && stockError) toast.error(stockError); }, [open, stockReady, stockError]);
 
   useEffect(() => {
     if (!open) return;
@@ -47,6 +59,7 @@ export function SupervisorAllocationDialog({
     setError(null);
     setLoading(false);
   }, [open]);
+  useEffect(() => { setError(null); }, [supervisor, split]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,11 +67,14 @@ export function SupervisorAllocationDialog({
     if (!supervisor) return setError("יש לבחור מפקח");
     if (typeof parsed === "string") return setError(parsed);
     const numeric = parsed["בנזין"] + parsed["סולר"];
+    const cards: string[] = [];
     for (const f of ["בנזין", "סולר"] as const)
       if (parsed[f]) {
         const stock = free.filter((v) => fuelOf(v) === f);
-        if (!pickExact(stock, parsed[f]))
+        const pick = pickExact(stock, parsed[f]);
+        if (!pick)
           return setError(`אין במלאי שוברי ${f} בסכום זה. המלאי הזמין כעת בסוג דלק זה: ${groupStock(stock)}.`);
+        cards.push(`${fuelWord(f)}: ${cardsText(pick)}`);
       }
     if (numeric > branchBalance) {
       setError("הסכום גבוה מהיתרה הזמינה בסניף");
@@ -66,67 +82,56 @@ export function SupervisorAllocationDialog({
     }
     setError(null);
     setLoading(true);
+    const done: string[] = [];
     try {
       for (const f of ["בנזין", "סולר"] as const) if (parsed[f]) {
         const error = await assignToSupervisor(branch, supervisor, parsed[f], f);
-        if (error) { setError(error); toast.error(error); return; }
+        if (error) {
+          if (done.length) {
+            setSplit((s) => ({ ...s, "בנזין": "" }));
+            setResult({ tone: "warning", title: "ההקצאה בוצעה חלקית", line: `הועברו ${done.join(" ו-")} ל${supervisor}. ${fuelWord(f)} לא הועבר: ${error}` });
+          }
+          setError(error); toast.error(error); return;
+        }
+        done.push(`${fmt(parsed[f])} ₪ ${fuelWord(f)}`);
       }
       onClose();
-      toast.success(`הועברו ${numeric.toLocaleString("he-IL")} ₪ ל${supervisor}`);
+      setResult({ tone: "success", title: "ההקצאה בוצעה", line: `הועברו ${done.join(" ו-")} ל${supervisor}`, detail: cards.join(" · ") || undefined });
     } finally { setLoading(false); }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="הקצאה למפקח">
-      <form onSubmit={submit} className="space-y-5">
-        <div className="flex items-center gap-3 rounded-lg bg-blue-100 p-4">
-          <span className="grid size-10 shrink-0 place-items-center rounded-md bg-surface text-blue-700">
-            <Wallet className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-muted-foreground">
-              יתרה זמינה במאגר {branchLabel(branch)}
-            </p>
-            <p className="font-display text-2xl font-extrabold tabular-nums text-secondary">
-              {branchBalance.toLocaleString("he-IL")} ₪
-            </p>
-            <FuelBreakdown list={free} />
-          </div>
-        </div>
-
-        <FormField label="בחר מפקח">
-          <Select
-            aria-label="בחר מפקח"
-            value={supervisor}
-            onChange={(e) => setSupervisor(e.target.value)}
-          >
-            <option value="">בחר מפקח…</option>
-            {supervisors.map((u) => (
-              <option key={u.id} value={fullName(u)}>
-                {fullName(u)}
-              </option>
-            ))}
-          </Select>
-          {supervisors.length === 0 ? (
-            <p className="mt-2 text-xs text-muted-foreground">
-              לא הוגדרו מפקחים לסניף זה. ניתן להוסיף מפקחים בהגדרות → ניהול משתמשים.
-            </p>
-          ) : null}
-        </FormField>
-
-        <FuelSplitFields values={split} onChange={setSplit} available={avail} />
-
-        {error || stockError ? <p className="text-sm font-semibold text-danger">{error ?? stockError}</p> : null}
-
-        <div className="flex flex-wrap justify-end gap-2 pt-1">
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-            ביטול
-          </Button>
-          <Button type="submit" loading={loading} disabled={!stockReady || !!stockError || typeof currentSplit === "string"}>
-            בצע הקצאה
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <>
+      <Modal open={open} onClose={onClose} title="הקצאה למפקח" description={`הקצאה מהיתרה שלך למפקחי סניף ${branchLabel(branch)}.`} size="lg">
+        <form onSubmit={submit} noValidate className="flex flex-col gap-[18px]">
+          <p className="m-0 rounded-[14px] border border-line bg-[#fbfcfe] px-4 py-3 text-sm text-slate-600">
+            היתרה שלי: <span className="ds-num font-bold text-navy-900">{fmt(branchBalance)} ₪</span>
+            <span className="mx-1.5">·</span>בנזין 95 <span className="ds-num font-semibold text-navy-900">{fmt(avail["בנזין"])} ₪</span>
+            <span className="mx-1.5">·</span>סולר <span className="ds-num font-semibold text-navy-900">{fmt(avail["סולר"])} ₪</span>
+          </p>
+          <AllocationFormFields
+            idPrefix="sup-alloc"
+            recipientLabel={`מפקח בסניף ${branchLabel(branch)}`}
+            recipientPlaceholder="בחירת מפקח…"
+            recipients={supervisors.map((u) => ({ value: fullName(u), label: `${fullName(u)} · מפקח · ${branchLabel(u.branch)}` }))}
+            recipient={supervisor}
+            onRecipient={setSupervisor}
+            emptyRecipientsNote="לא הוגדרו מפקחים לסניף זה. ניתן להוסיף מפקחים בהגדרות → ניהול משתמשים."
+            values={split}
+            onValues={setSplit}
+            available={avail}
+            pools={pools}
+            availPrefix="זמין ביתרה שלי"
+            overLabel="חורג מהיתרה שלך"
+            error={error}
+            fallbackError={stockError}
+            loading={loading}
+            submitDisabled={!stockReady || !!stockError || typeof currentSplit === "string" || !supervisor}
+            onCancel={onClose}
+          />
+        </form>
+      </Modal>
+      <ResultDialog result={result} onClose={() => setResult(null)} />
+    </>
   );
 }

@@ -1,29 +1,24 @@
 import { useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, FileSpreadsheet, Pencil, Plus, Search, Trash2, UploadCloud } from "lucide-react";
+import { FileSpreadsheet, Plus, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  Badge,
-  Button,
-  Card,
-  FormField,
-  Input,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-} from "@/design-system/delek-1ea111";
-import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
+import { Button, FormField, Input } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
+import { DataTable, EmptyRow, KV, MobileCardList } from "@/components/ui/DataTable";
+import { FilterChips } from "@/components/ui/FilterChips";
+import { Pager, usePaged } from "@/components/ui/Pager";
+import { ResultDialog, type ResultSummary } from "@/components/ui/ResultDialog";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
-import { mapPrivateVehicleRows } from "@/lib/importTemplates";
+import { mapPrivateVehicleRows, privateVehicleHeaders } from "@/lib/importTemplates";
 import { downloadImportTemplate } from "@/lib/excel";
-import { isReadOnlyRole, useAppStore } from "@/store/appStore";
+import { isReadOnlyRole, useAppStore, type ClientRecord } from "@/store/appStore";
 import { privateVehicleKey } from "@/lib/privateVehicles";
+import { SearchField, SettingsCard } from "./shared";
 
 const empty = { clientId: "", clientName: "", siteId: "", siteName: "", standard: "" };
+
+type ActiveFilter = "all" | "active" | "inactive";
 
 export function ClientsPanel() {
   const clients = useAppStore((s) => s.nonB2bClients);
@@ -37,42 +32,50 @@ export function ClientsPanel() {
   const [editing, setEditing] = useState<{ clientId: string; siteId: string } | null>(null);
   const [form, setForm] = useState(empty);
   const [error, setError] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(0);
+  const [active, setActive] = useState<ActiveFilter>("all");
+  const [result, setResult] = useState<ResultSummary | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const PAGE_SIZE = 25;
-  const filtered = useMemo(() => {
+  const searched = useMemo(() => {
     const q = query.trim();
     if (!q) return clients;
     return clients.filter((c) =>
       [c.clientId, c.clientName, c.siteId, c.siteName, c.standard ?? ""].some((v) => v.includes(q)),
     );
   }, [clients, query]);
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const current = Math.min(page, pageCount - 1);
-  const visible = filtered.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
+  const activeCount = searched.filter((c) => c.isActive === true).length;
+  const filtered = useMemo(
+    () =>
+      active === "all" ? searched : searched.filter((c) => (active === "active" ? c.isActive === true : c.isActive !== true)),
+    [searched, active],
+  );
+  const paged = usePaged(filtered);
 
   async function handleFiles(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
     if (!isSheetFile(file.name)) {
-      toast.error("יש להעלות קובץ אקסל (xlsx, xls) או CSV");
+      setResult({ tone: "error", title: "קובץ לא נתמך", line: "יש להעלות קובץ אקסל (xlsx, xls) או CSV", detail: file.name });
       return;
     }
     try {
       const raw = stripHeader(await parseSheetFile(file), "לקוח");
       const rows = mapPrivateVehicleRows(raw);
       if (rows.length === 0) {
-        toast.error("לא נמצאו שורות תקינות. עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן");
+        setResult({ tone: "error", title: "לא נמצאו שורות תקינות", line: "עמודות: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן", detail: file.name });
         return;
       }
       const { added, updated, deactivated, duplicates = 0, blanks = 0 } = await importClients(rows);
-      setPage(0);
-      toast.success(`נוספו ${added} אתרים, ${updated} עודכנו, ${deactivated} סומנו כלא פעילים · ${duplicates} כפולים ו־${blanks} שורות ריקות דולגו`);
+      paged.setPage(0);
+      setResult({
+        tone: "success",
+        title: "המאגר עודכן בהצלחה",
+        line: `נוספו ${added} אתרים, ${updated} עודכנו, ${deactivated} סומנו כלא פעילים`,
+        detail: `${duplicates} כפולים ו־${blanks} שורות ריקות דולגו`,
+      });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "סנכרון הקובץ נכשל");
+      setResult({ tone: "error", title: "סנכרון הקובץ נכשל", line: error instanceof Error ? error.message : "סנכרון הקובץ נכשל", detail: file.name });
     }
   }
 
@@ -118,202 +121,193 @@ export function ClientsPanel() {
     setOpen(false);
   }
 
+  const startEdit = (c: ClientRecord) => {
+    setEditing({ clientId: c.clientId, siteId: c.siteId });
+    setForm({
+      clientId: c.clientId,
+      clientName: c.clientName,
+      siteId: c.siteId,
+      siteName: c.siteName,
+      standard: c.standard ?? "",
+    });
+    setError(null);
+    setOpen(true);
+  };
+  const remove = (c: ClientRecord) => {
+    removeClient(c.clientId, c.siteId);
+    toast.success("האתר נמחק");
+  };
+  const status = (c: ClientRecord) => (c.isActive === true ? "פעיל" : "לא פעיל");
+
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-extrabold text-secondary">
-          מאגר רכב פרטי
-          <span className="ms-2 text-sm font-semibold text-muted-foreground">
-            {filtered.length.toLocaleString("he-IL")} מתוך {clients.length.toLocaleString("he-IL")}
-          </span>
-        </h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPage(0);
-              }}
-              placeholder="חיפוש לקוח או אתר"
-              aria-label="חיפוש לקוחות ואתרים"
-              className="w-64 pe-9"
-            />
-          </div>
-          <Button
-            variant="outline"
+    <>
+      <SettingsCard
+        label="מאגר רכב פרטי"
+        title="מאגר רכב פרטי"
+        sub={<><span className="ds-num">{clients.length.toLocaleString("he-IL")}</span> אתרים</>}
+        tools={<>
+          <button
+            type="button"
+            className="ds-btn ds-btn-light"
             onClick={() => {
               void downloadImportTemplate("privateVehicles")
                 .then(() => toast.success("תבנית הלקוחות הורדה"))
                 .catch(() => toast.error("הורדת התבנית נכשלה"));
             }}
           >
-            <FileSpreadsheet className="size-4" />
-            הורד תבנית
-          </Button>
+            <FileSpreadsheet className="size-4" aria-hidden />
+            הורדת קובץ לדוגמה
+          </button>
           {readOnly ? null : <>
-          <Button variant="outline" onClick={() => inputRef.current?.click()}>
-            <UploadCloud className="size-4" />
-            ייבוא מאקסל
-          </Button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-            aria-label="בחירת קובץ לקוחות"
-            onChange={(e) => {
-              void handleFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setForm(empty);
-              setError(null);
-              setOpen(true);
-            }}
-          >
-            <Plus className="size-4" />
-            הוספה
-          </Button>
+            <button type="button" className="ds-btn ds-btn-primary" onClick={() => inputRef.current?.click()}>
+              <UploadCloud className="size-4" aria-hidden />
+              העלאת קובץ
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              aria-label="בחירת קובץ לקוחות"
+              onChange={(e) => {
+                void handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              className="ds-btn ds-btn-light"
+              onClick={() => {
+                setEditing(null);
+                setForm(empty);
+                setError(null);
+                setOpen(true);
+              }}
+            >
+              <Plus className="size-4" aria-hidden />
+              הוספה
+            </button>
           </>}
+        </>}
+        footer={<Pager {...paged} always />}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-table-line px-[18px] py-3">
+          <FilterChips
+            label="סינון לפי סטטוס"
+            value={active}
+            onChange={setActive}
+            items={[
+              { value: "all", label: "הכל", count: searched.length },
+              { value: "active", label: "פעיל", count: activeCount },
+              { value: "inactive", label: "לא פעיל", count: searched.length - activeCount },
+            ]}
+          />
+          <SearchField value={query} onChange={setQuery} placeholder="חיפוש לקוח, אתר או תקן" label="חיפוש לקוחות ואתרים" />
         </div>
-      </div>
 
-      <div className="mt-6">
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableHeaderCell>מס' לקוח</TableHeaderCell>
-              <TableHeaderCell>שם לקוח</TableHeaderCell>
-              <TableHeaderCell>מספר אתר</TableHeaderCell>
-              <TableHeaderCell>שם אתר</TableHeaderCell>
-              <TableHeaderCell>סטטוס</TableHeaderCell>
-              <TableHeaderCell>פעולות</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {visible.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  לא נמצאו לקוחות או אתרים מתאימים
-                </TableCell>
-              </TableRow>
+        <DataTable minWidth={860} caption="מאגר רכב פרטי">
+          <thead>
+            <tr>
+              {/* A–E exactly as the import file: מס' לקוח, שם לקוח, מספר אתר, שם אתר, תקן */}
+              {privateVehicleHeaders.map((h) => <th key={h} scope="col">{h}</th>)}
+              <th scope="col">סטטוס</th>
+              {readOnly ? null : <th scope="col"><span className="sr-only">פעולות</span></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {paged.slice.length === 0 ? (
+              <EmptyRow colSpan={readOnly ? 6 : 7}>{clients.length === 0 ? "המאגר ריק" : undefined}</EmptyRow>
             ) : (
-              visible.map((c) => (
-                <TableRow key={privateVehicleKey(c)} className={c.isActive !== true ? "work-vehicle-inactive" : undefined} title={c.isActive !== true ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}>
-                  <TableCell className="tabular-nums font-semibold">{c.clientId}</TableCell>
-                  <TableCell>{c.clientName}</TableCell>
-                  <TableCell className="tabular-nums">{c.siteId}</TableCell>
-                  <TableCell>{c.siteName}</TableCell>
-                  <TableCell><Badge variant={c.isActive === true ? "success" : "danger"}>{c.isActive === true ? "פעיל" : "לא פעיל"}</Badge></TableCell>
-                  <TableCell>
-                    {readOnly ? "—" : <div className="flex items-center gap-1">
-                      <button
-                        aria-label={`ערוך ${c.siteName}`}
-                        onClick={() => {
-                          setEditing({ clientId: c.clientId, siteId: c.siteId });
-                          setForm({
-                            clientId: c.clientId,
-                            clientName: c.clientName,
-                            siteId: c.siteId,
-                            siteName: c.siteName,
-                            standard: c.standard ?? "",
-                          });
-                          setError(null);
-                          setOpen(true);
-                        }}
-                        className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-primary focus-visible:shadow-focus"
-                      >
-                        <Pencil className="size-4" />
-                      </button>
-                      <button
-                        aria-label={`מחק ${c.siteName}`}
-                        onClick={() => {
-                          removeClient(c.clientId, c.siteId);
-                          toast.success("האתר נמחק");
-                        }}
-                        className="grid size-9 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-muted hover:text-danger focus-visible:shadow-focus"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>}
-                  </TableCell>
-                </TableRow>
+              paged.slice.map((c) => (
+                <tr
+                  key={privateVehicleKey(c)}
+                  className={c.isActive !== true ? "is-inactive" : undefined}
+                  title={c.isActive !== true ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}
+                >
+                  <td><span className="ds-num font-semibold">{c.clientId}</span></td>
+                  <td>{c.clientName}</td>
+                  <td><span className="ds-num">{c.siteId}</span></td>
+                  <td>{c.siteName}</td>
+                  <td><span className="ds-num">{c.standard || "—"}</span></td>
+                  <td><StatusBadge status={status(c)} size="sm" /></td>
+                  {readOnly ? null : (
+                    <td>
+                      <span className="flex gap-1">
+                        <button type="button" className="ds-rowact" aria-label={`עריכת ${c.siteName}`} onClick={() => startEdit(c)}>עריכה</button>
+                        <button type="button" className="ds-rowact !text-redeemed-fg" aria-label={`מחיקת ${c.siteName}`} onClick={() => remove(c)}>מחיקה</button>
+                      </span>
+                    </td>
+                  )}
+                </tr>
               ))
             )}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          עמוד {current + 1} מתוך {pageCount}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={current === 0}
-            onClick={() => setPage(current - 1)}
-          >
-            <ChevronRight className="size-4" />
-            הקודם
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={current >= pageCount - 1}
-            onClick={() => setPage(current + 1)}
-          >
-            הבא
-            <ChevronLeft className="size-4" />
-          </Button>
-        </div>
-      </div>
+          </tbody>
+        </DataTable>
+        <MobileCardList
+          items={paged.slice}
+          keyOf={(c) => privateVehicleKey(c)}
+          empty={clients.length === 0 ? "המאגר ריק" : "לא נמצאו רשומות התואמות לסינון."}
+          render={(c) => (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className="ds-num font-bold text-navy-900">{c.clientId}</span>
+                <StatusBadge status={status(c)} size="sm" />
+              </div>
+              <span className="font-semibold text-ink">{c.clientName}</span>
+              <KV label="אתר">{c.siteName} · <span className="ds-num">{c.siteId}</span></KV>
+              <KV label="תקן"><span className="ds-num">{c.standard || "—"}</span></KV>
+              {readOnly ? null : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" className="ds-btn ds-btn-light" onClick={() => startEdit(c)}>עריכה</button>
+                  <button type="button" className="ds-btn ds-btn-light !text-redeemed-fg" onClick={() => remove(c)}>מחיקה</button>
+                </div>
+              )}
+            </>
+          )}
+        />
+      </SettingsCard>
 
       <Modal
         open={open}
         onClose={() => setOpen(false)}
         title={editing ? "עריכת לקוח ואתר" : "הוספת לקוח ואתר"}
       >
-        <form onSubmit={submit} className="space-y-5">
-          <FormField label="מס' לקוח">
-            <Input
-              value={form.clientId}
-              onChange={(e) => setForm({ ...form, clientId: e.target.value })}
-              inputMode="numeric"
-              aria-label="מס' לקוח"
-              className="tabular-nums"
-            />
-          </FormField>
-          <FormField label="שם לקוח">
-            <Input
-              value={form.clientName}
-              onChange={(e) => setForm({ ...form, clientName: e.target.value })}
-              aria-label="שם לקוח"
-            />
-          </FormField>
-          <FormField label="מספר אתר">
-            <Input
-              value={form.siteId}
-              onChange={(e) => setForm({ ...form, siteId: e.target.value })}
-              inputMode="numeric"
-              aria-label="מספר אתר"
-              className="tabular-nums"
-            />
-          </FormField>
-          <FormField label="שם אתר">
-            <Input
-              value={form.siteName}
-              onChange={(e) => setForm({ ...form, siteName: e.target.value })}
-              aria-label="שם אתר"
-            />
-          </FormField>
-          <FormField label="תקן" hint="תקן הרכב / השמירה של האתר">
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="מס' לקוח">
+              <Input
+                value={form.clientId}
+                onChange={(e) => setForm({ ...form, clientId: e.target.value })}
+                inputMode="numeric"
+                aria-label="מס' לקוח"
+                className="tabular-nums"
+              />
+            </FormField>
+            <FormField label="שם לקוח">
+              <Input
+                value={form.clientName}
+                onChange={(e) => setForm({ ...form, clientName: e.target.value })}
+                aria-label="שם לקוח"
+              />
+            </FormField>
+            <FormField label="מספר אתר">
+              <Input
+                value={form.siteId}
+                onChange={(e) => setForm({ ...form, siteId: e.target.value })}
+                inputMode="numeric"
+                aria-label="מספר אתר"
+                className="tabular-nums"
+              />
+            </FormField>
+            <FormField label="שם אתר">
+              <Input
+                value={form.siteName}
+                onChange={(e) => setForm({ ...form, siteName: e.target.value })}
+                aria-label="שם אתר"
+              />
+            </FormField>
+          </div>
+          <FormField label="תקן">
             <Input
               value={form.standard}
               onChange={(e) => setForm({ ...form, standard: e.target.value })}
@@ -321,8 +315,7 @@ export function ClientsPanel() {
             />
           </FormField>
 
-
-          {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+          {error ? <p role="alert" className="text-sm font-semibold text-danger">{error}</p> : null}
 
           <div className="flex flex-wrap justify-end gap-2 pt-1">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
@@ -332,6 +325,8 @@ export function ClientsPanel() {
           </div>
         </form>
       </Modal>
-    </section>
+
+      <ResultDialog result={result} onClose={() => setResult(null)} />
+    </>
   );
 }

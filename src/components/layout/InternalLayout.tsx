@@ -47,7 +47,8 @@ const navItems: readonly NavItem[] = [
   { to: "/allocations", label: "הקצאות לסניפים", icon: Waypoints, roles: ["admin", "viewer"] },
   { to: "/supervisor", label: "הנפקה לעובד", tab: "הנפקה", icon: UserCheck, roles: ["admin", "branch", "supervisor"] },
   { to: "/produced", label: "שוברים שהופקו", icon: Link2, roles: ["admin", "branch", "supervisor", "viewer"] },
-  { to: "/reports", label: "דוחות", tab: "דוחות", icon: BarChart3, roles: ["admin", "branch", "supervisor", "viewer"] },
+  // Supervisors have no access to reports; branch managers see their branch only (scoped in reports.tsx).
+  { to: "/reports", label: "דוחות", tab: "דוחות", icon: BarChart3, roles: ["admin", "branch", "viewer"] },
   { to: "/signatures", label: "ארכיון חתימות", icon: PenLine, roles: ["admin", "branch", "supervisor", "viewer"] },
   { to: "/settings", label: "הגדרות", icon: Settings, roles: ["admin", "viewer"] },
 ];

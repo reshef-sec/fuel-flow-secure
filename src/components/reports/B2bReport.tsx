@@ -1,162 +1,247 @@
-import { FuelBadge } from "@/components/fuel/fuel";
 import { useMemo, useState } from "react";
-import { FileDown } from "lucide-react";
-import { toast } from "sonner";
 
-import {
-  Badge,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-} from "@/design-system/delek-1ea111";
+import { FuelBadge, fuelOf } from "@/components/fuel/fuel";
+import { DataTable, EmptyRow, KV, MobileCardList } from "@/components/ui/DataTable";
 import { Pager, usePaged } from "@/components/ui/Pager";
-import { downloadCsv, statusVariant } from "@/components/dashboard/statusVariant";
-import type { VoucherStatus } from "@/components/dashboard/voucherData";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Tabs } from "@/components/ui/Tabs";
+import type { VoucherRecord } from "@/components/dashboard/voucherData";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
-import { formatIsraelDate, inDateRange } from "@/lib/israelDate";
 import { branchLabel } from "@/lib/branchLabels";
 import { historicalClientName } from "@/lib/importIntegrity";
+import { downloadReport, type ReportColumn } from "@/lib/excel";
+import { statusDisplay } from "@/lib/statusDisplay";
+import {
+  deliveredDate,
+  describeFilters,
+  fileStamp,
+  isInactiveWorkClient,
+  matchesReportFilters,
+  type ReportFilterValues,
+} from "./reportData";
+import { InactiveClientTag, ReportCard } from "./ReportCard";
 
-/** B2B billing report — one row per 100 ₪ code issued via the "ברכב עבודה" route. */
-export interface ReportFilterValues {
-  from: string;
-  to: string;
-  branch: string;
-  supervisor: string;
-  client: string;
-  status: string;
+export type { ReportFilterValues } from "./reportData";
+
+/** B2B billing report — one row per card issued via the "רכב עבודה" route. */
+type DetailRow = VoucherRecord & { value: number; code: string; inactive: boolean };
+interface SummaryRow {
+  standard: string;
+  codes: string;
+  names: string;
+  total: number;
+  inactive: boolean;
 }
 
-export function B2bReport({ filters }: { filters?: ReportFilterValues }) {
+const detailColumns: ReportColumn<DetailRow>[] = [
+  { header: "סניף", key: "branch", type: "text", get: (v) => branchLabel(v.branch) },
+  { header: "ערך כרטיס", key: "value", type: "money" },
+  { header: "סוג דלק", key: "fuel", type: "text", get: (v) => fuelOf(v) },
+  { header: "מספר כרטיס", key: "code", type: "text" },
+  { header: "שם לקוח", key: "client", type: "text", get: (v) => v.client ?? "—" },
+  { header: "קוד לקוח", key: "clientCode", type: "text", get: (v) => v.clientCode ?? v.clientId ?? "—" },
+  { header: "שם חשבון", key: "accountName", type: "text", get: (v) => v.accountName ?? v.siteName ?? "—" },
+  { header: "תקן", key: "standard", type: "text", get: (v) => v.standard ?? v.standardName ?? "—" },
+  { header: "שם עובד", key: "workerName", type: "text", get: (v) => v.workerName ?? "—" },
+  { header: "ת.ז", key: "workerId", type: "text", get: (v) => v.workerId ?? "—" },
+  { header: "טלפון", key: "workerPhone", type: "text", get: (v) => v.workerPhone ?? "—" },
+  { header: "תאריך מסירה", key: "delivered", type: "date", get: (v) => deliveredDate(v) },
+  { header: "סיבת הפקה", key: "reason", type: "text", get: (v) => v.reason ?? "—" },
+  { header: "סטטוס", key: "status", type: "text", get: (v) => statusDisplay(v.status).label },
+];
+
+// One row per תקן for the filtered period.
+const summaryColumns: ReportColumn<SummaryRow>[] = [
+  { header: "תקן", key: "standard", type: "text" },
+  { header: "קוד לקוח", key: "codes", type: "text" },
+  { header: "שם לקוח", key: "names", type: "text" },
+  { header: 'סה"כ ערך שוברים', key: "total", type: "money" },
+];
+
+export function B2bReport({ filters, generatedBy }: { filters: ReportFilterValues; generatedBy?: string }) {
   const vouchers = useAppStore((s) => s.vouchers);
   const clients = useAppStore((s) => s.b2bClients);
-  const branchList = useAppStore((s) => s.branchList);
   const role = useAppStore((s) => s.role);
   const me = useCurrentUser();
   const myName = me ? fullName(me) : "";
 
-  const rows = useMemo(() => {
+  const rows = useMemo<DetailRow[]>(() => {
     let list = vouchers.filter((v) => v.route === "b2b").map(v => ({ ...v, client: historicalClientName(v, [], clients) }));
     if (role === "branch" && me?.branch) list = list.filter((v) => v.branch === me.branch);
     if (role === "supervisor") list = list.filter((v) => v.supervisor === myName);
-    if (filters) {
-      const f = filters;
-      list = list.filter((v) => {
-        if (!inDateRange(v.deliveredAt ?? v.updatedAt, f.from, f.to)) return false;
-        if (f.branch && branchLabel(v.branch) !== f.branch) return false;
-        if (f.supervisor && v.supervisor !== f.supervisor) return false;
-        if (f.client && v.client !== f.client) return false;
-        if (f.status && v.status !== f.status) return false;
-        return true;
-      });
-    }
-    return list.map(v => ({ v, value: v.amount, code: v.serial }));
+    list = list.filter((v) => matchesReportFilters(v, filters));
+    return list.map(v => ({ ...v, value: v.amount, code: v.serial, inactive: isInactiveWorkClient(v, clients) }));
   }, [vouchers, clients, role, me?.branch, myName, filters]);
 
   const [view, setView] = useState<"detail" | "summary">("detail");
-  const isAdmin = role === "admin";
 
-  const detailHeaders = [
-    "סניף", "ערך כרטיס", "סוג דלק", "מספר כרטיס", "שם לקוח", "קוד לקוח", "שם חשבון", "תקן",
-    "שם עובד", "ת.ז", "טלפון", "תאריך מסירה", "סיבת הפקה", "סטטוס",
-  ];
-  const detail = rows.map(({ v, value, code }) => [
-    branchLabel(v.branch), `${value} ₪`, v.fuelType ?? "בנזין", code, v.client ?? "—",
-    v.clientCode ?? v.clientId ?? "—", v.accountName ?? v.siteName ?? "—", v.standard ?? v.standardName ?? "—",
-    v.workerName ?? "—", v.workerId ?? "—", v.workerPhone ?? "—",
-    formatIsraelDate(v.deliveredAt ?? v.updatedAt), v.reason ?? "—", v.status,
-  ]);
-
-  // One row per תקן for the filtered period.
-  const summaryHeaders = ["תקן", "קוד לקוח", "שם לקוח", 'סה"כ ערך שוברים'];
-  const summary = useMemo(() => {
-    const m = new Map<string, { standard: string; codes: Set<string>; names: Set<string>; total: number }>();
-    for (const { v, value } of rows) {
+  const summary = useMemo<SummaryRow[]>(() => {
+    const m = new Map<string, { standard: string; codes: Set<string>; names: Set<string>; total: number; flags: boolean[] }>();
+    for (const v of rows) {
       const std = v.standard ?? v.standardName ?? "—";
-      const g = m.get(std) ?? { standard: std, codes: new Set(), names: new Set(), total: 0 };
+      const g = m.get(std) ?? { standard: std, codes: new Set(), names: new Set(), total: 0, flags: [] };
       g.codes.add(v.clientCode ?? v.clientId ?? "—");
       g.names.add(v.client ?? "—");
-      g.total += value;
+      g.total += v.value;
+      g.flags.push(v.inactive);
       m.set(std, g);
     }
-    return [...m.values()].map((g) => [g.standard, [...g.codes].join(", "), [...g.names].join(", "), `${g.total.toLocaleString("he-IL")} ₪`]);
+    return [...m.values()].map((g) => ({
+      standard: g.standard,
+      codes: [...g.codes].join(", "),
+      names: [...g.names].join(", "),
+      total: g.total,
+      inactive: g.flags.length > 0 && g.flags.every(Boolean),
+    }));
   }, [rows]);
 
-  const headers = view === "detail" ? detailHeaders : summaryHeaders;
-  const flat = view === "detail" ? detail : summary;
-  const paged = usePaged(flat);
+  const detailPaged = usePaged(rows);
+  const summaryPaged = usePaged(summary);
   const total = rows.reduce((s, r) => s + r.value, 0);
+  const lockedBranch = role === "branch" && me?.branch ? me.branch : null;
+
+  const exportExcel = () =>
+    view === "detail"
+      ? downloadReport<DetailRow>({
+          fileName: `דוח-רכב-עבודה-מפורט-${fileStamp()}.xlsx`,
+          title: "דוח רכב עבודה — מפורט",
+          subtitle: describeFilters(filters, lockedBranch),
+          generatedBy,
+          columns: detailColumns,
+          rows,
+          totals: true,
+          sheetName: "רכב עבודה מפורט",
+        })
+      : downloadReport<SummaryRow>({
+          fileName: `דוח-רכב-עבודה-מסכם-${fileStamp()}.xlsx`,
+          title: "דוח רכב עבודה — מסכם",
+          subtitle: describeFilters(filters, lockedBranch),
+          generatedBy,
+          columns: summaryColumns,
+          rows: summary,
+          totals: true,
+          sheetName: "רכב עבודה מסכם",
+        });
+
+  const switcher = (
+    <Tabs
+      label="תצוגת דוח רכב עבודה"
+      items={[{ id: "detail", label: "מפורט" }, { id: "summary", label: "מסכם" }]}
+      value={view}
+      onChange={(id) => setView(id === "summary" ? "summary" : "detail")}
+    />
+  );
 
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-display text-xl font-extrabold text-secondary">דוח רכב עבודה</h2>
-          <p className="text-sm text-muted-foreground">
-            {rows.length} כרטיסים · סה"כ {total.toLocaleString("he-IL")} ₪
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div role="radiogroup" aria-label="תצוגת דוח" className="flex gap-1 rounded-lg bg-surface-muted p-1">
-            {([["detail", "דוח מפורט"], ["summary", "דוח מסכם"]] as const).map(([k, label]) => (
-              <button
-                key={k}
-                role="radio"
-                aria-checked={view === k}
-                onClick={() => setView(k)}
-                className={`rounded-md px-3 py-1.5 text-sm font-bold ${view === k ? "bg-surface text-primary shadow-card" : "text-muted-foreground"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              downloadCsv(view === "detail" ? "work-vehicle-detailed.csv" : "work-vehicle-summary.csv", headers, flat);
-              toast.success("הדוח יוצא לאקסל");
-            }}
-          >
-            <FileDown className="size-4" />
-            ייצוא לאקסל
-          </Button>
-        </div>
-      </div>
-      <div className="mt-4 min-w-0 max-w-full md:overflow-x-auto">
-        <Table>
-          <TableHead>
-            <TableRow>
-              {headers.map((h) => (
-                <TableHeaderCell key={h} className="whitespace-nowrap md:min-w-32">{h}</TableHeaderCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {flat.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={headers.length} className="py-10 text-center text-muted-foreground">
-                  אין שוברים שהופקו לרכב עבודה
-                </TableCell>
-              </TableRow>
-            ) : (
-              paged.slice.map((cells, i) => (
-                <TableRow key={i}>
-                  {cells.map((c, j) => (
-                    <TableCell key={j} className="whitespace-nowrap md:min-w-32">
-                      {view === "detail" && j === 2 ? <FuelBadge fuel={c === "סולר" ? "סולר" : "בנזין"} /> : view === "detail" && j === 13 ? <Badge variant={statusVariant[c as VoucherStatus]} size="sm">{c}</Badge> : c}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+    <ReportCard
+      title="דוח רכב עבודה"
+      count={rows.length}
+      countUnit="כרטיסים"
+      sum={total}
+      switcher={switcher}
+      onExport={exportExcel}
+      footer={view === "detail" ? <Pager {...detailPaged} always /> : <Pager {...summaryPaged} always />}
+    >
+      {view === "detail" ? (
+        <>
+          <DataTable minWidth={1650} caption="דוח רכב עבודה מפורט">
+            <thead>
+              <tr>{detailColumns.map((c) => <th key={c.key} scope="col">{c.header}</th>)}</tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <EmptyRow colSpan={detailColumns.length}>אין שוברים שהופקו לרכב עבודה</EmptyRow>
+              ) : (
+                detailPaged.slice.map((v) => (
+                  <tr key={v.serial}>
+                    <td className="font-semibold">{branchLabel(v.branch)}</td>
+                    <td><span className="ds-num">{v.value} ₪</span></td>
+                    <td><FuelBadge fuel={v.fuelType} /></td>
+                    <td><span className="ds-num">{v.code}</span></td>
+                    <td>{v.client ?? "—"}{v.inactive ? <InactiveClientTag /> : null}</td>
+                    <td><span className="ds-num">{v.clientCode ?? v.clientId ?? "—"}</span></td>
+                    <td>{v.accountName ?? v.siteName ?? "—"}</td>
+                    <td><span className="ds-num">{v.standard ?? v.standardName ?? "—"}</span></td>
+                    <td>{v.workerName ?? "—"}</td>
+                    <td><span className="ds-num">{v.workerId ?? "—"}</span></td>
+                    <td><span className="ds-num" dir="ltr">{v.workerPhone ?? "—"}</span></td>
+                    <td><span className="ds-num">{deliveredDate(v)}</span></td>
+                    <td>{v.reason ?? "—"}</td>
+                    <td><StatusBadge status={v.status} size="sm" /></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </DataTable>
+          <MobileCardList
+            items={detailPaged.slice}
+            keyOf={(v) => v.serial}
+            empty="אין שוברים שהופקו לרכב עבודה"
+            render={(v) => (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="ds-num font-bold text-navy-900">{v.code}</span>
+                  <StatusBadge status={v.status} size="sm" />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <FuelBadge fuel={v.fuelType} />
+                  <span className="ds-num font-bold text-navy-900">{v.value} ₪</span>
+                </div>
+                <KV label="שם לקוח">{v.client ?? "—"}{v.inactive ? <InactiveClientTag /> : null}</KV>
+                <KV label="תקן · סניף"><span className="ds-num">{v.standard ?? v.standardName ?? "—"}</span> · {branchLabel(v.branch)}</KV>
+                <KV label="שם עובד">{v.workerName ?? "—"}</KV>
+              </>
             )}
-          </TableBody>
-        </Table>
-        <Pager {...paged} />
-      </div>
-    </section>
+          />
+        </>
+      ) : (
+        <>
+          <DataTable minWidth={640} caption="דוח רכב עבודה מסכם">
+            <thead>
+              <tr>{summaryColumns.map((c) => <th key={c.key} scope="col">{c.header}</th>)}</tr>
+            </thead>
+            <tbody>
+              {summary.length === 0 ? (
+                <EmptyRow colSpan={summaryColumns.length}>אין שוברים שהופקו לרכב עבודה</EmptyRow>
+              ) : (
+                summaryPaged.slice.map((g) => (
+                  <tr key={g.standard}>
+                    <td><span className="ds-num font-semibold">{g.standard}</span></td>
+                    <td><span className="ds-num">{g.codes}</span></td>
+                    <td>{g.names}{g.inactive ? <InactiveClientTag /> : null}</td>
+                    <td><span className="ds-num font-bold">{g.total.toLocaleString("he-IL")} ₪</span></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            {summary.length > 0 ? (
+              <tfoot>
+                <tr>
+                  <td>סה״כ</td>
+                  <td />
+                  <td />
+                  <td><span className="ds-num">{total.toLocaleString("he-IL")} ₪</span></td>
+                </tr>
+              </tfoot>
+            ) : null}
+          </DataTable>
+          <MobileCardList
+            items={summaryPaged.slice}
+            keyOf={(g) => g.standard}
+            empty="אין שוברים שהופקו לרכב עבודה"
+            render={(g) => (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="ds-num font-bold text-navy-900">{g.standard}</span>
+                  <span className="ds-num font-bold text-navy-900">{g.total.toLocaleString("he-IL")} ₪</span>
+                </div>
+                <KV label="שם לקוח">{g.names}{g.inactive ? <InactiveClientTag /> : null}</KV>
+                <KV label="קוד לקוח"><span className="ds-num">{g.codes}</span></KV>
+              </>
+            )}
+          />
+        </>
+      )}
+    </ReportCard>
   );
 }

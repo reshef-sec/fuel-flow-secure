@@ -17,7 +17,8 @@
     "preview": "node server/index.js",
     "preview:vite": "vite preview",
     "serve": "node server/index.js",
-    "e2e": "node scripts/e2e-live.mjs"
+    "e2e": "node scripts/e2e-live.mjs",
+    "dev:local": "node scripts/dev-local.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { ChevronLeft } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { Card } from "@/design-system/delek-1ea111";
 import { MAIN_POOL, type Role } from "@/store/appStore";
 import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
 import { branchLabel } from "@/lib/branchLabels";
@@ -8,12 +8,9 @@ import { branchLabel } from "@/lib/branchLabels";
 type V = { branch: string; amount: number; deliveredAt?: string | null; updatedAt: string };
 type Slice = { name: string; value: number; branches: string[]; details?: { name: string; value: number }[] };
 
-const OTHERS = "אחרים";
-const TOP = 5;
 const DIRECT = "הונפק ישירות ממאגר מרכזי";
 const PALETTE = ["var(--color-primary)", "var(--color-accent)", "var(--color-secondary)", "var(--color-warning)", "var(--color-mint-300)", "var(--color-muted-foreground)"];
 const USED = "var(--color-danger)";
-const LEFT = "var(--color-success)";
 
 const ils = (n: number) => `${n.toLocaleString("he-IL")} ₪`;
 
@@ -47,10 +44,10 @@ export function SupervisorDistribution({ vouchers, issued }: { vouchers: { amoun
   const total = data.reduce((t, s) => t + s.value, 0);
   const color = (s: Slice, i: number) => (s.name === UNALLOCATED ? "var(--color-muted-foreground)" : s.name === ISSUED ? USED : PALETTE[i % (PALETTE.length - 1)]);
   return (
-    <Card className="mt-5">
+    <article className="ds-card p-[22px]">
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <p className="font-display text-lg font-extrabold text-secondary">התפלגות תקציב פנימית</p>
-        <p className="text-sm text-muted-foreground">סך תקציב הסניף · {ils(total)}</p>
+        <h2 className="m-0 text-[17px] font-bold text-navy-900">התפלגות תקציב פנימית</h2>
+        <p className="m-0 text-[13px] text-slate-600">סך תקציב הסניף · <span className="ds-num">{ils(total)}</span></p>
       </div>
       {total === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">אין נתונים</p> : (
         <div className="flex flex-col items-center gap-4 sm:flex-row">
@@ -74,16 +71,16 @@ export function SupervisorDistribution({ vouchers, issued }: { vouchers: { amoun
           </ul>
         </div>
       )}
-    </Card>
+    </article>
   );
 }
 
 /** Budget per branch in the period = issued in period + still-available. */
-export function BudgetUtilization({ vouchers, since, role, myBranch, periodLabel }: {
+export function BudgetUtilization({ vouchers, since, role, periodLabel }: {
   vouchers: V[]; since: string | null; role: Role; myBranch: string; periodLabel: string;
 }) {
-  const [selected, setSelected] = useState<string | null>(null);
-  if (role === "supervisor") return null;
+  // Branch managers and supervisors have their own views; this card is organisation-wide.
+  if (role === "supervisor" || role === "branch") return null;
 
   const stats = new Map<string, { issued: number; budget: number }>();
   for (const v of vouchers) {
@@ -101,79 +98,62 @@ export function BudgetUtilization({ vouchers, since, role, myBranch, periodLabel
   }
 
   const sorted = [...stats.entries()].filter(([, s]) => s.budget > 0).sort((a, b) => b[1].budget - a[1].budget);
-  const slices: Slice[] = sorted.slice(0, TOP).map(([name, s]) => ({ name, value: s.budget, branches: [name] }));
-  const rest = sorted.slice(TOP);
-  if (rest.length) slices.push({ name: OTHERS, value: rest.reduce((t, [, s]) => t + s.budget, 0), branches: rest.map(([n]) => n), details: rest.map(([name, s]) => ({ name, value: s.budget })) });
-  const allocTotal = slices.reduce((t, s) => t + s.value, 0);
-
-  const scope = role === "branch" ? [mainBranch(myBranch)] : selected ? slices.find((s) => s.name === selected)?.branches ?? null : null;
-  const pick = scope ? [...stats.entries()].filter(([n]) => scope.includes(n)).map(([, s]) => s) : [...stats.values()];
-  const used = pick.reduce((t, s) => t + s.issued, 0);
-  const left = Math.max(0, pick.reduce((t, s) => t + s.budget, 0) - used);
-  const poolTotal = used + left;
-  const poolData = [{ name: "נוצל", value: used }, { name: "יתרה", value: left }];
-  const poolTitle = role === "branch" ? `סניף ${myBranch || "—"}` : selected ?? "מאגר ארצי";
-
-  const pool = (
-    <Card padding="lg" className="flex-1">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <p className="font-display text-lg font-extrabold text-secondary">ניצול תקציב</p>
-        <p className="text-sm text-muted-foreground">{branchLabel(poolTitle)} · {periodLabel}</p>
-      </div>
-      {poolTotal === 0 ? <p className="py-16 text-center text-sm text-muted-foreground">אין נתונים לתקופה</p> : (
-        <div className="relative h-64">
-          <ResponsiveContainer>
-            <PieChart>
-              <Pie data={poolData} dataKey="value" nameKey="name" innerRadius="60%" outerRadius="90%" paddingAngle={2} isAnimationActive>
-                <Cell fill={USED} /><Cell fill={LEFT} />
-              </Pie>
-              <Tooltip content={<Tip total={poolTotal} />} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-            <div><p className="font-display text-2xl font-extrabold text-secondary">{Math.round((used / poolTotal) * 100)}%</p><p className="text-xs text-muted-foreground">נוצל</p></div>
-          </div>
-        </div>
-      )}
-      <div className="mt-2 flex justify-center gap-4 text-sm">
-        {poolData.map((d, i) => <span key={d.name} className="flex items-center gap-1.5"><span className="size-3 rounded-full" style={{ background: i ? LEFT : USED }} />{d.name} · {ils(d.value)}</span>)}
-      </div>
-    </Card>
-  );
-
-  if (role === "branch") return null;
+  const used = sorted.reduce((t, [, s]) => t + s.issued, 0);
+  const total = sorted.reduce((t, [, s]) => t + s.budget, 0);
+  const left = Math.max(0, total - used);
+  const pctOf = (part: number, whole: number) => (whole ? Math.max(0, Math.min(100, Math.round((part / whole) * 100))) : 0);
 
   return (
-    <div className="mt-5 flex flex-col gap-5 lg:flex-row">
-      <Card padding="lg" className="flex-1">
-        <div className="mb-2 flex items-baseline justify-between gap-2">
-          <p className="font-display text-lg font-extrabold text-secondary">התפלגות תקציבים</p>
-          <p className="text-sm text-muted-foreground">{selected ? "לחצו שוב לאיפוס" : "לחצו על סניף לסינון"}</p>
+    <article className="ds-card flex flex-col gap-4 p-[22px]">
+      <div className="flex items-start justify-between gap-2.5">
+        <div className="flex flex-col gap-[3px]">
+          <h2 className="m-0 text-[17px] font-bold text-navy-900">ניצול תקציב לפי סניף</h2>
+          <span className="text-[12.5px] text-slate-600">הונפק מתוך התקציב · {periodLabel}</span>
         </div>
-        {allocTotal === 0 ? <p className="py-16 text-center text-sm text-muted-foreground">אין נתונים לתקופה</p> : (
-          <div className="h-64">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={slices} dataKey="value" nameKey="name" innerRadius="60%" outerRadius="90%" paddingAngle={2}
-                  onClick={(d: { name?: string }) => setSelected((cur) => (cur === d.name ? null : d.name ?? null))} className="cursor-pointer">
-                  {slices.map((s, i) => (
-                    <Cell key={s.name} fill={PALETTE[i % PALETTE.length]} opacity={selected && selected !== s.name ? 0.35 : 1} stroke={selected === s.name ? "var(--color-secondary)" : undefined} strokeWidth={selected === s.name ? 3 : 1} />
-                  ))}
-                </Pie>
-                <Tooltip content={<Tip total={allocTotal} />} />
-              </PieChart>
-            </ResponsiveContainer>
+        <Link to="/allocations" className="inline-flex min-h-11 items-center gap-1 px-1 text-[13px] font-semibold text-primary no-underline hover:text-blue-700">
+          להקצאות
+          <ChevronLeft className="size-3.5" aria-hidden />
+        </Link>
+      </div>
+      {sorted.length === 0 ? (
+        <p className="py-10 text-center text-sm text-slate-600">אין נתונים לתקופה</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl bg-table-head px-3.5 py-2.5 text-[13px] text-slate-600">
+            <span>מאגר ארצי · נוצל <span className="ds-num font-bold text-navy-900">{pctOf(used, used + left)}%</span></span>
+            <span>
+              <span className="ds-num font-semibold text-navy-900">{ils(used)}</span> הונפק · <span className="ds-num font-semibold text-navy-900">{ils(left)}</span> יתרה
+            </span>
           </div>
-        )}
-        <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm">
-          {slices.map((s, i) => (
-            <button key={s.name} onClick={() => setSelected((c) => (c === s.name ? null : s.name))} className={`flex items-center gap-1.5 ${selected && selected !== s.name ? "opacity-50" : ""}`}>
-              <span className="size-3 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} />{branchLabel(s.name)}
-            </button>
-          ))}
-        </div>
-      </Card>
-      {pool}
-    </div>
+          <ul className="ds-scroll m-0 flex max-h-[340px] list-none flex-col gap-3.5 p-0 pe-1">
+            {sorted.map(([name, s]) => {
+              const pct = pctOf(s.issued, s.budget);
+              const high = pct >= 90;
+              return (
+                <li key={name} className="flex flex-col gap-1.5">
+                  <div className="flex justify-between gap-2 text-[13.5px]">
+                    <span className="font-semibold">{branchLabel(name)}</span>
+                    <span className="text-slate-600">
+                      <span className="ds-num">{s.issued.toLocaleString("he-IL")} / {ils(s.budget)}</span> ·{" "}
+                      <span className={`ds-num font-semibold ${high ? "text-pending-fg" : "text-navy-900"}`}>{pct}%</span>
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`ניצול ${branchLabel(name)}`}>
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${pct}%`, background: high ? "var(--color-pending)" : "linear-gradient(90deg, var(--color-primary), var(--color-mint-500))" }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="flex flex-wrap gap-4 border-t border-table-line pt-1.5 text-[12.5px] text-slate-600">
+            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[3px]" style={{ background: "linear-gradient(90deg, var(--color-primary), var(--color-mint-500))" }} />תקין</span>
+            <span className="inline-flex items-center gap-1.5"><span className="size-2.5 rounded-[3px] bg-pending" />90% ומעלה — קרוב למיצוי</span>
+          </div>
+        </>
+      )}
+    </article>
   );
 }
