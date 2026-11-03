@@ -1,16 +1,17 @@
-import { Greeting } from "@/components/dashboard/Greeting";
-import { FuelBreakdown } from "@/components/fuel/fuel";
-import { PoolDenominations } from "@/components/dashboard/PoolDenominations";
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { FilePlus2, UserCheck } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { Building2, ChevronLeft, FilePlus2, Fuel, Plus, Send, Ticket, UserCheck, Wallet } from "lucide-react";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
-import { VoucherTable } from "@/components/dashboard/VoucherTable";
+import { PageHero } from "@/components/ui/PageHero";
+import { FilterChips } from "@/components/ui/FilterChips";
+import { Greeting, GREETING_SUBTITLE } from "@/components/dashboard/Greeting";
+import { KpiCard } from "@/components/dashboard/KpiCard";
+import { FuelBreakdown } from "@/components/fuel/fuel";
+import { PoolDenominations } from "@/components/dashboard/PoolDenominations";
 import { RequestDialog } from "@/components/requests/RequestDialog";
 import { PendingRequests } from "@/components/requests/PendingRequests";
 import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorAllocationDialog";
-import { Button, Card, Select, StatCard } from "@/design-system/delek-1ea111";
 import { fullName, isReadOnlyRole, MAIN_POOL, seesAllData, useAppStore, useCurrentUser } from "@/store/appStore";
 import { BudgetUtilization, SupervisorDistribution } from "@/components/dashboard/BudgetUtilization";
 import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
@@ -102,143 +103,188 @@ function Dashboard() {
     return Number.isFinite(r) ? Math.max(0, Math.min(100, r)) : 0;
   };
 
+  const ils = (n: number) => n.toLocaleString("he-IL");
+  // Same condition as the former "דרישת שוברים לסניף" card (admin with request permission).
+  const canRequestHere = Boolean(me?.canRequest && !isSupervisor && !isBranchManager && !readOnly);
+  const smallBtn = "ds-btn min-h-10 rounded-[10px] px-[13px] text-[13px]";
+
   return (
     <InternalLayout title="דשבורד ניהול שוברים">
-      <Greeting />
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="font-display text-lg font-extrabold text-secondary">תמונת מצב</p>
+      <PageHero
+        eyebrow="דשבורד ניהול שוברים"
+        title={<Greeting />}
+        subtitle={GREETING_SUBTITLE}
+        actions={
+          <>
+            <Link to="/vouchers" className="ds-btn ds-btn-glass no-underline hover:text-white">
+              <Ticket className="size-4" aria-hidden />
+              למלאי השוברים
+            </Link>
+            {role === "admin" ? (
+              <Link to="/allocations" className="ds-btn ds-btn-onnavy no-underline">
+                <Plus className="size-4" strokeWidth={2.4} aria-hidden />
+                הקצאה לסניף
+              </Link>
+            ) : null}
+            {canRequestHere && me ? (
+              <button type="button" className="ds-btn ds-btn-onnavy" onClick={() => setRequestOpen(true)}>
+                <FilePlus2 className="size-4" aria-hidden />
+                דרישת שוברים לסניף {branchLabel(me.branch)}
+              </button>
+            ) : null}
+          </>
+        }
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3 max-[899.98px]:flex-col max-[899.98px]:items-stretch">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="m-0 text-[19px] font-extrabold text-navy-900">תמונת מצב</h2>
+          <span className="text-[13px] text-slate-600">
+            מדדי הנפקה לפי {periodLabels[period]} · מדדי תקציב מציגים את המצב העדכני
+          </span>
         </div>
-        <Select
+        <FilterChips
+          label="טווח זמן"
           value={period}
-          onChange={(e) => setPeriod(e.target.value as Period)}
-          aria-label="טווח זמן"
-          className="w-auto font-semibold"
-        >
-          {(Object.keys(periodLabels) as Period[]).map((p) => (
-            <option key={p} value={p}>
-              {periodLabels[p]}
-            </option>
-          ))}
-        </Select>
+          onChange={setPeriod}
+          items={(Object.keys(periodLabels) as Period[]).map((p) => ({ value: p, label: periodLabels[p] }))}
+        />
       </div>
 
-      {me?.canRequest && !isSupervisor && !isBranchManager && !readOnly ? (
-        <Card padding="lg" className="mb-5 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="font-display text-lg font-extrabold text-secondary">
-              דרישת שוברים לסניף {branchLabel(me.branch)}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              יש לך הרשאה להקים דרישת שוברים לאישור אדמין מרכזי
-            </p>
-          </div>
-          <Button onClick={() => setRequestOpen(true)}>
-            <FilePlus2 className="size-4" />
-            הגשת דרישת שוברים
-          </Button>
-        </Card>
-      ) : null}
-
       {adminView ? (
-        <div className="grid gap-5 sm:grid-cols-3">
-          <StatCard
+        <section aria-label="מדדים עיקריים" className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+          <KpiCard
             label="יתרת תקציב מרכזי"
-            value={summary ? `${balance.toLocaleString("he-IL")} ₪` : "—"}
-            caption="טרם הוקצה לסניפים"
+            icon={Wallet}
+            value={summary ? ils(balance) : "—"}
+            unit={summary ? "₪" : ""}
+            note="טרם הוקצה לסניפים"
             percent={pct(balance, balance + branchesBudget + issuedValue)}
           />
-          <StatCard
+          <KpiCard
             label="יתרת תקציב בסניפים"
-            value={`${branchesBudget.toLocaleString("he-IL")} ₪`}
-            caption="הוקצה לסניפים וטרם הונפק"
+            icon={Building2}
+            tone="mint"
+            value={ils(branchesBudget)}
+            note="הוקצה לסניפים וטרם הונפק"
             percent={pct(branchesBudget, balance + branchesBudget + issuedValue)}
-            tone="accent"
+            footer={<CardLink to="/allocations">להקצאות</CardLink>}
           />
-          <StatCard
+          <KpiCard
             label="סך שוברים שהונפקו"
-            value={`${issuedValue.toLocaleString("he-IL")} ₪`}
-            caption={`${issued.length} שוברים · ${periodLabels[period]}`}
+            icon={Send}
+            tone="orange"
+            value={ils(issuedValue)}
+            note={`${issued.length} שוברים · ${periodLabels[period]}`}
             percent={pct(issuedValue, total)}
-            tone="secondary"
+            footer={<CardLink to="/produced">לשוברים שהופקו</CardLink>}
           />
-        </div>
+          <KpiCard label="יתרה זמינה לפי סוג דלק" icon={Fuel} tone="navy" note="מאגר מרכזי">
+            {summary ? (
+              <FuelBreakdown totals={{ "בנזין": summary.gasoline_amount, "סולר": summary.diesel_amount }} className="text-sm" />
+            ) : (
+              <p className="m-0 text-sm text-danger">{inventoryError ?? "טוען יתרת מלאי…"}</p>
+            )}
+          </KpiCard>
+        </section>
       ) : isBranchManager ? (
-        <div className="grid gap-5 md:grid-cols-3">
-          <Card className="flex flex-col justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-muted-foreground">היתרה הזמינה שלי</p>
-              <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">{balance.toLocaleString("he-IL")} ₪</p>
-              <p className="text-xs text-muted-foreground">{branchAvailable.length} שוברים זמינים · סניף {myBranch ? branchLabel(myBranch) : "—"}</p>
-              <FuelBreakdown list={branchAvailable} className="mt-1" />
-            </div>
-            <Button size="sm" className="self-start" onClick={() => setSupervisorOpen(true)}>
-              <UserCheck className="size-4" />
-              הקצאה למפקח
-            </Button>
-          </Card>
-          <Card className="flex flex-col justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-muted-foreground">סך תקציב הסניף</p>
-              <p className="font-display text-3xl font-extrabold tabular-nums text-secondary">{(value(available) + issuedValue).toLocaleString("he-IL")} ₪</p>
-              <p className="text-xs text-muted-foreground">הונפק + יתרה זמינה</p>
-            </div>
-            {me?.canRequest ? (
-              <Button size="sm" variant="outline" className="self-start" onClick={() => setRequestOpen(true)}>
-                <FilePlus2 className="size-4" />
-                הגשת דרישת שוברים
-              </Button>
-            ) : null}
-          </Card>
-          <StatCard
+        <section aria-label="מדדים עיקריים" className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+          <KpiCard
+            label="היתרה הזמינה שלי"
+            icon={Wallet}
+            tone="mint"
+            value={ils(balance)}
+            note={`${branchAvailable.length} שוברים זמינים · סניף ${myBranch ? branchLabel(myBranch) : "—"}`}
+            footer={
+              <button type="button" className={`${smallBtn} ds-btn-primary`} onClick={() => setSupervisorOpen(true)}>
+                <UserCheck className="size-4" aria-hidden />
+                הקצאה למפקח
+              </button>
+            }
+          >
+            <FuelBreakdown list={branchAvailable} />
+          </KpiCard>
+          <KpiCard
+            label="סך תקציב הסניף"
+            icon={Building2}
+            value={ils(value(available) + issuedValue)}
+            note="הונפק + יתרה זמינה"
+            footer={
+              me?.canRequest ? (
+                <button type="button" className={`${smallBtn} ds-btn-light`} onClick={() => setRequestOpen(true)}>
+                  <FilePlus2 className="size-4" aria-hidden />
+                  הגשת דרישת שוברים
+                </button>
+              ) : undefined
+            }
+          />
+          <KpiCard
             label="שוברים שהונפקו"
-            value={`${issuedValue.toLocaleString("he-IL")} ₪`}
-            caption={`${issued.length} שוברים · ${periodLabels[period]}`}
+            icon={Send}
+            tone="orange"
+            value={ils(issuedValue)}
+            note={`${issued.length} שוברים · ${periodLabels[period]}`}
             percent={pct(issuedValue, value(available) + issuedValue)}
-            tone="secondary"
           />
-        </div>
+        </section>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2">
-          <StatCard
+        <section aria-label="מדדים עיקריים" className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+          <KpiCard
             label="יתרת תקציב לניצול"
-            value={`${balance.toLocaleString("he-IL")} ₪`}
-            caption="הוקצה אליי וטרם הונפק"
+            icon={Wallet}
+            tone="mint"
+            value={ils(balance)}
+            note="הוקצה אליי וטרם הונפק"
             percent={pct(balance, balance + issuedValue)}
-            tone="accent"
           />
-          <StatCard
+          <KpiCard
             label="שוברים שהונפקו לעובדים"
-            value={`${issuedValue.toLocaleString("he-IL")} ₪`}
-            caption={`${issued.length} שוברים · ${periodLabels[period]}`}
+            icon={Send}
+            tone="orange"
+            value={ils(issuedValue)}
+            note={`${issued.length} שוברים · ${periodLabels[period]}`}
             percent={pct(issuedValue, balance + issuedValue)}
-            tone="secondary"
           />
-        </div>
+          <KpiCard label="פירוט יתרה זמינה לפי סוג דלק" icon={Fuel} tone="navy">
+            <FuelBreakdown list={available} className="text-sm" />
+          </KpiCard>
+        </section>
       )}
 
-      {!isBranchManager ? (
-        <Card className="py-3">
-          <p className="text-sm font-semibold text-muted-foreground">
-            פירוט יתרה זמינה לפי סוג דלק{adminView ? " (מאגר מרכזי)" : ""}
-          </p>
-          {adminView ? summary ? (
-            <FuelBreakdown totals={{ "בנזין": summary.gasoline_amount, "סולר": summary.diesel_amount }} className="mt-1 text-sm" />
-          ) : <p className="mt-1 text-sm text-danger">{inventoryError ?? "טוען יתרת מלאי…"}</p> : (
-            <FuelBreakdown list={available} className="mt-1 text-sm" />
-          )}
-        </Card>
+      {adminView ? (
+        <section className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr))]">
+          <PoolDenominations summary={summary} error={inventoryError} />
+          <BudgetUtilization vouchers={allVouchers as never} since={since} role={role} myBranch={myBranch} periodLabel={periodLabels[period]} />
+        </section>
       ) : null}
-
-      {adminView ? <PoolDenominations summary={summary} error={inventoryError} /> : null}
 
       {isBranchManager ? <SupervisorDistribution vouchers={available} issued={issuedValue} /> : null}
 
-      <BudgetUtilization vouchers={allVouchers as never} since={since} role={role} myBranch={myBranch} periodLabel={periodLabels[period]} />
+      {adminView ? (
+        <div id="requests" className="scroll-mt-6">
+          <PendingRequests readOnly={readOnly} />
+        </div>
+      ) : null}
 
-      {adminView ? <PendingRequests readOnly={readOnly} /> : null}
-
-      <VoucherTable since={since} periodLabel={periodLabels[period]} />
+      {/* The full voucher table moved to its own page (/vouchers). */}
+      <Link
+        to="/vouchers"
+        className="ds-card flex items-center justify-between gap-4 px-5 py-4 text-navy-900 no-underline transition-colors hover:bg-table-hover"
+      >
+        <span className="flex items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-[10px] bg-blue-100 text-blue-700">
+            <Ticket className="size-5" aria-hidden />
+          </span>
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[15px] font-bold">טבלת השוברים המלאה</span>
+            <span className="text-[12.5px] text-slate-600">חיפוש, סינון לפי סטטוס וסוג דלק וייצוא לאקסל — בעמוד מלאי שוברים</span>
+          </span>
+        </span>
+        <span className="inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-primary">
+          למלאי השוברים
+          <ChevronLeft className="size-4" aria-hidden />
+        </span>
+      </Link>
 
       {!isSupervisor && !readOnly && <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} />}
 
@@ -251,5 +297,15 @@ function Dashboard() {
         />
       ) : null}
     </InternalLayout>
+  );
+}
+
+/** Small "go to page" link at the bottom of a KPI card. */
+function CardLink({ to, children }: { to: "/allocations" | "/produced"; children: string }) {
+  return (
+    <Link to={to} className="inline-flex min-h-11 w-full items-center justify-between gap-1 px-1 text-[13px] font-semibold text-primary no-underline hover:text-blue-700">
+      <span>{children}</span>
+      <ChevronLeft className="size-3.5" aria-hidden />
+    </Link>
   );
 }

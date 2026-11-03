@@ -7,7 +7,7 @@ export { Badge } from "./design-system/components/badge";
 export { Button } from "./design-system/components/button";
 export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./design-system/components/card";
 export { Checkbox, FormField, Input, Label, Select, Textarea } from "./design-system/components/field";
-export { Logo } from "./design-system/components/logo";
+export { Logo, logoAssets, type LogoVariant } from "./design-system/components/logo";
 export { DonutStat, ProgressBar } from "./design-system/components/progress";
 export { StatCard } from "./design-system/components/stat-card";
 export { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "./design-system/components/table";

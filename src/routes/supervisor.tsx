@@ -1,38 +1,29 @@
 import type { FuelType } from "@/components/fuel/fuel";
 import { publicVoucherUrl } from "@/lib/publicUrl";
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  BadgeCheck,
   Building2,
   Check,
   Copy,
-  Hash,
   Link2,
-  MapPin,
+  MessageCircle,
   Plus,
-  Trash2,
   Search,
   Send,
   SquareArrowOutUpRight,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cardsOfFuel, issuancePool } from "@/lib/issuanceStock";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
-import {
-  Badge,
-  Button,
-  Card,
-  CardHeader,
-  CardTitle,
-  FormField,
-  Input,
-  Select,
-} from "@/design-system/delek-1ea111";
+import { PageHero } from "@/components/ui/PageHero";
+import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import {
   fullName,
+  groupStock,
   useAppStore,
   useCurrentUser,
   type B2BClientRecord,
@@ -47,6 +38,7 @@ import { isActiveClient } from "@/lib/importIntegrity";
 import { workVehicleKey } from "@/lib/workVehicles";
 import { api } from "@/lib/apiClient";
 import { NoAccess } from "@/components/layout/NoAccess";
+import { cardsText, fieldBadClass, fieldClass, labelClass } from "@/components/allocations/AllocationForm";
 
 export const Route = createFileRoute("/supervisor")({
   head: () => ({
@@ -83,6 +75,20 @@ const newBlock = (mode: Mode = "b2b"): Block => ({
   key: blockSeq++, mode, search: "", b2b: null, regular: null, amount: "", reason: "", fuelType: "",
 });
 
+const fmt = (n: number) => n.toLocaleString("he-IL");
+const fuelWord = (f: FuelType) => (f === "בנזין" ? "בנזין 95" : "סולר");
+const b2bSub = (c: B2BClientRecord) => [c.accountName, c.standard && `תקן ${c.standard}`, c.clientCode && `קוד ${c.clientCode}`].filter(Boolean).join(" · ");
+const regularSub = (c: ClientRecord) => [c.siteName, c.siteId && `אתר ${c.siteId}`, c.clientId && `לקוח ${c.clientId}`].filter(Boolean).join(" · ");
+
+/** Per-block live stock view (display only; mirrors the stockError consumption order). */
+interface BlockStock {
+  avail: number | null;
+  pick: { amount: number }[] | null;
+  error: string | null;
+}
+
+interface IssuedResult { url: string; name: string; total: number; codes: number }
+
 function SupervisorPage() {
   // Issuing is a write action; the read-only viewer has no access to this screen.
   const role = useAppStore((s) => s.role);
@@ -101,10 +107,14 @@ function SupervisorIssuePage() {
   const [blocks, setBlocks] = useState<Block[]>(() => [newBlock()]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [link, setLink] = useState<string | null>(null);
+  const [issued, setIssued] = useState<IssuedResult | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const pool = useMemo(
+    () => issuancePool(stock, { role, branch: me?.branch, supervisorName: me ? fullName(me) : undefined }),
+    [stock, role, me],
+  );
   const stockError = useMemo(() => {
-    const pool = issuancePool(stock, { role, branch: me?.branch, supervisorName: me ? fullName(me) : undefined });
     let remaining = pool;
     for (const block of blocks) {
       if (!block.fuelType || !Number(block.amount) || issuanceAmountError(block.fuelType, Number(block.amount))) continue;
@@ -114,12 +124,26 @@ function SupervisorIssuePage() {
       remaining = remaining.filter(v => !ids.has(v.serial));
     }
     return null;
-  }, [stock, role, me, blocks]);
-  useEffect(() => {
-    if (!stockReady || !stockError) return;
-    toast.error(stockError, { id: "issuance-stock" });
-    return () => { toast.dismiss("issuance-stock"); };
-  }, [stockReady, stockError]);
+  }, [pool, blocks]);
+  const blockStock = useMemo<BlockStock[]>(() => {
+    let remaining = pool;
+    return blocks.map((block) => {
+      if (!block.fuelType) return { avail: null, pick: null, error: null };
+      const cards = cardsOfFuel(remaining, block.fuelType);
+      const avail = cards.reduce((t, v) => t + v.amount, 0);
+      const raw = block.amount.trim();
+      if (!raw) return { avail, pick: null, error: null };
+      const n = Number(raw);
+      const amountError = issuanceAmountError(block.fuelType, n);
+      if (amountError) return { avail, pick: null, error: amountError };
+      if (n > avail) return { avail, pick: null, error: `חורג מהמלאי שלי (${fmt(avail)} ₪)` };
+      const picked = pickExact(cards, n);
+      if (!picked) return { avail, pick: null, error: `${STOCK_SHORTAGE}. המלאי הזמין: ${groupStock(cards)}.` };
+      const ids = new Set(picked.map((v) => v.serial));
+      remaining = remaining.filter((v) => !ids.has(v.serial));
+      return { avail, pick: picked, error: null };
+    });
+  }, [pool, blocks]);
   // Any field change clears stale validation from the previous attempt.
   useEffect(() => { setError(null); }, [employeeName, blocks]);
 
@@ -139,16 +163,17 @@ function SupervisorIssuePage() {
       if (!sel || !n || !b.reason) return setError(`לקוח ${i + 1}: יש לבחור לקוח, למלא סכום ולבחור סיבה`);
       if (!b.fuelType) return setError(`לקוח ${i + 1}: יש לבחור סוג דלק`);
       const fuelType = b.fuelType;
-       const amountError = issuanceAmountError(fuelType, n);
-       if (amountError) return setError(`לקוח ${i + 1}: ${amountError}`);
+      const amountError = issuanceAmountError(fuelType, n);
+      if (amountError) return setError(`לקוח ${i + 1}: ${amountError}`);
       if (b.mode === "b2b" && b.b2b) items.push({ amount: n, fuelType, reason: b.reason, route: "b2b", clientName: b.b2b.clientName, clientCode: b.b2b.clientCode, accountName: b.b2b.accountName, standard: b.b2b.standard });
       else if (b.regular) items.push({ amount: n, fuelType, reason: b.reason, route: "regular", clientName: b.regular.clientName, clientCode: b.regular.clientId, siteId: b.regular.siteId, siteName: b.regular.siteName, ...(b.regular.standard ? { standard: b.regular.standard } : {}) });
     }
     setError(null);
     setLoading(true);
     try {
+      const name = employeeName.trim();
       const created = await issueWorkerVoucher({
-        employeeName: employeeName.trim(),
+        employeeName: name,
         branch: me.branch || "הנהלה",
         ...(role === "supervisor" ? { supervisor: fullName(me) } : {}),
         requester: fullName(me),
@@ -159,11 +184,10 @@ function SupervisorIssuePage() {
         toast.error(created.error);
         return;
       }
-      setLink(publicVoucherUrl(created.id));
+      setIssued({ url: publicVoucherUrl(created.id), name, total: items.reduce((t, it) => t + it.amount, 0), codes: created.serials.length });
       setCopied(false);
       setEmployeeName("");
       setBlocks([newBlock()]);
-      toast.success(`הופקו ${created.serials.length} קודים בלינק אחד`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "הפקת הלינק נכשלה");
     } finally {
@@ -172,9 +196,9 @@ function SupervisorIssuePage() {
   }
 
   async function copyLink() {
-    if (!link) return;
+    if (!issued) return;
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(issued.url);
       setCopied(true);
       toast.success("הלינק הועתק — ניתן להדביק בוואטסאפ");
     } catch {
@@ -182,100 +206,222 @@ function SupervisorIssuePage() {
     }
   }
 
+  // ---- summary (display only) ----
+  const nameOk = employeeName.trim().length >= 2;
+  const multi = blocks.length > 1;
+  const missing: string[] = [];
+  if (!nameOk) missing.push("שם עובד");
+  const totals = { "בנזין": 0, "סולר": 0 } as Record<FuelType, number>;
+  const used = { "בנזין": [] as { amount: number }[], "סולר": [] as { amount: number }[] };
+  blocks.forEach((b, i) => {
+    const tag = multi ? `לקוח ${i + 1}: ` : "";
+    const sel = b.mode === "b2b" ? b.b2b : b.regular;
+    const s = blockStock[i];
+    if (!sel) missing.push(tag + (b.mode === "b2b" ? "רכב / לקוח" : "לקוח / אתר"));
+    if (!b.fuelType) missing.push(tag + "סוג דלק");
+    else if (!s?.pick && !s?.error) missing.push(tag + "סכום");
+    if (!b.reason) missing.push(tag + "סיבת הנפקה");
+    if (b.fuelType && s?.pick) {
+      totals[b.fuelType] += Number(b.amount);
+      used[b.fuelType].push(...s.pick);
+    }
+  });
+  const anyBlockError = blockStock.some((s) => s.error);
+  const total = totals["בנזין"] + totals["סולר"];
+  const ready = nameOk && missing.length === 0 && !anyBlockError && total > 0;
+  const usedText = (["בנזין", "סולר"] as const).filter((f) => totals[f] > 0).map((f) => `${f}: ${cardsText(used[f])}`).join(" · ");
+  const myStock = { "בנזין": cardsOfFuel(pool, "בנזין").reduce((t, v) => t + v.amount, 0), "סולר": cardsOfFuel(pool, "סולר").reduce((t, v) => t + v.amount, 0) };
+  const waText = issued ? `שלום ${issued.name}, זה הלינק לשוברי הדלק שלך: ${issued.url}` : "";
+
   return (
     <InternalLayout title="הפקת שוברי דלק">
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card padding="lg">
-          <CardHeader>
-            <CardTitle>הפקת שוברי דלק</CardTitle>
-            <Badge variant="info" size="md">
-              <Link2 className="size-3.5" />
-              לינק חד פעמי
-            </Badge>
-          </CardHeader>
+      <PageHero
+        eyebrow="הנפקה"
+        title="הנפקה לעובד"
+        subtitle="לינק חד־פעמי עם שוברי דלק לעובד."
+        actions={
+          <Link to="/produced" className="ds-btn ds-btn-glass">
+            <Link2 className="size-4" aria-hidden />
+            שוברים שהופקו
+          </Link>
+        }
+      />
 
-          <form onSubmit={submit} className="mt-2 space-y-5">
-            <FormField label="שם עובד" hint="השם יופיע מראש בלינק — העובד יאמת עם ת.ז וטלפון">
-              <Input aria-label="שם עובד" value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} placeholder="שם מלא של העובד" required />
-            </FormField>
+      <form onSubmit={submit} noValidate className="grid items-start gap-[18px] min-[1100px]:grid-cols-[minmax(0,1fr)_360px]">
+        <section aria-label="טופס הנפקה" className="ds-card flex min-w-0 flex-col gap-5 px-[22px] pb-6 pt-[22px] max-[899.98px]:px-4">
+          <div className="flex flex-col gap-3">
+            <h2 className="m-0 text-[17px] font-extrabold text-navy-900">פרטי העובד</h2>
+            <label className={cn(labelClass, "max-w-[420px]")}>
+              שם עובד
+              <input
+                className={fieldClass}
+                type="text"
+                autoComplete="off"
+                placeholder="שם מלא של העובד"
+                value={employeeName}
+                onChange={(e) => setEmployeeName(e.target.value)}
+                required
+              />
+              <span className="text-[12.5px] font-medium text-slate-600">השם יופיע מראש בלינק — העובד יאמת עם ת.ז וטלפון</span>
+            </label>
+          </div>
 
+          <div className="flex flex-col gap-3.5 border-t border-table-line pt-[18px]">
+            <h2 className="m-0 text-[17px] font-extrabold text-navy-900">לקוחות ואתרים</h2>
             {blocks.map((b, i) => (
               <ClientBlock
                 key={b.key}
                 index={i}
                 block={b}
+                stockInfo={blockStock[i]}
                 role={role}
                 branch={me?.branch}
                 onChange={(p) => patch(b.key, p)}
                 onRemove={blocks.length > 1 ? () => setBlocks((bs) => bs.filter((x) => x.key !== b.key)) : undefined}
               />
             ))}
+            <button
+              type="button"
+              onClick={() => setBlocks((bs) => [...bs, newBlock()])}
+              className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-[#9dbbef] bg-[#f7faff] text-[14.5px] font-bold text-blue-500 hover:bg-[#eef4ff] focus-visible:shadow-focus-mint focus-visible:outline-none"
+            >
+              <Plus className="size-[18px]" aria-hidden />
+              הוסף לקוח / אתר
+            </button>
+          </div>
+        </section>
 
-            <Button type="button" variant="outline" block onClick={() => setBlocks((bs) => [...bs, newBlock()])}>
-              <Plus className="size-4" />
-              הוספת לקוח
-            </Button>
-
-            {error || stockError ? <p className="text-sm font-semibold text-danger">{error ?? stockError}</p> : null}
-
-            <Button type="submit" loading={loading} disabled={!stockReady || !!stockError} block>
-              <Send className="size-4" />
-              הפקת לינק לעובד
-            </Button>
-          </form>
-        </Card>
-
-        <Card padding="lg">
-          <CardHeader>
-            <CardTitle>הלינק לשליחה לעובד</CardTitle>
-          </CardHeader>
-          {link ? (
-            <div className="space-y-4">
-              <div className="rounded-xl border-2 border-dashed border-primary bg-blue-100/60 p-5 text-center">
-                <p className="text-xs font-semibold text-muted-foreground">לינק אישי לעובד</p>
-                <p dir="ltr" className="mt-2 break-all font-display text-lg font-extrabold text-secondary">{link}</p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Button variant="accent" block onClick={copyLink}>
-                  {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                  העתק לינק
-                </Button>
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-primary bg-surface px-4 text-sm font-bold text-primary transition-colors hover:bg-blue-100"
-                >
-                  <SquareArrowOutUpRight className="size-4" />
-                  פתח בחלון חדש
-                </a>
-              </div>
+        <aside aria-label="סיכום הנפקה" className="ds-card flex flex-col gap-3.5 p-5 min-[1100px]:sticky min-[1100px]:top-5">
+          <div className="flex items-center justify-between gap-2.5">
+            <h2 className="m-0 text-[17px] font-extrabold text-navy-900">סיכום הנפקה</h2>
+            <span className={cn("rounded-full px-2.5 py-[3px] text-xs font-bold", ready ? "bg-[#e8f0fd] text-blue-700" : "bg-[#f1f3f7] text-ink-soft")}>
+              {ready ? "מוכן להפקה" : "טיוטה"}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <div className="ds-kv border-b border-table-line py-[9px]">
+              <span>עובד</span>
+              <span className={nameOk ? "font-semibold text-navy-900" : "text-slate-600"}>{nameOk ? employeeName.trim() : "—"}</span>
             </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border bg-surface-muted p-10 text-center">
-              <span className="mx-auto grid size-14 place-items-center rounded-xl bg-blue-100 text-blue-700">
-                <Link2 className="size-7" />
-              </span>
-              <p className="mt-3 font-display text-base font-extrabold text-secondary">עדיין לא הופק לינק</p>
-              <p className="mt-1 text-sm text-muted-foreground">מלא שם עובד, לקוח, סכום וסיבה כדי לקבל לינק.</p>
-            </div>
-          )}
-        </Card>
-      </div>
+            {blocks.map((b, i) => {
+              const sel = b.mode === "b2b" ? b.b2b : b.regular;
+              const s = blockStock[i];
+              const has = !!(b.fuelType && s?.pick);
+              return (
+                <div key={b.key} className="ds-kv border-b border-table-line py-[9px]">
+                  <span className="min-w-0">{i + 1} · {sel ? sel.clientName : "—"}</span>
+                  <span className={cn("ds-num whitespace-nowrap", has ? "font-semibold text-navy-900" : "text-slate-600")}>
+                    {has && b.fuelType ? `${fmt(Number(b.amount))} ₪ ${fuelWord(b.fuelType)}` : "—"}
+                  </span>
+                </div>
+              );
+            })}
+            {(["בנזין", "סולר"] as const).filter((f) => totals[f] > 0).map((f) => (
+              <div key={f} className="ds-kv border-b border-table-line py-[9px]">
+                <span className="font-bold text-navy-900">סה״כ {fuelWord(f)}</span>
+                <span className="ds-num font-bold text-navy-900">{fmt(totals[f])} ₪</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-1 rounded-[14px] bg-shell px-4 py-3.5 text-white">
+            <span className="text-[12.5px] text-shell-text">סה״כ לעובד</span>
+            <span className="ds-num text-[26px] font-semibold">{fmt(total)} ₪</span>
+            <span className="ds-num text-[12.5px] leading-relaxed text-mint-300">{usedText || "טרם הוזן סכום"}</span>
+          </div>
+          {missing.length ? (
+            <span className="text-[12.5px] leading-relaxed text-slate-600">חסר: {missing.join(" · ")}</span>
+          ) : anyBlockError ? (
+            <span className="text-[12.5px] font-bold leading-relaxed text-red-700">יש לתקן את הסכומים המסומנים</span>
+          ) : null}
+          {error || stockError ? <p role="alert" className="m-0 text-sm font-semibold text-red-700">{error ?? stockError}</p> : null}
+          <button type="submit" className="ds-btn ds-btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" disabled={loading || !stockReady || !!stockError} aria-busy={loading}>
+            <Send className="size-4" aria-hidden />
+            {loading ? "מפיק לינק…" : "הפקת לינק לעובד"}
+          </button>
+          <span className="ds-num text-center text-xs text-slate-600">
+            {stockReady ? `המלאי שלי · בנזין 95: ${fmt(myStock["בנזין"])} ₪ · סולר: ${fmt(myStock["סולר"])} ₪` : "טוען מלאי…"}
+          </span>
+        </aside>
+      </form>
 
-      <section className="mt-8">
-        <h2 className="mb-3 font-display text-xl font-extrabold text-secondary">שוברים שהופקו</h2>
-        <ProducedLinks limit={10} />
+      <section aria-label="שוברים אחרונים שהופקו" className="ds-card flex flex-col gap-1 px-[22px] py-5 max-[899.98px]:px-4">
+        <div className="flex items-center justify-between gap-2.5 pb-2">
+          <h2 className="m-0 text-[17px] font-bold text-navy-900">שוברים אחרונים שהופקו</h2>
+          <Link to="/produced" className="px-1 py-3 text-[13px] font-semibold text-blue-500 no-underline hover:text-blue-700">לכל הרשימה</Link>
+        </div>
+        <ProducedLinks limit={10} variant="compact" />
       </section>
+
+      <Modal
+        open={!!issued}
+        onClose={() => setIssued(null)}
+        title="הלינק הופק"
+        description={issued ? `הופקו ${issued.codes} קודים בסך ${fmt(issued.total)} ₪ עבור ${issued.name}` : undefined}
+        footer={<button type="button" className="ds-btn ds-btn-light" onClick={() => setIssued(null)}>הנפקה נוספת</button>}
+      >
+        {issued ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5 rounded-[14px] border-2 border-dashed border-blue-500 bg-[#f2f6fe] p-4 text-center">
+              <span className="text-[12.5px] font-bold text-slate-600">לינק אישי לעובד</span>
+              <span dir="ltr" className="ds-num break-all text-[17px] font-semibold text-shell-2">{issued.url}</span>
+            </div>
+            <div className="grid gap-2.5 min-[600px]:grid-cols-3">
+              <button type="button" className="ds-btn ds-btn-primary" onClick={() => void copyLink()}>
+                {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+                {copied ? "הלינק הועתק" : "העתקת לינק"}
+              </button>
+              <a
+                className="ds-btn bg-[#177a42] text-white no-underline hover:bg-[#11633a] hover:text-white"
+                href={`https://wa.me/?text=${encodeURIComponent(waText)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MessageCircle className="size-4" aria-hidden />
+                וואטסאפ
+              </a>
+              <a className="ds-btn ds-btn-light no-underline" href={issued.url} target="_blank" rel="noopener noreferrer">
+                <SquareArrowOutUpRight className="size-4" aria-hidden />
+                צפייה בעמוד העובד
+              </a>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </InternalLayout>
   );
 }
 
+function Seg<T extends string>({ label, options, value, onPick }: { label: string; options: readonly (readonly [T, string])[]; value: T | ""; onPick: (v: T) => void }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="grid grid-cols-2 gap-1.5 rounded-xl bg-[#f1f4f9] p-1">
+      {options.map(([v, text]) => {
+        const on = value === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => { if (!on) onPick(v); }}
+            className={cn(
+              "flex min-h-11 items-center justify-center gap-2 rounded-[9px] text-sm font-bold focus-visible:shadow-focus-mint focus-visible:outline-none",
+              on ? "bg-white text-blue-700 shadow-[0_1px_3px_rgba(11,17,64,.14)]" : "bg-transparent text-slate-600",
+            )}
+          >
+            {text}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ClientBlock({
-  index, block, role, branch, onChange, onRemove,
+  index, block, stockInfo, role, branch, onChange, onRemove,
 }: {
   index: number;
   block: Block;
+  stockInfo?: BlockStock;
   role: string;
   branch?: string;
   onChange: (p: Partial<Block>) => void;
@@ -305,7 +451,7 @@ function ClientBlock({
   }, [mode, b2bClients, nonB2b]);
   const verifiedActive = (c: B2BClientRecord | ClientRecord) => isActiveClient(c) && Boolean(activeKeys?.has("accountName" in c ? workVehicleKey(c) : JSON.stringify([c.clientId,c.siteId])));
 
-  // Inactive clients (missing from the last import) are never offered.
+  // Only active clients are offered.
   const allowedB2b = useMemo(
     () => b2bClients.filter((c) => verifiedActive(c) && (role === "admin" || c.branch === branch)),
     [b2bClients, role, branch, activeKeys],
@@ -315,126 +461,130 @@ function ClientBlock({
   const amountRules = issuanceAmountRules(block.fuelType);
 
   const matches = useMemo(() => {
+    if (selected) return [];
     const q = search.trim();
-    if (!q || selected) return [];
-    if (mode === "b2b") return allowedB2b.filter((c) => c.clientName.includes(q) || c.accountName.includes(q) || c.standard.includes(q) || c.clientCode.includes(q)).slice(0, 8);
-    return nonB2b.filter((c) => verifiedActive(c) && (c.clientName.includes(q) || c.siteName.includes(q))).slice(0, 8);
+    if (mode === "b2b") return allowedB2b.filter((c) => !q || c.clientName.includes(q) || c.accountName.includes(q) || c.standard.includes(q) || c.clientCode.includes(q)).slice(0, 50);
+    return nonB2b.filter((c) => verifiedActive(c) && (!q || c.clientName.includes(q) || c.siteName.includes(q))).slice(0, 50);
   }, [search, selected, mode, allowedB2b, nonB2b, activeKeys]);
 
+  const searchLabel = mode === "b2b" ? "חיפוש רכב עבודה / לקוח" : "חיפוש לקוח / אתר";
+  const n = index + 1;
+  const amountId = `amount-${block.key}`;
+  const reasonId = `reason-${block.key}`;
+
   return (
-    <div className="space-y-4 rounded-xl border border-border p-4">
-      <div className="flex items-center justify-between">
-        <p className="font-display text-sm font-extrabold text-secondary">לקוח {index + 1}</p>
+    <article aria-label={`לקוח ${n}`} className="flex flex-col gap-3.5 rounded-card border border-[#dfe6f1] bg-white p-4 shadow-[0_1px_2px_rgba(11,17,64,.04)]">
+      <div className="flex min-h-11 items-center justify-between gap-2.5">
+        <span className="inline-flex min-w-0 items-center gap-2.5 text-[15px] font-extrabold text-shell-2">
+          <span className="ds-num inline-grid size-7 flex-none place-items-center rounded-lg bg-[#e8f0fd] text-[13px] text-blue-700">{n}</span>
+          <span className="truncate">{selected ? selected.clientName : `לקוח ${n}`}</span>
+        </span>
         {onRemove ? (
-          <button type="button" aria-label="הסרת לקוח" onClick={onRemove} className="grid size-8 place-items-center rounded-md text-danger hover:bg-surface-muted">
-            <Trash2 className="size-4" />
+          <button type="button" aria-label={`הסרת לקוח ${n}`} onClick={onRemove} className="ds-iconbtn border-[#f3c3c9] text-red-700 hover:bg-[#fdf2f3]">
+            <Trash2 className="size-4" aria-hidden />
           </button>
         ) : null}
       </div>
-      <div role="radiogroup" aria-label="סוג רכב" className="grid grid-cols-2 gap-2 rounded-xl bg-surface-muted p-1">
-        {([["b2b", "רכב עבודה"], ["regular", "רכב פרטי"]] as const).map(([value, label]) => (
-          <label
-            key={value}
-            className={cn(
-              "flex cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-bold transition-colors",
-              mode === value ? "bg-surface text-primary shadow-card" : "text-muted-foreground",
-            )}
-          >
+
+      <Seg
+        label="סוג רכב"
+        options={[["b2b", "רכב עבודה"], ["regular", "רכב פרטי"]] as const}
+        value={mode}
+        onPick={(value) => onChange({ mode: value, search: "", b2b: null, regular: null, reason: "" })}
+      />
+
+      {selected ? (
+        <div className="flex items-center gap-3 rounded-xl border border-blue-500 bg-[#eef4ff] px-3 py-2.5">
+          <span className="grid size-[38px] flex-none place-items-center rounded-[10px] bg-white text-blue-500">
+            <Building2 className="size-[18px]" aria-hidden />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-[14.5px] font-bold leading-snug text-navy-900">{selected.clientName}</span>
+            <span className="text-[12.5px] leading-normal text-slate-600">
+              {mode === "b2b" && b2b ? b2bSub(b2b) : regular ? regularSub(regular) : ""}
+            </span>
+          </span>
+          <button type="button" className="ds-rowact min-h-11" onClick={() => onChange({ b2b: null, regular: null, search: "" })}>החלפה</button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <label className="relative block">
+            <span className="sr-only">{searchLabel}</span>
+            <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-600" aria-hidden />
             <input
-              type="radio"
-              name={`mode-${block.key}`}
-              value={value}
-              checked={mode === value}
-              onChange={() => onChange({ mode: value, search: "", b2b: null, regular: null, reason: "" })}
-              className="accent-primary"
+              type="search"
+              className={cn(fieldClass, "pr-9")}
+              placeholder={mode === "b2b" ? "חיפוש לפי לקוח, חשבון או תקן" : "חיפוש לפי לקוח או אתר"}
+              value={search}
+              onChange={(e) => onChange({ search: e.target.value, b2b: null, regular: null })}
             />
-            {label}
           </label>
-        ))}
-      </div>
+          <div role="listbox" aria-label={searchLabel} className="ds-scroll flex max-h-[262px] flex-col gap-1.5 overflow-y-auto p-0.5">
+            {matches.map((c) => {
+              const isB2b = "accountName" in c;
+              return (
+                <button
+                  key={isB2b ? workVehicleKey(c) : `${(c as ClientRecord).clientId}|${(c as ClientRecord).siteId}`}
+                  type="button"
+                  role="option"
+                  aria-selected={false}
+                  onClick={() => onChange(isB2b ? { b2b: c, search: "" } : { regular: c as ClientRecord, search: "" })}
+                  className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-start text-navy-900 hover:border-slate-400 focus-visible:shadow-focus-mint focus-visible:outline-none"
+                >
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="text-[14.5px] font-bold leading-snug">{c.clientName}</span>
+                    <span className="text-[12.5px] leading-normal text-slate-600">{isB2b ? b2bSub(c) : regularSub(c as ClientRecord)}</span>
+                  </span>
+                </button>
+              );
+            })}
+            {matches.length === 0 ? (
+              <span className="px-1 py-2.5 text-[13px] text-slate-600">{activeKeys ? "לא נמצאו תוצאות." : "טוען לקוחות…"}</span>
+            ) : null}
+          </div>
+        </div>
+      )}
 
-      <FormField label="בחירת לקוח">
-        <div className="relative">
-          <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            aria-label="חיפוש לקוח"
-            value={search}
-            onChange={(e) => onChange({ search: e.target.value, b2b: null, regular: null })}
-            placeholder="הקלד שם לקוח…"
-            className="pe-9"
+      <div className="grid items-start gap-3.5 rounded-xl border border-line bg-[#f4f7fc] p-3.5 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
+        <div className={labelClass}>
+          <span id={`fuel-${block.key}`}>סוג דלק</span>
+          <Seg
+            label={`סוג דלק ללקוח ${n}`}
+            options={[["בנזין", "בנזין 95"], ["סולר", "סולר"]] as const}
+            value={block.fuelType}
+            onPick={(value) => onChange({ fuelType: value })}
           />
-          {matches.length > 0 ? (
-            <ul className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-raised">
-              {matches.map((c) => {
-                const isB2b = "accountName" in c;
-                const sub = isB2b ? `${c.accountName} · ${c.standard}` : (c as ClientRecord).siteName;
-                return (
-                  <li key={isB2b ? workVehicleKey(c) : `${(c as ClientRecord).clientId}|${(c as ClientRecord).siteId}`}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onChange(isB2b ? { b2b: c, search: `${c.clientName} · ${sub}` } : { regular: c as ClientRecord, search: `${c.clientName} · ${sub}` })
-                      }
-                      className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-start text-sm hover:bg-blue-100"
-                    >
-                      <span className="font-bold text-secondary">{c.clientName}</span>
-                      <span className="truncate text-muted-foreground">{sub}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
         </div>
-      </FormField>
-
-      {b2b && mode === "b2b" ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <InfoCard icon={Building2} label="שם לקוח" value={b2b.clientName} />
-          <InfoCard icon={Hash} label="קוד לקוח" value={b2b.clientCode} />
-          <InfoCard icon={MapPin} label="שם חשבון" value={b2b.accountName} />
-          <InfoCard icon={BadgeCheck} label="תקן" value={b2b.standard} />
+        <div className={labelClass}>
+          <label htmlFor={amountId}>סכום (₪)</label>
+          <input
+            id={amountId}
+            type="number"
+            inputMode="numeric"
+            min={amountRules.min}
+            step={amountRules.step}
+            placeholder="0"
+            value={block.amount}
+            onChange={(e) => onChange({ amount: e.target.value })}
+            aria-invalid={stockInfo?.error ? true : undefined}
+            className={cn(fieldClass, "ds-num", stockInfo?.error && fieldBadClass)}
+          />
+          <span className="text-[12.5px] font-medium text-slate-600">
+            {block.fuelType && stockInfo?.avail != null ? `זמין לי: ${fmt(stockInfo.avail)} ₪ · ${amountRules.hint}` : "יש לבחור סוג דלק"}
+          </span>
+          {stockInfo?.error ? <span role="alert" className="text-[12.5px] font-bold text-red-700">{stockInfo.error}</span> : null}
+          {stockInfo?.pick ? <span className="ds-num text-[12.5px] font-semibold text-available-fg">ייבחרו: {cardsText(stockInfo.pick)}</span> : null}
         </div>
-      ) : null}
-      {regular && mode === "regular" ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <InfoCard icon={Building2} label="לקוח" value={`${regular.clientName} (${regular.clientId})`} />
-          <InfoCard icon={MapPin} label="אתר" value={`${regular.siteName} (${regular.siteId})`} />
-        </div>
-      ) : null}
-
-      <div className="grid min-w-0 gap-x-4 gap-y-5 sm:grid-cols-2">
-        <FormField label="סוג דלק" className="min-w-0">
-          <Select aria-label="בחר סוג דלק" value={block.fuelType} onChange={(e) => onChange({ fuelType: e.target.value as FuelType })}>
-            <option value="">בחר סוג דלק…</option>
-            <option value="בנזין">בנזין 95</option>
-            <option value="סולר">סולר</option>
-          </Select>
-        </FormField>
-        <FormField label="סכום (₪)" hint={block.fuelType ? amountRules.hint : undefined} className="min-w-0">
-          <Input aria-label="סכום" type="number" min={amountRules.min} step={amountRules.step} inputMode="numeric" value={block.amount} onChange={(e) => onChange({ amount: e.target.value })} className="min-w-0 tabular-nums" />
-        </FormField>
-        <FormField label="סיבת הנפקה" className="min-w-0 sm:col-span-2">
-          <Select aria-label="בחר סיבת הנפקה" value={block.reason} onChange={(e) => onChange({ reason: e.target.value })}>
-            <option value="">בחר סיבה…</option>
+        <div className={labelClass}>
+          <label htmlFor={reasonId}>סיבת הנפקה</label>
+          <select id={reasonId} className={fieldClass} value={block.reason} onChange={(e) => onChange({ reason: e.target.value })}>
+            <option value="">בחירה…</option>
             {modeReasons.map((r) => (
               <option key={r.name} value={r.name}>{r.name}</option>
             ))}
-          </Select>
-        </FormField>
+          </select>
+        </div>
       </div>
-    </div>
-  );
-}
-
-function InfoCard({ icon: Icon, label, value }: { icon: typeof Hash; label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-surface-muted p-3">
-      <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-        <Icon className="size-3.5" />
-        {label}
-      </p>
-      <p className="mt-1 font-display text-sm font-extrabold text-secondary">{value}</p>
-    </div>
+    </article>
   );
 }

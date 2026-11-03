@@ -1,47 +1,30 @@
 import { useMemo, useRef, useState } from "react";
-import { FileSpreadsheet, Pencil, Plus, Search, Trash2, UploadCloud } from "lucide-react";
+import { FileSpreadsheet, Plus, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  Badge,
-  Button,
-  Card,
-  FormField,
-  Input,
-  Select,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-} from "@/design-system/delek-1ea111";
+import { Button, FormField, Input, Select } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { downloadCsv } from "@/components/dashboard/statusVariant";
+import { DataTable, EmptyRow, KV, MobileCardList } from "@/components/ui/DataTable";
+import { FilterChips } from "@/components/ui/FilterChips";
+import { Pager, usePaged } from "@/components/ui/Pager";
+import { ResultDialog, type ResultSummary } from "@/components/ui/ResultDialog";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { isSheetFile, parseSheetFile } from "@/lib/parseSheet";
 import { parseWorkVehicleSheet } from "@/lib/workVehicleSheet";
 import { isReadOnlyRole, useAppStore, type B2BClientRecord } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
 import { workVehicleKey } from "@/lib/workVehicles";
+import { workVehicleColumns } from "@/lib/importTemplates";
+import { downloadImportTemplate } from "@/lib/excel";
+import { SearchField, SettingsCard } from "./shared";
 
 type Key = Exclude<keyof B2BClientRecord, "isActive">;
-/** Exact Excel column order (RTL). */
-const columns: { key: Key; label: string; required?: boolean }[] = [
-  { key: "standard", label: "תקן", required: true },
-  { key: "accountName", label: "שם חשבון", required: true },
-  { key: "balance", label: 'יתרת הנה"ש' },
-  { key: "clientCode", label: "קוד לקוח", required: true },
-  { key: "clientName", label: "שם לקוח", required: true },
-  { key: "loadType", label: "סוג העמסה" },
-  { key: "branch", label: "סניף", required: true },
-  { key: "budgetSection", label: "סעיף תקציבי" },
-  { key: "accountKey", label: "מפתח חשבון אב" },
-  { key: "itemFamily", label: "משפחת פריטים" },
-  { key: "accountStatus", label: "חשבון [פעיל/כותרת]" },
-  { key: "accountType", label: "סוג חשבון" },
-];
+/** Exact Excel column order (RTL) — shared with the template download (src/lib/importTemplates.ts). */
+const columns: { key: Key; label: string; required?: boolean }[] = workVehicleColumns;
 const cols = columns.map((c) => c.label);
 const empty = Object.fromEntries(columns.map((c) => [c.key, ""])) as unknown as Required<B2BClientRecord>;
+
+type ActiveFilter = "all" | "active" | "inactive";
 
 export function B2bPanel() {
   const rows = useAppStore((s) => s.b2bClients);
@@ -57,36 +40,48 @@ export function B2bPanel() {
   const [form, setForm] = useState(empty);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [active, setActive] = useState<ActiveFilter>("all");
+  const [result, setResult] = useState<ResultSummary | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = useMemo(() => {
+  const searched = useMemo(() => {
     const q = query.trim();
     if (!q) return rows;
     return rows.filter((r) => Object.values(r).some((v) => String(v ?? "").includes(q)));
   }, [rows, query]);
+  const activeCount = searched.filter((r) => r.isActive === true).length;
+  const filtered = useMemo(
+    () =>
+      active === "all" ? searched : searched.filter((r) => (active === "active" ? r.isActive === true : r.isActive !== true)),
+    [searched, active],
+  );
+  const paged = usePaged(filtered);
 
   async function handleFiles(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
     if (!isSheetFile(file.name)) {
-      toast.error("יש להעלות קובץ אקסל (xlsx, xls) או CSV");
+      setResult({ tone: "error", title: "קובץ לא נתמך", line: "יש להעלות קובץ אקסל (xlsx, xls) או CSV", detail: file.name });
       return;
     }
     try {
       const all = await parseSheetFile(file);
       const parsed = parseWorkVehicleSheet(all, columns);
       if (!parsed.length) {
-        toast.error(`לא נמצאו שורות תקינות. עמודות: ${cols.join(", ")}`);
+        setResult({ tone: "error", title: "לא נמצאו שורות תקינות", line: `עמודות: ${cols.join(", ")}`, detail: file.name });
         return;
       }
       const { active = 0, added, reactivated, remained_active, deactivated, skipped = 0, duplicates = 0 } = await importB2b(parsed);
-      toast.success(reactivated !== undefined && remained_active !== undefined
-        ? `עודכנו בהצלחה: ${reactivated} רכבים הוחזרו לפעיל, ${remained_active} נותרו פעילים, ${deactivated} סומנו כלא פעילים`
-        : `עודכנו בהצלחה: ${active} פעילים, ${deactivated} סומנו כלא פעילים`, {
-        description: `${added} רכבים חדשים, ${skipped} שורות ריקות/לא תקינות ו־${duplicates} שורות כפולות דולגו`,
+      setResult({
+        tone: "success",
+        title: "המאגר עודכן בהצלחה",
+        line: reactivated !== undefined && remained_active !== undefined
+          ? `${reactivated} רכבים הוחזרו לפעיל, ${remained_active} נותרו פעילים, ${deactivated} סומנו כלא פעילים`
+          : `${active} פעילים, ${deactivated} סומנו כלא פעילים`,
+        detail: `${added} רכבים חדשים, ${skipped} שורות ריקות/לא תקינות ו־${duplicates} שורות כפולות דולגו`,
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "סנכרון הקובץ נכשל");
+      setResult({ tone: "error", title: "סנכרון הקובץ נכשל", line: error instanceof Error ? error.message : "סנכרון הקובץ נכשל", detail: file.name });
     }
   }
 
@@ -123,121 +118,142 @@ export function B2bPanel() {
   }
 
   const fields = columns.filter((c) => c.key !== "branch");
+  const startEdit = (r: B2BClientRecord) => {
+    setEditing(r);
+    setForm({ ...empty, ...r });
+    setError(null);
+    setOpen(true);
+  };
+  const remove = (r: B2BClientRecord) => {
+    removeB2b(r.clientCode, r.standard);
+    toast.success("הרשומה נמחקה");
+  };
+  const cell = (r: B2BClientRecord, key: Key) => (key === "branch" && r.branch ? branchLabel(r.branch) : r[key] || "—");
+  const numeric = new Set<Key>(["standard", "clientCode", "balance", "budgetSection", "accountKey"]);
 
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-extrabold text-secondary">מאגר רכב עבודה</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="חיפוש"
-              aria-label="חיפוש במאגר B2B"
-              className="w-56 pe-9"
-            />
-          </div>
-          <Button
-            variant="outline"
-            onClick={() =>
-              downloadCsv("b2b-template.csv", cols, [columns.map((c) => (c.key === "branch" ? "צפון" : ""))])
-            }
+    <>
+      <SettingsCard
+        label="מאגר רכב עבודה"
+        title="מאגר רכב עבודה"
+        sub={<><span className="ds-num">{rows.length.toLocaleString("he-IL")}</span> רשומות</>}
+        tools={<>
+          <button
+            type="button"
+            className="ds-btn ds-btn-light"
+            onClick={() => void downloadImportTemplate("workVehicles").catch(() => toast.error("הורדת התבנית נכשלה"))}
           >
-            <FileSpreadsheet className="size-4" />
-            הורד תבנית
-          </Button>
+            <FileSpreadsheet className="size-4" aria-hidden />
+            הורדת קובץ לדוגמה
+          </button>
           {readOnly ? null : <>
-          <Button variant="outline" onClick={() => inputRef.current?.click()}>
-            <UploadCloud className="size-4" />
-            ייבוא מאקסל
-          </Button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="hidden"
-            aria-label="קובץ B2B"
-            onChange={(e) => {
-              void handleFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setForm(empty);
-              setError(null);
-              setOpen(true);
-            }}
-          >
-            <Plus className="size-4" />
-            הוספה
-          </Button>
+            <button type="button" className="ds-btn ds-btn-primary" onClick={() => inputRef.current?.click()}>
+              <UploadCloud className="size-4" aria-hidden />
+              העלאת קובץ
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              aria-label="קובץ רכב עבודה"
+              onChange={(e) => {
+                void handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              className="ds-btn ds-btn-light"
+              onClick={() => {
+                setEditing(null);
+                setForm(empty);
+                setError(null);
+                setOpen(true);
+              }}
+            >
+              <Plus className="size-4" aria-hidden />
+              הוספה
+            </button>
           </>}
+        </>}
+        footer={<Pager {...paged} always />}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-table-line px-[18px] py-3">
+          <FilterChips
+            label="סינון לפי סטטוס"
+            value={active}
+            onChange={setActive}
+            items={[
+              { value: "all", label: "הכל", count: searched.length },
+              { value: "active", label: "פעיל", count: activeCount },
+              { value: "inactive", label: "לא פעיל", count: searched.length - activeCount },
+            ]}
+          />
+          <SearchField value={query} onChange={setQuery} placeholder="חיפוש תקן, חשבון או לקוח" label="חיפוש במאגר רכב עבודה" />
         </div>
-      </div>
 
-      <Card padding="none" className="mt-4 overflow-x-auto">
-        <Table>
-          <TableHead>
-            <TableRow>
-              {cols.map((c) => (
-                <TableHeaderCell key={c}>{c}</TableHeaderCell>
-              ))}
-              <TableHeaderCell>סטטוס</TableHeaderCell>
-              <TableHeaderCell>פעולות</TableHeaderCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={columns.length + 2} className="py-10 text-center text-muted-foreground">
-                  אין רשומות
-                </TableCell>
-              </TableRow>
+        <DataTable minWidth={1500} caption="מאגר רכב עבודה">
+          <thead>
+            <tr>
+              {cols.map((c) => <th key={c} scope="col">{c}</th>)}
+              <th scope="col">סטטוס</th>
+              {readOnly ? null : <th scope="col"><span className="sr-only">פעולות</span></th>}
+            </tr>
+          </thead>
+          <tbody>
+            {paged.slice.length === 0 ? (
+              <EmptyRow colSpan={columns.length + (readOnly ? 1 : 2)}>{rows.length === 0 ? "המאגר ריק" : undefined}</EmptyRow>
             ) : (
-              filtered.map((r) => (
-                <TableRow key={workVehicleKey(r)} className={r.isActive !== true ? "work-vehicle-inactive" : undefined} title={r.isActive !== true ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}>
+              paged.slice.map((r) => (
+                <tr
+                  key={workVehicleKey(r)}
+                  className={r.isActive !== true ? "is-inactive" : undefined}
+                  title={r.isActive !== true ? "לא פעיל — לא הופיע בייבוא האחרון" : undefined}
+                >
                   {columns.map((c) => (
-                    <TableCell key={c.key} className="whitespace-nowrap">
-                      {c.key === "branch" && r.branch ? branchLabel(r.branch) : r[c.key] || "—"}
-                    </TableCell>
+                    <td key={c.key}>
+                      {numeric.has(c.key) ? <span className="ds-num">{cell(r, c.key)}</span> : cell(r, c.key)}
+                    </td>
                   ))}
-                  <TableCell><Badge variant={r.isActive === true ? "success" : "danger"}>{r.isActive === true ? "פעיל" : "לא פעיל"}</Badge></TableCell>
-                  <TableCell>
-                    {readOnly ? "—" : <div className="flex items-center gap-1">
-                      <button
-                        aria-label={`ערוך ${r.accountName}`}
-                        onClick={() => {
-                          setEditing(r);
-                          setForm({ ...empty, ...r });
-                          setError(null);
-                          setOpen(true);
-                        }}
-                        className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-primary"
-                      >
-                        <Pencil className="size-4" />
-                      </button>
-                      <button
-                        aria-label={`מחק ${r.accountName}`}
-                        onClick={() => {
-                          removeB2b(r.clientCode, r.standard);
-                          toast.success("הרשומה נמחקה");
-                        }}
-                        className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-surface-muted hover:text-danger"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>}
-                  </TableCell>
-                </TableRow>
+                  <td><StatusBadge status={r.isActive === true ? "פעיל" : "לא פעיל"} size="sm" /></td>
+                  {readOnly ? null : (
+                    <td>
+                      <span className="flex gap-1">
+                        <button type="button" className="ds-rowact" aria-label={`עריכת ${r.accountName}`} onClick={() => startEdit(r)}>עריכה</button>
+                        <button type="button" className="ds-rowact !text-redeemed-fg" aria-label={`מחיקת ${r.accountName}`} onClick={() => remove(r)}>מחיקה</button>
+                      </span>
+                    </td>
+                  )}
+                </tr>
               ))
             )}
-          </TableBody>
-        </Table>
-      </Card>
+          </tbody>
+        </DataTable>
+        <MobileCardList
+          items={paged.slice}
+          keyOf={(r) => workVehicleKey(r)}
+          empty={rows.length === 0 ? "המאגר ריק" : "לא נמצאו רשומות התואמות לסינון."}
+          render={(r) => (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <span className="ds-num font-bold text-navy-900">{r.standard || "—"}</span>
+                <StatusBadge status={r.isActive === true ? "פעיל" : "לא פעיל"} size="sm" />
+              </div>
+              <span className="font-semibold text-ink">{r.clientName || "—"}</span>
+              <KV label="שם חשבון">{r.accountName || "—"}</KV>
+              <KV label="קוד לקוח"><span className="ds-num">{r.clientCode || "—"}</span></KV>
+              <KV label="סניף">{r.branch ? branchLabel(r.branch) : "—"}</KV>
+              {readOnly ? null : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" className="ds-btn ds-btn-light" onClick={() => startEdit(r)}>עריכה</button>
+                  <button type="button" className="ds-btn ds-btn-light !text-redeemed-fg" onClick={() => remove(r)}>מחיקה</button>
+                </div>
+              )}
+            </>
+          )}
+        />
+      </SettingsCard>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? "עריכת לקוח רכב עבודה" : "הוספת לקוח רכב עבודה"}>
         <form onSubmit={submit} className="space-y-4">
@@ -255,16 +271,18 @@ export function B2bPanel() {
               ))}
             </Select>
           </FormField>
-          {fields.map((f) => (
-            <FormField key={f.key} label={f.label}>
-              <Input
-                aria-label={f.label}
-                value={form[f.key] ?? ""}
-                onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-              />
-            </FormField>
-          ))}
-          {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {fields.map((f) => (
+              <FormField key={f.key} label={f.label}>
+                <Input
+                  aria-label={f.label}
+                  value={form[f.key] ?? ""}
+                  onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                />
+              </FormField>
+            ))}
+          </div>
+          {error ? <p role="alert" className="text-sm font-semibold text-danger">{error}</p> : null}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               ביטול
@@ -273,6 +291,8 @@ export function B2bPanel() {
           </div>
         </form>
       </Modal>
-    </section>
+
+      <ResultDialog result={result} onClose={() => setResult(null)} />
+    </>
   );
 }

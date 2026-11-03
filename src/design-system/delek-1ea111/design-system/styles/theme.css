@@ -31,12 +31,59 @@
   --color-slate-600: #566172;
   --color-slate-900: #1b2432;
 
+  --color-orange-100: #fff0e0;
+  --color-orange-500: #f08a24;
+  --color-orange-700: #9a4a00;
+  --color-red-100: #fde8ea;
+  --color-red-500: #d9414f;
+  --color-red-700: #a01c2c;
+  --color-amber-100: #fff4d9;
+  --color-amber-700: #8a5a00;
+
+  /* Redesign 2026 — status families (badge bg / dot / text).
+     available = stored "טרם שומש" (shown as "זמין"), issued = "הוקצה לעובד",
+     redeemed = "מומש סופית". Neutral = legacy values (e.g. "חסום"). */
+  --color-available-bg: #e2f6f1;
+  --color-available: #12a08c;
+  --color-available-fg: #0b6b5d;
+  --color-issued-bg: #fff0e0;
+  --color-issued: #f08a24;
+  --color-issued-fg: #9a4a00;
+  --color-redeemed-bg: #fde8ea;
+  --color-redeemed: #d9414f;
+  --color-redeemed-fg: #a01c2c;
+  --color-pending-bg: #fff4d9;
+  --color-pending: #e0a11b;
+  --color-pending-fg: #8a5a00;
+  --color-waiting-bg: #e8f0fd;
+  --color-waiting: #1f5fd0;
+  --color-waiting-fg: #17489f;
+  --color-neutral-bg: #f1f3f7;
+  --color-neutral: #94a2b8;
+  --color-neutral-fg: #3d4757;
+
+  /* Redesign 2026 — navy shell surfaces and table chrome */
+  --color-shell: #0b1140;
+  --color-shell-2: #16215e;
+  --color-shell-text: #c9d1ee;
+  --color-shell-muted: #a9b4dc;
+  --color-page: #f4f6fa;
+  --color-line: #e6ebf2;
+  --color-line-strong: #d5dce8;
+  --color-ink: #1b2432;
+  --color-ink-soft: #3d4757;
+  --color-table-head: #f7f9fc;
+  --color-table-zebra: #fafbfd;
+  --color-table-hover: #eef4ff;
+  --color-table-line: #eef2f7;
+  --color-row-inactive: #fdf2f3;
+
   --color-success: #12a08c;
   --color-warning: #e0a11b;
   --color-danger: #d9414f;
 
   /* Semantic */
-  --color-background: var(--color-slate-50);
+  --color-background: var(--color-page);
   --color-surface: #ffffff;
   --color-surface-muted: var(--color-slate-100);
   --color-foreground: var(--color-navy-900);
@@ -68,11 +115,21 @@
   --radius-lg: 14px;
   --radius-xl: 20px;
   --radius-pill: 999px;
+  --radius-control: 11px;
+  --radius-card: 16px;
+  --radius-dialog: 20px;
+  --radius-hero: 22px;
 
   /* Elevation */
   --shadow-card: 0 1px 2px rgb(11 17 64 / 0.03), 0 10px 30px rgb(11 17 64 / 0.045);
   --shadow-raised: 0 16px 40px rgb(11 17 64 / 0.1);
   --shadow-focus: 0 0 0 3px rgb(31 95 208 / 0.25);
+  --shadow-focus-mint: 0 0 0 3px rgb(69 205 186 / 0.55);
+  --shadow-hero: 0 18px 40px rgb(11 17 64 / 0.18);
+  --shadow-dialog: 0 30px 80px rgb(11 17 64 / 0.4);
+  --shadow-btn: 0 6px 16px rgb(31 95 208 / 0.25);
+  --shadow-auth: 0 1px 2px rgb(11 17 64 / 0.03), 0 18px 44px rgb(11 17 64 / 0.08);
+  --shadow-topbar: 0 6px 20px rgb(11 17 64 / 0.25);
 }
 
 @layer base {

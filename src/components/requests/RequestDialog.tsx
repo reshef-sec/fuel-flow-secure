@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { Button, FormField, Input, Textarea } from "@/design-system/delek-1ea111";
+import { FormField, Textarea } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
 import { FuelSplitFields, emptySplit, readSplit } from "@/components/fuel/fuel";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
@@ -48,11 +48,11 @@ export function RequestDialog({ open, onClose }: { open: boolean; onClose: () =>
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="הגשת דרישת שוברים">
+    <Modal open={open} onClose={onClose} title="הגשת דרישת שוברים" description="הדרישה תישלח לאישור אדמין מרכזי">
       <form onSubmit={submit} className="space-y-5">
-        <div className="rounded-lg bg-surface-muted p-4 text-sm">
-          <p className="font-semibold text-secondary">{me ? fullName(me) : "—"}</p>
-          <p className="text-muted-foreground">סניף {me?.branch ? branchLabel(me.branch) : "—"}</p>
+        <div className="rounded-xl border border-table-line bg-table-head px-3.5 py-3 text-sm">
+          <p className="m-0 font-semibold text-navy-900">{me ? fullName(me) : "—"}</p>
+          <p className="m-0 text-slate-600">סניף {me?.branch ? branchLabel(me.branch) : "—"}</p>
         </div>
 
         <FuelSplitFields values={split} onChange={setSplit} />
@@ -68,13 +68,13 @@ export function RequestDialog({ open, onClose }: { open: boolean; onClose: () =>
           />
         </FormField>
 
-        {error ? <p className="text-sm font-semibold text-danger">{error}</p> : null}
+        {error ? <p role="alert" className="m-0 rounded-lg bg-redeemed-bg px-3 py-2 text-sm font-semibold text-redeemed-fg">{error}</p> : null}
 
-        <div className="flex flex-wrap justify-end gap-2 pt-1">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <div className="grid grid-cols-2 gap-2 pt-1 min-[900px]:flex min-[900px]:justify-end">
+          <button type="button" className="ds-btn ds-btn-light" onClick={onClose}>
             ביטול
-          </Button>
-          <Button type="submit">שליחת דרישה</Button>
+          </button>
+          <button type="submit" className="ds-btn ds-btn-primary">שליחת דרישה</button>
         </div>
       </form>
     </Modal>

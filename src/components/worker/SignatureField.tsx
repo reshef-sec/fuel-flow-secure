@@ -68,7 +68,7 @@ export function SignatureField({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="block text-sm font-semibold text-foreground">חתימה דיגיטלית</span>
+        <span className="block text-[13.5px] font-semibold text-ink-soft">חתימה דיגיטלית</span>
         <button
           type="button"
           onClick={() => {
@@ -76,9 +76,9 @@ export function SignatureField({
             onChangeRef.current(false);
             captureRef.current?.(null);
           }}
-          className="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-semibold text-primary hover:bg-blue-100"
+          className="inline-flex min-h-9 cursor-pointer items-center gap-[5px] rounded-lg border-0 bg-transparent px-2 text-[12.5px] font-bold text-blue-500 hover:bg-waiting-bg focus-visible:shadow-focus-mint focus-visible:outline-none"
         >
-          <Eraser className="size-3.5" />
+          <Eraser className="size-3.5" aria-hidden />
           נקה חתימה
         </button>
       </div>
@@ -88,8 +88,8 @@ export function SignatureField({
         onPointerUp={report}
         onMouseUp={report}
         onTouchEnd={report}
-        className={`relative w-full overflow-hidden rounded-md border-2 border-dashed bg-slate-50 ${
-          error ? "border-danger" : "border-blue-300"
+        className={`relative w-full overflow-hidden rounded-xl border-2 border-dashed bg-[#f8fafc] ${
+          error ? "border-redeemed" : "border-[#9dbbef]"
         }`}
         style={{ height: HEIGHT }}
       >
@@ -101,7 +101,7 @@ export function SignatureField({
           canvasProps={{ className: "absolute inset-0 touch-none" }}
           onEnd={report}
         />
-        <span className="pointer-events-none absolute inset-x-0 bottom-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+        <span className="pointer-events-none absolute inset-x-0 bottom-2 flex items-center justify-center gap-1.5 text-xs text-slate-600">
           <PenLine className="size-3.5" />
           אנא חתמו כאן (ציור על המסך)
         </span>

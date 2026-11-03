@@ -15,22 +15,15 @@ import {
   TableRow,
 } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
-import { downloadCsv, statusVariant } from "@/components/dashboard/statusVariant";
-import { MAIN_POOL, formatAssignment } from "@/components/dashboard/voucherData";
-import { FuelBadge, parseFuelType } from "@/components/fuel/fuel";
+import { statusVariant } from "@/components/dashboard/statusVariant";
+import { formatAssignment } from "@/components/dashboard/voucherData";
+import { FuelBadge } from "@/components/fuel/fuel";
 import { Pager, usePaged } from "@/components/ui/Pager";
-import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
-import { validateStockSheet } from "@/lib/validateStockSheet";
-import { partitionStockRows, pazFeedbackCardNumbers } from "@/lib/importIntegrity";
+import { useVoucherImports } from "@/lib/useVoucherImports";
 import { useAppStore } from "@/store/appStore";
+import { templateColumns } from "@/lib/importTemplates";
+import { downloadImportTemplate } from "@/lib/excel";
 
-const templateColumns = [
-  { name: "מספר כרטיס", example: "019949" },
-  { name: "קוד", example: "••••••" },
-  { name: "ערך", example: "100" },
-  { name: "סוג", example: "בנזין 95 / סולר" },
-  { name: "תוקף", example: "2027-12-31" },
-];
 
 /** Compact drop zone used by both import tools. */
 function DropZone({
@@ -104,10 +97,15 @@ function DropZone({
 
 export function ImportPanel() {
   const vouchers = useAppStore((s) => s.vouchers);
-  const importVouchers = useAppStore((s) => s.importVouchers);
-  const markSerialsRedeemed = useAppStore((s) => s.markSerialsRedeemed);
   const [validity, setValidity] = useState<Record<string, string>>({});
   const [recent, setRecent] = useState<string[]>([]);
+  // Import logic is shared with the /vouchers page (same handlers, same parsers, same toasts).
+  const { handleStock, handleRedeemed } = useVoucherImports({
+    onStockImported: (serials, valid) => {
+      setValidity((m) => ({ ...m, ...valid }));
+      setRecent(serials);
+    },
+  });
   const [q, setQ] = useState("");
 
   const rows = useMemo(() => {
@@ -121,56 +119,9 @@ export function ImportPanel() {
   const paged = usePaged(rows);
 
   function downloadTemplate() {
-    downloadCsv("vouchers-template.csv", templateColumns.map((c) => c.name), [templateColumns.map((c) => c.example)]);
-    toast.success("תבנית האקסל הורדה");
-  }
-
-  async function handleStock(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
-    if (!isSheetFile(file.name)) return void toast.error("יש להעלות קובץ אקסל (xlsx, xls) או CSV");
-    try {
-      const all = await parseSheetFile(file);
-      const checked = validateStockSheet(all, new Set(vouchers.map((v) => v.serial)));
-      if (typeof checked === "string") return void toast.error(`קובץ אקסל אינו תואם לתבנית הנדרשת. ${checked}`);
-      const { accepted: raw, skipped: localSkipped } = partitionStockRows(checked, new Set(vouchers.map(v => v.serial)));
-      if (!raw.length) return void toast.info(`לא נוספו שוברים · ${localSkipped} כרטיסים כפולים דולגו`);
-      const today = new Date().toISOString().slice(0, 10);
-      const parsed = raw.map((r) => ({
-          v: {
-            serial: String(r[0] ?? "").trim(),
-            realCode: String(r[1] ?? "").trim(),
-            amount: Number(String(r[2] ?? "").replace(/[₪,\s]/g, "")),
-            branch: MAIN_POOL,
-            status: "טרם שומש" as const,
-            updatedAt: today,
-            fuelType: parseFuelType(r[3]),
-          },
-          validUntil: String(r[4] ?? "").trim(),
-        }));
-      const result = await importVouchers(parsed.map((p) => p.v));
-      setValidity((m) => ({ ...m, ...Object.fromEntries(parsed.map((p) => [p.v.serial, p.validUntil])) }));
-      setRecent(result.serials);
-      toast.success(`נוספו ${result.added} שוברים · ${result.skipped + localSkipped} כרטיסים כפולים דולגו`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "ייבוא הקובץ נכשל");
-    }
-  }
-
-  async function handleRedeemed(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
-    if (!isSheetFile(file.name)) return void toast.error("יש להעלות קובץ אקסל (xlsx, xls) או CSV");
-    try {
-      const raw = stripHeader(await parseSheetFile(file), "כרטיס");
-      const serials = pazFeedbackCardNumbers(raw);
-      if (!serials.length) return void toast.error("לא נמצאו מספרי כרטיסים בקובץ");
-      const updated = await markSerialsRedeemed(serials);
-      if (!updated) return void toast.info("מספרי הכרטיסים בקובץ לא נמצאו במאגר או שכבר מומשו");
-      toast.success(`עודכנו בהצלחה ${updated} שוברים לסטטוס 'מומש סופית'`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "ייבוא היזון חוזר נכשל");
-    }
+    void downloadImportTemplate("stock")
+      .then(() => toast.success("תבנית האקסל הורדה"))
+      .catch(() => toast.error("הורדת התבנית נכשלה"));
   }
 
   return (

@@ -1,13 +1,15 @@
 @import "tailwindcss";
 @import "./design-system/delek-1ea111/design-system/styles/theme.css";
+@import "./components/ui/ui.css";
 
 @source "./design-system/delek-1ea111";
 
 
 @theme {
   --color-inactive-row: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
-  --font-sans: "Assistant", "Heebo", system-ui, sans-serif;
-  --font-display: "Assistant", "Heebo", system-ui, sans-serif;
+  /* Redesign 2026: Heebo everywhere (Assistant kept as a fallback). */
+  --font-sans: "Heebo", "Assistant", system-ui, sans-serif;
+  --font-display: "Heebo", "Assistant", system-ui, sans-serif;
 }
 
 .responsive-table tbody tr.work-vehicle-inactive,

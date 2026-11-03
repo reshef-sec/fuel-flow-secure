@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FlaskConical, Trash2, TriangleAlert } from "lucide-react";
+import { FlaskConical, ShieldCheck, Trash2, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Input, Label } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
@@ -41,14 +41,30 @@ export function DevelopmentPanel() {
   };
 
   return (
-    <section className="mt-8 border-t border-border pt-6" aria-labelledby="development-title">
-      <h2 id="development-title" className="flex items-center gap-2 text-lg font-bold text-secondary">
-        <FlaskConical className="size-5" />כלי פיתוח ובדיקות
-      </h2>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <Button variant="outline" onClick={() => setModal("demo")} disabled={busy}><FlaskConical className="size-4" />טעינת נתוני הדגמה</Button>
-        <Button variant="danger" onClick={() => setModal("reset")} disabled={busy}><Trash2 className="size-4" />איפוס וניקוי נתונים</Button>
+    <section className="flex max-w-4xl flex-col gap-3" aria-labelledby="development-title">
+      <h2 id="development-title" className="sr-only">כלי פיתוח ובדיקות</h2>
+      <div className="inline-flex items-center gap-2 self-start rounded-pill bg-waiting-bg px-3 py-1 text-[12.5px] font-bold text-waiting-fg">
+        <ShieldCheck className="size-4" aria-hidden />
+        גלוי רק לבעלת המערכת
       </div>
+      <article className="ds-card flex flex-wrap items-center justify-between gap-3 px-[18px] py-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h3 className="m-0 text-base font-extrabold text-navy-900">נתוני הדגמה</h3>
+          <span className="text-[13px] text-slate-600">שוברי בדיקה ללא קודי מימוש אמיתיים.</span>
+        </div>
+        <button type="button" className="ds-btn ds-btn-light max-[899.98px]:w-full" onClick={() => setModal("demo")} disabled={busy}>
+          <FlaskConical className="size-4" aria-hidden />טעינת נתוני הדגמה
+        </button>
+      </article>
+      <article className="ds-card flex flex-wrap items-center justify-between gap-3 border-redeemed-bg px-[18px] py-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h3 className="m-0 text-base font-extrabold text-redeemed-fg">איפוס וניקוי נתונים</h3>
+          <span className="text-[13px] text-slate-600">מוחק את כל השוברים והפעילויות. משתמשים, סניפים ומאגרים נשמרים. לא ניתן לבטל.</span>
+        </div>
+        <Button variant="danger" className="min-h-11 max-[899.98px]:w-full" onClick={() => setModal("reset")} disabled={busy}>
+          <Trash2 className="size-4" />איפוס וניקוי נתונים
+        </Button>
+      </article>
       <Modal open={modal !== null} onClose={close} title={modal === "reset" ? "איפוס וניקוי נתונים" : "טעינת נתוני הדגמה"}>
         {modal === "reset" ? <>
           <p className="flex items-start gap-2 font-semibold text-danger"><TriangleAlert className="size-5 shrink-0" />פעולה זו תמחק את כל השוברים, הפעילויות והנתונים במערכת</p>
