@@ -26,8 +26,11 @@ const mapCodes = (rows: unknown): Code[] =>
 
 // ---------- Public employee link (/voucher/:id) ----------
 
-export async function getWorkerLinkStatus({ data }: Args<{ id: string }>) {
-  const r = await rpc<Record<string, any>>("worker_link_status", { p_id: data.id });
+/** `p_demo: true` only for learning-environment links (…?demo=1); without `demo` the params are unchanged. */
+const demoParam = (demo?: boolean) => (demo === true ? { p_demo: true } : {});
+
+export async function getWorkerLinkStatus({ data }: Args<{ id: string; demo?: boolean }>) {
+  const r = await rpc<Record<string, any>>("worker_link_status", { p_id: data.id, ...demoParam(data.demo) });
   if (!r?.exists) return { exists: false as const };
   return {
     exists: true as const,
@@ -38,9 +41,9 @@ export async function getWorkerLinkStatus({ data }: Args<{ id: string }>) {
   };
 }
 
-export async function openWorkerWallet({ data }: Args<{ id: string; workerId: string; phone: string }>) {
+export async function openWorkerWallet({ data }: Args<{ id: string; workerId: string; phone: string; demo?: boolean }>) {
   const r = await rpc<Record<string, any>>("open_worker_wallet", {
-    p_id: data.id, p_worker_id: data.workerId, p_phone: data.phone,
+    p_id: data.id, p_worker_id: data.workerId, p_phone: data.phone, ...demoParam(data.demo),
   });
   return {
     ok: Boolean(r?.ok),
@@ -52,10 +55,10 @@ export async function openWorkerWallet({ data }: Args<{ id: string; workerId: st
 
 export async function signWorkerLink({
   data,
-}: Args<{ id: string; workerId: string; phone: string; fullName: string; signature: string }>) {
+}: Args<{ id: string; workerId: string; phone: string; fullName: string; signature: string; demo?: boolean }>) {
   const r = await rpc<Record<string, any>>("sign_worker_link", {
     p_id: data.id, p_worker_id: data.workerId, p_phone: data.phone,
-    p_full_name: data.fullName, p_signature: data.signature,
+    p_full_name: data.fullName, p_signature: data.signature, ...demoParam(data.demo),
   });
   return { ok: Boolean(r?.ok), codes: mapCodes(r?.codes) };
 }

@@ -101,4 +101,6 @@ export const publicProfile = (p) => p && ({
   role: p.role,
   requires_password_change: Boolean(p.requires_password_change),
   is_first_login: Boolean(p.requires_password_change),
+  /** סביבת לימוד active — only ever true for the dev-tools owner. */
+  learning_mode: Boolean(p.learning_mode) && isDevToolsOwner(p),
 });

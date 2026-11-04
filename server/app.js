@@ -13,6 +13,7 @@ import accountRoutes from "./routes/accounts.js";
 import tableRoutes from "./routes/table.js";
 import rpcRoutes from "./routes/rpc.js";
 import notificationRoutes from "./routes/notifications.js";
+import learningRoutes, { learningRouter } from "./routes/learning.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -57,6 +58,8 @@ export function createApp({ staticDir = path.resolve(here, "../dist/client") } =
     next();
   });
   app.use("/api", loadUser);
+  // Owner's requests run against the learning_* collections while סביבת לימוד is active.
+  app.use("/api", learningRouter);
 
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
   app.use("/api/auth", authRoutes);
@@ -64,6 +67,7 @@ export function createApp({ staticDir = path.resolve(here, "../dist/client") } =
   app.use("/api/db", tableRoutes);
   app.use("/api/rpc", rpcRoutes);
   app.use("/api/notifications", notificationRoutes);
+  app.use("/api/learning", learningRoutes);
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "Not found")));
 
   // Production: serve the built SPA with client-side routing fallback.

@@ -19,6 +19,7 @@ import { cardsOfFuel, issuancePool } from "@/lib/issuanceStock";
 
 import { InternalLayout } from "@/components/layout/InternalLayout";
 import { PageHero } from "@/components/ui/PageHero";
+import { useLearningActive } from "@/components/learning/LearningMode";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import {
@@ -107,6 +108,8 @@ function SupervisorIssuePage() {
   const [blocks, setBlocks] = useState<Block[]>(() => [newBlock()]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Learning environment: the produced link opens the demo copy (…?demo=1).
+  const learningActive = useLearningActive();
   const [issued, setIssued] = useState<IssuedResult | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -184,7 +187,7 @@ function SupervisorIssuePage() {
         toast.error(created.error);
         return;
       }
-      setIssued({ url: publicVoucherUrl(created.id), name, total: items.reduce((t, it) => t + it.amount, 0), codes: created.serials.length });
+      setIssued({ url: publicVoucherUrl(created.id, undefined, learningActive), name, total: items.reduce((t, it) => t + it.amount, 0), codes: created.serials.length });
       setCopied(false);
       setEmployeeName("");
       setBlocks([newBlock()]);

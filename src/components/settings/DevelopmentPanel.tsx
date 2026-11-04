@@ -3,6 +3,7 @@ import { FlaskConical, ShieldCheck, Trash2, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Input, Label } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
+import { LearningCard } from "@/components/learning/LearningMode";
 import { generateDemoData, resetSystemData } from "@/lib/backend";
 import { isResetConfirmed, RESET_CONFIRMATION } from "@/lib/developmentAccess";
 import { useDevelopmentToolsAccess } from "@/lib/superAdmin";
@@ -47,6 +48,7 @@ export function DevelopmentPanel() {
         <ShieldCheck className="size-4" aria-hidden />
         גלוי רק לבעלת המערכת
       </div>
+      <LearningCard />
       <article className="ds-card flex flex-wrap items-center justify-between gap-3 px-[18px] py-4">
         <div className="flex min-w-0 flex-col gap-1">
           <h3 className="m-0 text-base font-extrabold text-navy-900">נתוני הדגמה</h3>

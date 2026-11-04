@@ -13,6 +13,8 @@ export interface Profile {
   role: ProfileRole;
   requires_password_change: boolean;
   is_first_login?: boolean;
+  /** סביבת לימוד: true only for the system owner while the learning environment is active. */
+  learning_mode?: boolean;
 }
 
 /** Truthy marker for "signed in" (the real session is an httpOnly cookie). */

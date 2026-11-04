@@ -24,6 +24,7 @@ import { userDisplayName } from "@/lib/userDisplay";
 import { useIsSuperAdmin } from "@/lib/superAdmin";
 import { signOut } from "@/lib/useAuth";
 import { RealtimeNotifications } from "@/components/layout/RealtimeNotifications";
+import { DemoChip, LearningBanner, LearningSwitch } from "@/components/learning/LearningMode";
 import { roleLabels, storedRole, useAppStore, type Role } from "@/store/appStore";
 
 type NavTo = "/" | "/vouchers" | "/allocations" | "/supervisor" | "/produced" | "/reports" | "/signatures" | "/settings";
@@ -141,8 +142,9 @@ export function InternalLayout({ title, children }: { title: string; children: R
         className="sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col gap-[22px] overflow-y-auto bg-shell px-4 pb-[22px] pt-[26px] text-white min-[900px]:flex"
         style={{ backgroundImage: SHELL_BG }}
       >
-        <Link to="/" activeOptions={{ exact: true }} aria-label="רשף ביטחון — דף הבית" className="flex justify-center border-b border-white/[.08] px-2.5 pb-3.5 pt-1.5">
+        <Link to="/" activeOptions={{ exact: true }} aria-label="רשף ביטחון — דף הבית" className="relative flex justify-center border-b border-white/[.08] px-2.5 pb-3.5 pt-1.5">
           <Logo variant="reversed" className="h-[92px]" alt="רשף ביטחון" />
+          <DemoChip className="absolute left-1 top-0" />
         </Link>
         <div className="px-3.5 text-center text-[15px] font-bold tracking-[.08em] text-shell-text">מערכת לניהול שוברי דלק</div>
         <nav aria-label="ניווט ראשי" className="flex flex-col gap-1">
@@ -178,19 +180,23 @@ export function InternalLayout({ title, children }: { title: string; children: R
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* ── Mobile top bar ── */}
+        {/* ── Mobile top bar + learning-environment stripe (sticky together) ── */}
+        <div className="sticky top-0 z-20">
         <header
-          className="sticky top-0 z-20 flex items-center justify-between gap-3 bg-shell px-3.5 py-2.5 text-white shadow-topbar min-[900px]:hidden"
+          className="flex items-center justify-between gap-3 bg-shell px-3.5 py-2.5 text-white shadow-topbar min-[900px]:hidden"
           style={{ backgroundImage: "radial-gradient(120% 140% at 100% 0%, rgba(31,95,208,0.45), transparent 60%)" }}
         >
           <button type="button" className="ds-iconbtn is-dark" aria-label="פתיחת תפריט" aria-expanded={open} onClick={() => setOpen(true)}>
             <Menu className="size-5" aria-hidden />
           </button>
-          <Link to="/" activeOptions={{ exact: true }} aria-label="רשף ביטחון — דף הבית">
+          <Link to="/" activeOptions={{ exact: true }} aria-label="רשף ביטחון — דף הבית" className="flex items-center gap-1.5">
             <Logo variant="reversed" className="h-[42px]" alt="רשף ביטחון" />
+            <DemoChip />
           </Link>
           {bell(true)}
         </header>
+        <LearningBanner />
+        </div>
 
         {/* ── Mobile drawer ── */}
         {open ? (
@@ -202,7 +208,10 @@ export function InternalLayout({ title, children }: { title: string; children: R
               style={{ backgroundImage: "radial-gradient(120% 50% at 100% 0%, rgba(31,95,208,0.4), transparent 60%)" }}
             >
               <div className="mb-2 flex items-center justify-between border-b border-white/10 px-1 pb-4">
-                <Logo variant="reversed" className="h-14" alt="רשף ביטחון" />
+                <span className="flex items-center gap-1.5">
+                  <Logo variant="reversed" className="h-14" alt="רשף ביטחון" />
+                  <DemoChip />
+                </span>
                 <button type="button" className="ds-iconbtn is-dark" aria-label="סגירה" onClick={() => setOpen(false)}>
                   <X className="size-[18px]" aria-hidden />
                 </button>
@@ -214,6 +223,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
                 </Link>
               ))}
               <div className="mt-auto flex flex-col gap-3 border-t border-white/10 px-1.5 pt-3.5">
+                <LearningSwitch tone="dark" className="flex-wrap justify-between" />
                 {roleSelect}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 flex-col gap-0.5">
@@ -238,6 +248,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
             <span aria-current="page" className="font-semibold text-navy-900">{title}</span>
           </nav>
           <div className="flex items-center gap-2.5">
+            <LearningSwitch />
             {roleSelect}
             {bell(false)}
           </div>

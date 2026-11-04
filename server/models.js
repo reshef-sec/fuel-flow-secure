@@ -6,6 +6,7 @@
 import mongoose from "mongoose";
 import { randomUUID } from "node:crypto";
 import { pazMatchKey } from "./lib/canonical.js";
+import { learningContext } from "./lib/learningContext.js";
 
 const { Schema } = mongoose;
 const uuid = { type: String, default: () => randomUUID() };
@@ -34,6 +35,8 @@ const profileSchema = new Schema({
   failed_logins: { type: Number, default: 0 },
   locked_until: { type: Date, default: null },
   last_login_at: { type: Date, default: null },
+  /** Owner-only learning environment (סביבת לימוד) switch. */
+  learning_mode: { type: Boolean, default: false },
 }, opts("profiles"));
 profileSchema.index({ id: 1 }, { unique: true });
 profileSchema.index({ phone: 1 }, { unique: true });
@@ -196,19 +199,46 @@ const inventoryLockSchema = new Schema({ _id: String, n: { type: Number, default
   { collection: "inventory_locks", versionKey: false });
 export const InventoryLock = mongoose.model("InventoryLock", inventoryLockSchema);
 
-export const Profile = mongoose.model("Profile", profileSchema);
-export const AppUser = mongoose.model("AppUser", appUserSchema);
-export const AppSetting = mongoose.model("AppSetting", appSettingSchema);
-export const Branch = mongoose.model("Branch", branchSchema);
-export const IssueReason = mongoose.model("IssueReason", reasonSchema);
-export const B2BClient = mongoose.model("B2BClient", b2bSchema);
-export const RegularClient = mongoose.model("RegularClient", regularSchema);
-export const Voucher = mongoose.model("Voucher", voucherSchema);
-export const VoucherCode = mongoose.model("VoucherCode", voucherCodeSchema);
-export const VoucherRequest = mongoose.model("VoucherRequest", requestSchema);
-export const WorkerLink = mongoose.model("WorkerLink", workerLinkSchema);
-export const SignatureArchive = mongoose.model("SignatureArchive", signatureSchema);
-export const ActivityLog = mongoose.model("ActivityLog", activitySchema);
+/**
+ * Learning environment (סביבת לימוד): every model has a twin bound to a `learning_<collection>`
+ * collection. The exported models are proxies that resolve, per request, to the real or the
+ * learning model via AsyncLocalStorage (see server/lib/learning.js). Nothing outside a learning
+ * context can ever read or write the learning collections, and vice versa.
+ */
+function twin(name, schema) {
+  const real = mongoose.model(name, schema);
+  const learning = mongoose.model(`Learning${name}`, schema, `learning_${schema.options.collection}`);
+  REAL[name] = real;
+  LEARNING[name] = learning;
+  const pick = () => (learningContext.getStore()?.learning ? learning : real);
+  // Dummy function target: avoids Proxy invariants on the real model's non-configurable props.
+  return new Proxy(function routedModel() {}, {
+    get(_t, prop) {
+      const m = pick();
+      const v = Reflect.get(m, prop, m);
+      return typeof v === "function" && prop !== "prototype" ? v.bind(m) : v;
+    },
+    construct(_t, args) { return new (pick())(...args); },
+    apply(_t, self, args) { return Reflect.apply(pick(), self, args); },
+    has(_t, prop) { return prop in pick(); },
+  });
+}
+export const REAL = {};
+export const LEARNING = {};
+
+export const Profile = twin("Profile", profileSchema);
+export const AppUser = twin("AppUser", appUserSchema);
+export const AppSetting = twin("AppSetting", appSettingSchema);
+export const Branch = twin("Branch", branchSchema);
+export const IssueReason = twin("IssueReason", reasonSchema);
+export const B2BClient = twin("B2BClient", b2bSchema);
+export const RegularClient = twin("RegularClient", regularSchema);
+export const Voucher = twin("Voucher", voucherSchema);
+export const VoucherCode = twin("VoucherCode", voucherCodeSchema);
+export const VoucherRequest = twin("VoucherRequest", requestSchema);
+export const WorkerLink = twin("WorkerLink", workerLinkSchema);
+export const SignatureArchive = twin("SignatureArchive", signatureSchema);
+export const ActivityLog = twin("ActivityLog", activitySchema);
 
 /** Table name (as used by the frontend) → model. */
 export const TABLES = {

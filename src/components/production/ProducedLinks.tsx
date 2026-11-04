@@ -15,9 +15,11 @@ import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { toast } from "sonner";
 
 import { useAppStore, useCurrentUser } from "@/store/appStore";
+import { useLearningActive } from "@/components/learning/LearningMode";
 
-const linkUrl = (id: string) =>
-  publicVoucherUrl(id);
+/** Employee link; learning-environment links carry ?demo=1 so the public page reads the demo data. */
+const linkUrl = (id: string, demo: boolean) =>
+  publicVoucherUrl(id, undefined, demo);
 
 export type LinkStatus = (typeof LINK_STATUS_FILTERS)[number];
 
@@ -79,6 +81,7 @@ export function ProducedLinks({ limit, variant = "table" }: { limit?: number; va
   const role = useAppStore((s) => s.role);
   const authId = useAppStore((s) => s.authId);
   const rows = useProducedRows(limit);
+  const demo = useLearningActive();
 
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -108,7 +111,7 @@ export function ProducedLinks({ limit, variant = "table" }: { limit?: number; va
 
   async function copy(id: string) {
     try {
-      await navigator.clipboard.writeText(linkUrl(id));
+      await navigator.clipboard.writeText(linkUrl(id, demo));
       toast.success("הלינק הועתק — ניתן לשלוח שוב לעובד");
     } catch {
       toast.error("ההעתקה נכשלה");
@@ -155,7 +158,7 @@ export function ProducedLinks({ limit, variant = "table" }: { limit?: number; va
         <button type="button" className={mobile ? "ds-btn ds-btn-light" : "ds-rowact"} aria-label={`העתקת הלינק של ${who}`} onClick={() => void copy(l.id)}>
           <Copy className="inline size-4" aria-hidden /> העתקה
         </button>
-        <a className={cn(mobile ? "ds-btn ds-btn-light" : "ds-rowact", "no-underline")} aria-label={`פתיחת הלינק של ${who}`} href={linkUrl(l.id)} target="_blank" rel="noopener noreferrer">
+        <a className={cn(mobile ? "ds-btn ds-btn-light" : "ds-rowact", "no-underline")} aria-label={`פתיחת הלינק של ${who}`} href={linkUrl(l.id, demo)} target="_blank" rel="noopener noreferrer">
           <SquareArrowOutUpRight className="inline size-4" aria-hidden /> פתיחה
         </a>
         {showUnlock ? (

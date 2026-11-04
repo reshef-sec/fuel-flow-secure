@@ -16,6 +16,7 @@ import vehicles from "../rpc/vehicles.js";
 import workerLinks from "../rpc/workerLinks.js";
 import devtools from "../rpc/devtools.js";
 import misc from "../rpc/misc.js";
+import { runInLearning } from "../lib/learningContext.js";
 
 export const REGISTRY = { ...inventory, ...vehicles, ...workerLinks, ...devtools, ...misc };
 
@@ -23,6 +24,9 @@ const VIEWER_READ = new Set([
   "needs_setup", "lookup_auth_id", "can_use_development_tools", "worker_link_status",
   "get_central_inventory_snapshot", "get_central_inventory_summary", "central_inventory_counts", "central_stock_available",
 ]);
+
+/** Public employee-page functions that may be pointed at the learning environment with p_demo. */
+const DEMO_PUBLIC = new Set(["worker_link_status", "open_worker_wallet", "sign_worker_link"]);
 
 const router = Router();
 
@@ -38,7 +42,11 @@ router.post("/:name", ah(async (req, res) => {
   // Viewers are read-only: only an explicit allow-list of read functions.
   if (user?.role === "viewer" && !VIEWER_READ.has(req.params.name)) throw forbidden();
   if (!entry.handler) throw new HttpError(404, `Unknown function ${req.params.name}`, "PGRST202");
-  const data = await entry.handler(req.body ?? {}, { user, req });
+  const params = req.body ?? {};
+  const run = () => entry.handler(params, { user, req });
+  // Demo links (…?demo=1) from the learning environment open against the learning_* data only.
+  // These records are fictitious, so a public caller asking for them reaches nothing real.
+  const data = params.p_demo === true && DEMO_PUBLIC.has(req.params.name) ? await runInLearning(run) : await run();
   res.json({ data: data === undefined ? null : data });
 }));
 

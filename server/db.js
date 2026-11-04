@@ -11,7 +11,7 @@ export async function connectDb(uri = process.env.MONGODB_URI) {
     retryWrites: true,
     w: "majority",
   });
-  await Promise.all(Object.values(models.TABLES).map((m) => m.createIndexes()));
+  await Promise.all([...Object.values(models.REAL), ...Object.values(models.LEARNING)].map((m) => m.createIndexes()));
   await models.AppSetting.updateOne({ key: "main" }, { $setOnInsert: { key: "main", balance: 0 } }, { upsert: true });
   return mongoose.connection;
 }

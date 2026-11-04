@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { createFileRoute, ClientOnly } from "@tanstack/react-router";
-import { AlertCircle, CalendarX2, CheckCircle2, KeyRound, Lock, ShieldCheck, Wallet } from "lucide-react";
+import { AlertCircle, CalendarX2, CheckCircle2, FlaskConical, KeyRound, Lock, ShieldCheck, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Logo } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { getWorkerLinkStatus, openWorkerWallet, signWorkerLink } from "@/lib/backend";
+import { isDemoSearchValue } from "@/lib/publicUrl";
 import { StepIndicator } from "@/components/worker/StepIndicator";
 import { WalletCodeCard } from "@/components/worker/WalletCodeCard";
 
@@ -24,6 +25,8 @@ export const Route = createFileRoute("/voucher/$id")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
+  // ?demo=1 → a learning-environment (סביבת לימוד) link: read from the demo copy. Absent → unchanged.
+  validateSearch: (search: Record<string, unknown>): { demo?: 1 } => (isDemoSearchValue(search.demo) ? { demo: 1 } : {}),
   component: VoucherWallet,
 });
 
@@ -63,6 +66,9 @@ function ErrorLine({ children }: { children: ReactNode }) {
 
 function VoucherWallet() {
   const { id } = Route.useParams();
+  const demo = Route.useSearch({ select: (s) => s.demo === 1 });
+  /** Only demo links pass a flag; real links keep the exact previous call shape. */
+  const demoArg = demo ? { demo: true } : {};
   const [ready, setReady] = useState(false);
   const [link, setLink] = useState<{ total: number; signed: boolean } | null>(null);
   const [blocked, setBlocked] = useState<"locked" | "expired" | null>(null);
@@ -86,7 +92,7 @@ function VoucherWallet() {
       setReady(true);
       return;
     }
-    fetchStatus({ data: { id } })
+    fetchStatus({ data: { id, ...(demo ? { demo: true } : {}) } })
       .then((r) => {
         if (r.exists && r.state !== "ok") setBlocked(r.state);
         setLink(r.exists ? { total: r.total, signed: r.signed } : null);
@@ -97,7 +103,7 @@ function VoucherWallet() {
       })
       .catch(() => setLink(null))
       .finally(() => setReady(true));
-  }, [id, fetchStatus]);
+  }, [id, fetchStatus, demo]);
 
   async function identify(e: React.FormEvent) {
     e.preventDefault();
@@ -106,7 +112,7 @@ function VoucherWallet() {
     if (!/^0\d{8,9}$/.test(phone)) return setError("מספר טלפון לא תקין (ספרות בלבד)");
     if (!link) return;
     if (link.signed) {
-      const r = await openWallet({ data: { id, workerId: idNumber, phone } });
+      const r = await openWallet({ data: { id, workerId: idNumber, phone, ...demoArg } });
       if (r.ok) {
         setCodes(r.codes);
         setError(null);
@@ -123,7 +129,7 @@ function VoucherWallet() {
     e.preventDefault();
     if (!hasSignature || !signature || !consent) return setError("נדרשת חתימה ואישור קבלה");
     const r = await signFn({
-      data: { id, workerId: idNumber, phone, fullName: fullName.trim(), signature },
+      data: { id, workerId: idNumber, phone, fullName: fullName.trim(), signature, ...demoArg },
     });
     if (!r.ok) return setError("הלינק כבר נחתם על ידי עובד אחר");
     setCodes(r.codes);
@@ -152,6 +158,12 @@ function VoucherWallet() {
       <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col">
         <header className="flex flex-col items-center gap-3 border-b border-line bg-white px-[18px] pb-4 pt-[18px] min-[480px]:mt-6 min-[480px]:rounded-t-[18px] min-[480px]:border-x min-[480px]:border-t">
           <Logo variant="color" className="h-[84px]" />
+          {demo ? (
+            <span className="inline-flex items-center gap-1.5 rounded-pill border border-[#f0d48a] bg-pending-bg px-2.5 py-[3px] text-[12px] font-bold text-pending-fg">
+              <FlaskConical className="size-3.5" aria-hidden />
+              קישור דמו
+            </span>
+          ) : null}
           <div className="w-full rounded-xl bg-available-bg px-3.5 py-2.5 text-center">
             <h1 className="m-0 text-lg font-extrabold text-navy-900">
               {step === "wallet" ? "הארנק הדיגיטלי שלי" : "קבלת שוברי דלק"}
