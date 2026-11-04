@@ -1,4 +1,5 @@
 import type { FuelType } from "@/components/fuel/fuel";
+import { isUnissuedAvailable, type StockCard } from "@/lib/issuanceStock";
 import { assignmentLabel } from "@/lib/branchLabels";
 
 export type VoucherStatus = "מומש סופית" | "מומש בפועל" | "טרם שומש" | "חסום" | "הוקצה לעובד";
@@ -72,8 +73,10 @@ export interface VoucherRecord {
 export const isIssued = (v: VoucherRecord) => Boolean(v.linkId || v.workerName || v.workerId);
 
 /** Unused budget still available to hand out (not issued, redeemed or blocked). */
+// Same predicate as issuance and the allocations balances (src/lib/issuanceStock.ts), so every
+// screen counts exactly the same cards as "available".
 export const isAvailable = (v: VoucherRecord) =>
-  !isIssued(v) && v.status !== "מומש סופית" && v.status !== "מומש בפועל" && v.status !== "חסום";
+  isUnissuedAvailable(v as unknown as StockCard) && Number(v.amount) > 0;
 
 export const isWorkerVoucher = (v: VoucherRecord) =>
   Boolean(v.workerId || v.workerName) || v.status === "הוקצה לעובד";

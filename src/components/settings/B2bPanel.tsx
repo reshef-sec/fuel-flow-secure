@@ -90,8 +90,9 @@ export function B2bPanel() {
     const p = Object.fromEntries(
       Object.entries(form).map(([k, v]) => [k, String(v ?? "").trim()]),
     ) as unknown as B2BClientRecord;
-    if (columns.some((c) => c.required && !p[c.key])) {
-      setError("יש למלא תקן, שם חשבון, קוד לקוח, שם לקוח וסניף");
+    // סניף is optional: empty = the vehicle is open to every branch at issuance.
+    if (columns.some((c) => c.required && c.key !== "branch" && !p[c.key])) {
+      setError("יש למלא תקן, שם חשבון, קוד לקוח ושם לקוח");
       return;
     }
     const clash = rows.some(
@@ -128,7 +129,7 @@ export function B2bPanel() {
     removeB2b(r.clientCode, r.standard);
     toast.success("הרשומה נמחקה");
   };
-  const cell = (r: B2BClientRecord, key: Key) => (key === "branch" && r.branch ? branchLabel(r.branch) : r[key] || "—");
+  const cell = (r: B2BClientRecord, key: Key) => (key === "branch" ? (r.branch ? branchLabel(r.branch) : "כל הסניפים") : r[key] || "—");
   const numeric = new Set<Key>(["standard", "clientCode", "balance", "budgetSection", "accountKey"]);
 
   return (
@@ -193,7 +194,7 @@ export function B2bPanel() {
           <SearchField value={query} onChange={setQuery} placeholder="חיפוש תקן, חשבון או לקוח" label="חיפוש במאגר רכב עבודה" />
         </div>
 
-        <DataTable minWidth={1500} caption="מאגר רכב עבודה">
+        <DataTable fit caption="מאגר רכב עבודה">
           <thead>
             <tr>
               {cols.map((c) => <th key={c} scope="col">{c}</th>)}
@@ -216,10 +217,10 @@ export function B2bPanel() {
                       {numeric.has(c.key) ? <span className="ds-num">{cell(r, c.key)}</span> : cell(r, c.key)}
                     </td>
                   ))}
-                  <td><StatusBadge status={r.isActive === true ? "פעיל" : "לא פעיל"} size="sm" /></td>
+                  <td className="ds-nowrap"><StatusBadge status={r.isActive === true ? "פעיל" : "לא פעיל"} size="sm" /></td>
                   {readOnly ? null : (
-                    <td>
-                      <span className="flex gap-1">
+                    <td className="ds-nowrap">
+                      <span className="flex flex-col items-start gap-0.5 2xl:flex-row 2xl:gap-1">
                         <button type="button" className="ds-rowact" aria-label={`עריכת ${r.accountName}`} onClick={() => startEdit(r)}>עריכה</button>
                         <button type="button" className="ds-rowact !text-redeemed-fg" aria-label={`מחיקת ${r.accountName}`} onClick={() => remove(r)}>מחיקה</button>
                       </span>
@@ -243,7 +244,7 @@ export function B2bPanel() {
               <span className="font-semibold text-ink">{r.clientName || "—"}</span>
               <KV label="שם חשבון">{r.accountName || "—"}</KV>
               <KV label="קוד לקוח"><span className="ds-num">{r.clientCode || "—"}</span></KV>
-              <KV label="סניף">{r.branch ? branchLabel(r.branch) : "—"}</KV>
+              <KV label="סניף">{r.branch ? branchLabel(r.branch) : "כל הסניפים"}</KV>
               {readOnly ? null : (
                 <div className="grid grid-cols-2 gap-2">
                   <button type="button" className="ds-btn ds-btn-light" onClick={() => startEdit(r)}>עריכה</button>
@@ -257,13 +258,13 @@ export function B2bPanel() {
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? "עריכת לקוח רכב עבודה" : "הוספת לקוח רכב עבודה"}>
         <form onSubmit={submit} className="space-y-4">
-          <FormField label="סניף">
+          <FormField label="סניף" hint="ללא שיוך — כל הסניפים יוכלו לבחור ברכב בהנפקה. שיוך לסניף — רק הסניף הזה יראה אותו.">
             <Select
               aria-label="סניף"
               value={form.branch}
               onChange={(e) => setForm({ ...form, branch: e.target.value })}
             >
-              <option value="">בחר סניף…</option>
+              <option value="">כל הסניפים (ללא שיוך)</option>
               {branchList.map((b) => (
                 <option key={b.id} value={b.name}>
                   {branchLabel(b.name)}

@@ -37,6 +37,13 @@
   .ds-grid tbody tr.is-inactive td { background: var(--color-row-inactive); }
   .ds-grid.ds-grid-sticky-first thead th:first-child { right: 0; z-index: 3; }
   .ds-grid.ds-grid-sticky-first tbody td:first-child { position: sticky; right: 0; z-index: 1; box-shadow: -1px 0 0 var(--color-table-line); }
+  /* .ds-grid-fit (DataTable default): every table fits its card without horizontal scrolling —
+     tighter padding, wrapping headers and long text cells. */
+  .ds-grid.ds-grid-fit { font-size: 13px; }
+  .ds-grid.ds-grid-fit thead th { padding: 8px 6px; height: auto; white-space: normal; line-height: 1.25; font-size: 12px; vertical-align: bottom; }
+  .ds-grid.ds-grid-fit tbody td { padding: 7px 6px; height: 46px; white-space: normal; line-height: 1.3; overflow-wrap: break-word; }
+  .ds-grid.ds-grid-fit tbody td button, .ds-grid.ds-grid-fit tbody td a, .ds-grid.ds-grid-fit [class*="badge"] { white-space: nowrap; }
+  .ds-grid.ds-grid-fit tbody td .ds-num, .ds-grid.ds-grid-fit tbody td.ds-nowrap, .ds-grid.ds-grid-fit tbody td.ds-nowrap * { white-space: nowrap; overflow-wrap: normal; }
   .ds-grid tfoot td {
     padding: 0 16px; height: 50px; font-weight: 700; background: var(--color-table-head);
     border-top: 1px solid var(--color-slate-200); white-space: nowrap;

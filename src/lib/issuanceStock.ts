@@ -15,6 +15,9 @@ export const isCentralBranch = (b: string | null | undefined) => canonicalBranch
 const clean = (s: string | null | undefined) => (s ?? "").replace(/\s+/g, " ").trim();
 const embeddedSupervisor = (branch: string) => clean(/\(([^()]*)\)/.exec(branch)?.[1]?.replace(/^מפקח\s+/, ""));
 
+/** Who holds a branch card: the supervisor's name (field or "(מפקח …)" suffix), or "" for the branch itself. */
+export const stockHolder = (v: { supervisor?: string; branch: string }) => clean(v.supervisor) || embeddedSupervisor(v.branch);
+
 export interface StockCard {
   serial: string; amount: number | string; branch: string; status: string;
   fuelType?: string; supervisor?: string; linkId?: string; workerId?: string; workerName?: string;
@@ -33,7 +36,7 @@ export function issuancePool<T extends StockCard>(stock: T[], who: Issuer): T[] 
   const me = clean(who.supervisorName);
   return stock.filter((v) => {
     if (!isUnissuedAvailable(v) || !(Number(v.amount) > 0)) return false;
-    const holder = clean(v.supervisor) || embeddedSupervisor(v.branch);
+    const holder = stockHolder(v);
     if (who.role === "admin") return isCentralBranch(v.branch) && !holder;
     if (canonicalBranch(v.branch) !== myBranch || isCentralBranch(v.branch)) return false;
     return who.role === "supervisor" ? holder === me && !!me : !holder;

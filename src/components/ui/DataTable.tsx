@@ -46,6 +46,7 @@ export function DataTable({
   maxHeight = 520,
   minWidth,
   stickyFirst = true,
+  fit = true,
   desktopOnly = true,
   caption,
   className,
@@ -56,6 +57,8 @@ export function DataTable({
   /** Minimum table width (px) before horizontal scrolling kicks in. */
   minWidth?: number;
   stickyFirst?: boolean;
+  /** Fit all columns in the card: compact cells, wrapping text, no horizontal scroll (default; ignores minWidth). */
+  fit?: boolean;
   /** Hide under 900px (render a MobileCardList instead). Set false to keep the table on phones. */
   desktopOnly?: boolean;
   /** Visually hidden caption for screen readers. */
@@ -65,7 +68,7 @@ export function DataTable({
   const style: CSSProperties = { maxHeight };
   return (
     <div className={cn("ds-scroll", desktopOnly && "ds-desk", className)} style={style} tabIndex={0} role="region" aria-label={caption}>
-      <table className={cn("ds-grid", stickyFirst && "ds-grid-sticky-first")} style={minWidth ? { minWidth } : undefined}>
+      <table className={cn("ds-grid", stickyFirst && !fit && "ds-grid-sticky-first", fit && "ds-grid-fit")} style={minWidth && !fit ? { minWidth } : undefined}>
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         {children}
       </table>

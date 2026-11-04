@@ -15,7 +15,7 @@
  *   - activity_log covers the last 3 weeks completely (every import, allocation, issuance, request).
  */
 import {
-  Profile, AppUser, AppSetting, Branch, IssueReason, B2BClient, RegularClient, Voucher, VoucherCode,
+  REAL, Profile, AppUser, AppSetting, Branch, IssueReason, B2BClient, RegularClient, Voucher, VoucherCode,
   VoucherRequest, WorkerLink, SignatureArchive, ActivityLog,
 } from "../models.js";
 import { MAIN_POOL, STATUS } from "./canonical.js";
@@ -143,9 +143,12 @@ export async function seedLearning({ owner } = {}) {
     return new Date(Math.min(t, nowMs - 60000));
   };
 
-  // ── identities (unique, never colliding with the owner) ──
-  const usedIds = new Set([String(owner?.national_id ?? "")]);
-  const usedPhones = new Set([String(owner?.phone ?? "")]);
+  // ── reference data copied from the real system (read-only; never written back) ──
+  const ref = await loadReference();
+
+  // ── identities (unique, never colliding with the owner or any real person) ──
+  const usedIds = new Set([String(owner?.national_id ?? ""), ...ref.users.map((u) => u.national_id), ...ref.profiles.map((p) => p.national_id)]);
+  const usedPhones = new Set([String(owner?.phone ?? ""), ...ref.users.map((u) => u.phone), ...ref.profiles.map((p) => p.phone)]);
   const nationalId = () => {
     for (;;) {
       const body = `${R.int(2, 3)}${R.digits(7)}`;
@@ -170,46 +173,92 @@ export async function seedLearning({ owner } = {}) {
   const [ownerLast, ...ownerFirst] = ownerName.split(/\s+/);
   const ownerActor = { id: owner?.id ?? null, name: ownerName, role: "admin" };
 
-  const staff = STAFF.map(([last, first, role, branch, title, canRequest]) => ({
-    id: R.uuid(), last, first, name: `${last} ${first}`, role, branch, title, canRequest,
-    nationalId: nationalId(), phone: phone(),
-  }));
-  const managerOf = (b) => staff.find((s) => s.role === "branch" && s.branch === b);
-  const supervisorsOf = (b) => staff.filter((s) => s.role === "supervisor" && s.branch === b);
+  // ── branches: the real ones when the system has them, otherwise the fictional four ──
+  const realBranches = ref.branches.filter((b) => String(b.name ?? "").trim());
+  const branchRows = realBranches.length ? realBranches : BRANCHES.map((b) => ({ ...b, manager: "" }));
+  const branchNames = branchRows.map((b) => b.name);
 
-  const appUsers = [
-    { national_id: owner?.national_id, last_name: ownerLast, first_name: ownerFirst.join(" "), role: "admin",
-      title: "מנהלת מערכת", phone: owner?.phone, branch: "", can_request: true, requires_password_change: false },
-    ...staff.map((s) => ({
+  // ── staff: the real users directory (names, roles, branches, phones) when present ──
+  const profileByNid = new Map(ref.profiles.map((p) => [p.national_id, p]));
+  const realStaff = ref.users.filter((u) => ["branch", "supervisor", "viewer"].includes(u.role)
+    && u.national_id !== owner?.national_id);
+  let staff;
+  if (realStaff.length) {
+    staff = realStaff.map((u) => {
+      const p = profileByNid.get(u.national_id);
+      const last = String(u.last_name ?? "").trim();
+      const first = String(u.first_name ?? "").trim();
+      return {
+        id: p?.id ?? R.uuid(), hasProfile: Boolean(p), last, first, name: [last, first].filter(Boolean).join(" ") || p?.full_name || "",
+        role: u.role, branch: String(u.branch ?? ""), title: u.title ?? "", canRequest: Boolean(u.can_request),
+        nationalId: u.national_id, phone: u.phone || p?.phone || "",
+      };
+    });
+  } else {
+    staff = fictionalStaff(R, branchNames).map((s) => ({ ...s, id: R.uuid(), hasProfile: false, nationalId: nationalId(), phone: phone() }));
+  }
+  const withProfileFirst = (list) => {
+    const p = list.filter((s) => s.hasProfile);
+    return p.length ? p : list;
+  };
+  const managerOf = (b) => {
+    const named = branchRows.find((x) => x.name === b)?.manager;
+    const mgrs = withProfileFirst(staff.filter((s) => s.role === "branch" && s.branch === b));
+    return mgrs.find((s) => s.name === named) ?? mgrs[0];
+  };
+  const supervisorsOf = (b) => withProfileFirst(staff.filter((s) => s.role === "supervisor" && s.branch === b));
+  const requesterOf = (b, preferSupervisor) => {
+    const sup = supervisorsOf(b).find((s) => s.canRequest);
+    return (preferSupervisor && sup) || managerOf(b) || sup || ownerActor;
+  };
+
+  // Branches that actually have people get the activity (allocations, issuance, requests).
+  const staffed = branchNames.filter((b) => managerOf(b) || supervisorsOf(b).length);
+  const ACT = (staffed.length ? staffed : branchNames).slice(0, 6);
+
+  const appUsers = realStaff.length
+    ? ref.users.map(stripDoc)
+    : [...ref.users.map(stripDoc), ...staff.map((s) => ({
       national_id: s.nationalId, last_name: s.last, first_name: s.first, role: s.role, title: s.title,
       phone: s.phone, branch: s.branch, can_request: s.canRequest, requires_password_change: false,
-    })),
-  ];
-  const profiles = [
-    { id: owner?.id, phone: owner?.phone, national_id: owner?.national_id, full_name: ownerName, branch: owner?.branch ?? "",
-      role: "admin", password_hash: DUMMY_HASH, requires_password_change: false, last_login_at: at(0, 8, 12) },
-    ...staff.map((s) => ({
-      id: s.id, phone: s.phone, national_id: s.nationalId, full_name: s.name, branch: s.branch, role: s.role,
-      password_hash: DUMMY_HASH, requires_password_change: false, last_login_at: at(R.int(0, 6), R.int(7, 17), R.int(0, 59)),
-    })),
-  ];
-  const branches = BRANCHES.map((b) => ({ ...b, manager: managerOf(b.name).name }));
-  const reasons = REASONS.map(([name, category]) => ({ id: R.uuid(), name, category }));
-  const reasonsFor = (route) => reasons.filter((r) => r.category === (route === "b2b" ? "B2B" : "Regular")).map((r) => r.name);
+    }))];
+  if (!appUsers.some((u) => u.national_id === owner?.national_id)) {
+    appUsers.unshift({ national_id: owner?.national_id, last_name: ownerLast, first_name: ownerFirst.join(" "), role: "admin",
+      title: "מנהלת מערכת", phone: owner?.phone, branch: "", can_request: true, requires_password_change: false });
+  }
+  // Login accounts: copies of the real ones with an unusable password hash (nobody can sign in with them;
+  // sign-in always reads the real profiles).
+  const profiles = ref.profiles.map((p) => ({
+    ...stripDoc(p), password_hash: DUMMY_HASH, token_version: 0, failed_logins: 0, locked_until: null, learning_mode: false,
+  }));
+  if (!profiles.some((p) => p.national_id === owner?.national_id)) {
+    profiles.unshift({ id: owner?.id, phone: owner?.phone, national_id: owner?.national_id, full_name: ownerName, branch: owner?.branch ?? "",
+      role: "admin", password_hash: DUMMY_HASH, requires_password_change: false, last_login_at: at(0, 8, 12) });
+  }
+  const branches = realBranches.length
+    ? realBranches.map(stripDoc)
+    : BRANCHES.map((b) => ({ ...b, manager: managerOf(b.name)?.name ?? "" }));
 
-  // ── vehicle pools ──
-  const b2b = [];
+  const reasons = ref.reasons.length ? ref.reasons.map(stripDoc) : REASONS.map(([name, category]) => ({ id: R.uuid(), name, category }));
+  const reasonsFor = (route) => {
+    const want = route === "b2b" ? "B2B" : "Regular";
+    const own = reasons.filter((r) => (r.category === "B2B" ? "B2B" : "Regular") === want).map((r) => r.name);
+    return own.length ? own : reasons.map((r) => r.name);
+  };
+
+  // ── vehicle pools: real pools copied as they are; fictional only when a pool is empty ──
+  const b2b = ref.b2b.length ? ref.b2b.map(stripDoc) : [];
   const usedStandards = new Set();
   let clientCode = 3100 + R.int(0, 300);
-  for (const b of BRANCHES) {
-    for (const [clientName, vehicles] of B2B_CLIENTS[b.name]) {
+  for (const bName of ref.b2b.length ? [] : ACT) {
+    for (const [clientName, vehicles] of B2B_CLIENTS[bName] ?? GENERIC_B2B) {
       clientCode += R.int(17, 240);
       for (let i = 0; i < vehicles; i += 1) {
         let standard;
         do standard = `806${R.digits(5)}`; while (usedStandards.has(standard));
         usedStandards.add(standard);
         b2b.push({
-          id: R.uuid(), client_code: String(clientCode), standard, branch: b.name, client_name: clientName,
+          id: R.uuid(), client_code: String(clientCode), standard, branch: bName, client_name: clientName,
           account_name: `${R.pick(VEHICLE_ROLES)} · ${clientName}`, balance: String(R.int(8, 60) * 250),
           load_type: "דלק", budget_section: String(4100 + R.int(0, 8) * 10), account_key: `${clientCode}${R.digits(3)}`,
           item_family: "דלק לרכב", account_status: "פעיל", account_type: "תקן רכב", is_active: true,
@@ -217,11 +266,11 @@ export async function seedLearning({ owner } = {}) {
       }
     }
   }
-  for (const i of [4, 15, 26]) Object.assign(b2b[i], { is_active: false, account_status: "לא פעיל" });
+  if (!ref.b2b.length) for (const i of [4, 15, 26]) if (b2b[i]) Object.assign(b2b[i], { is_active: false, account_status: "לא פעיל" });
 
-  const regular = [];
+  const regular = ref.regular.length ? ref.regular.map(stripDoc) : [];
   let clientId = 52000 + R.int(0, 900);
-  for (const [clientName, sites] of REGULAR_CLIENTS) {
+  for (const [clientName, sites] of ref.regular.length ? [] : REGULAR_CLIENTS) {
     clientId += R.int(40, 700);
     let siteId = R.int(1, 9);
     for (const siteName of sites) {
@@ -230,16 +279,16 @@ export async function seedLearning({ owner } = {}) {
       siteId += R.int(1, 6);
     }
   }
-  for (const i of [5, 16, 28]) regular[i].is_active = false;
+  if (!ref.regular.length) for (const i of [5, 16, 28]) regular[i].is_active = false;
 
   // ── workers (employees who receive cards) ──
-  const usedNames = new Set(staff.map((s) => s.name));
+  const usedNames = new Set([...staff.map((s) => s.name), ...ref.profiles.map((p) => p.full_name)]);
   const workers = [];
   for (let i = 0; i < 64; i += 1) {
     let name;
     do name = `${R.pick(LAST)} ${R.chance(0.72) ? R.pick(FIRST_M) : R.pick(FIRST_F)}`; while (usedNames.has(name));
     usedNames.add(name);
-    workers.push({ name, nationalId: nationalId(), phone: phone(), branch: BRANCHES[i % 4].name });
+    workers.push({ name, nationalId: nationalId(), phone: phone(), branch: ACT[i % ACT.length] });
   }
   const workersOf = (b) => workers.filter((w) => w.branch === b);
 
@@ -296,11 +345,13 @@ export async function seedLearning({ owner } = {}) {
   const routeFields = (route, branchName, allowInactive) => {
     if (route === "b2b") {
       const own = b2b.filter((c) => c.branch === branchName && (allowInactive || c.is_active));
-      const c = R.pick(own.length ? own : b2b.filter((x) => x.is_active));
+      const active = b2b.filter((x) => x.is_active);
+      const c = R.pick(own.length ? own : active.length ? active : b2b);
       return { route, client: c.client_name, client_code: c.client_code, account_name: c.account_name, standard: c.standard,
         client_id: null, site_id: null, site_name: null };
     }
-    const c = R.pick(regular.filter((x) => allowInactive || x.is_active));
+    const usable = regular.filter((x) => allowInactive || x.is_active);
+    const c = R.pick(usable.length ? usable : regular);
     return { route, client: c.client_name, client_id: c.client_id, site_id: c.site_id, site_name: c.site_name,
       client_code: null, account_name: null, standard: null };
   };
@@ -312,20 +363,25 @@ export async function seedLearning({ owner } = {}) {
       return { fuel, amount: randomDenom(fuel) };
     });
   };
-  const issuerOf = (branchName) => (R.chance(0.8) ? R.pick(supervisorsOf(branchName)) : managerOf(branchName));
+  const issuerOf = (branchName) => {
+    const sups = supervisorsOf(branchName);
+    const mgr = managerOf(branchName);
+    if (sups.length && (R.chance(0.8) || !mgr)) return R.pick(sups);
+    return mgr ?? ownerActor;
+  };
   const issuedFields = (issuer, branchName, worker, route, issuedAt, signed) => ({
     branch: branchName, supervisor: issuer.role === "supervisor" ? issuer.name : null, supervisor_id: issuer.id,
     status: STATUS.ISSUED, ...routeFields(route, branchName, false), reason: null, issue_reason: null,
     worker_name: worker.name, employee_name: worker.name,
     worker_id: signed ? worker.nationalId : null, employee_id: signed ? worker.nationalId : null,
     employee_phone: signed ? worker.phone : null,
-    requester: managerOf(branchName).name, approver: ownerName,
+    requester: (managerOf(branchName) ?? ownerActor).name, approver: ownerName,
     delivered_at: day(issuedAt), updated_on: day(issuedAt), issued_at: issuedAt, expires_at: addMonths(issuedAt, 3),
   });
 
   // ── 1. historical (pre-link) issuances, all redeemed: ~3–5 months ago ──
   for (let e = 0; e < 100; e += 1) {
-    const b = BRANCHES[e % 4].name;
+    const b = ACT[e % ACT.length];
     const dAgo = R.int(95, 150);
     const issuedAt = at(dAgo, R.int(7, 17), R.int(0, 59));
     const worker = R.pick(workersOf(b));
@@ -344,11 +400,11 @@ export async function seedLearning({ owner } = {}) {
   const linkDays = [0, 1, 2, 3, ...Array.from({ length: 41 }, () => R.int(4, 86))].sort((a, b) => a - b);
   const waitingIdx = new Set([0, 1, 3, 4, 6, 8, 9, 11, 13]);
   const lockedIdx = new Set([15, 22, 29, 35, 41]);
-  const usedLinkIds = new Set();
+  const usedLinkIds = new Set(ref.linkIds.map(String)); // never reuse a real link number
   const links = [];
   const archives = [];
   linkDays.forEach((dAgo, i) => {
-    const b = BRANCHES[(i * 3 + R.int(0, 3)) % 4].name;
+    const b = ACT[(i * 3 + R.int(0, 3)) % ACT.length];
     const createdAt = at(dAgo, R.int(7, 18), R.int(0, 59));
     const worker = R.pick(workersOf(b));
     const issuer = issuerOf(b);
@@ -391,18 +447,17 @@ export async function seedLearning({ owner } = {}) {
   const requestId = (t) => `req-${t.getTime()}-${R.int(100, 998)}`;
   const BRANCH_STOCK = [["בנזין", 100, 8], ["בנזין", 500, 2], ["סולר", 50, 6], ["סולר", 100, 4], ["סולר", 500, 1]];
   const SUP_STOCK = [["בנזין", 100, 3], ["בנזין", 500, 1], ["סולר", 50, 2], ["סולר", 100, 2]];
-  BRANCHES.forEach((br, bi) => {
-    const b = br.name;
-    const manager = managerOf(b);
-    const allocDay = [17, 14, 12, 19][bi];
+  ACT.forEach((b, bi) => {
+    const manager = managerOf(b) ?? ownerActor;
+    const allocDay = [17, 14, 12, 19, 16, 13][bi % 6];
     const allocAt = at(allocDay, 11, R.int(0, 59));
     const sum = { "בנזין": 0, "סולר": 0 };
-    const requester = bi === 1 ? supervisorsOf(b).find((s) => s.canRequest) : manager;
+    const requester = requesterOf(b, bi === 1);
     const base = { branch: b, requester: requester.name, approver: ownerName, updated_on: day(allocAt) };
     for (const [fuel, amount, n] of BRANCH_STOCK) {
       for (let k = 0; k < n; k += 1) { card(fuel, amount, batchBefore(allocDay, 3), { ...base }); sum[fuel] += amount; }
     }
-    for (const sup of supervisorsOf(b)) {
+    for (const sup of supervisorsOf(b).slice(0, 3)) {
       const supAt = at(allocDay - R.int(1, 4), R.int(9, 16), R.int(0, 59));
       const supSum = { "בנזין": 0, "סולר": 0 };
       for (const [fuel, amount, n] of SUP_STOCK) {
@@ -422,43 +477,45 @@ export async function seedLearning({ owner } = {}) {
     requests.push({
       id: requestId(createdAt), requester: requester.name, requester_id: requester.nationalId, branch: b,
       amount: sum["בנזין"] + sum["סולר"] + askedExtra, benzine_amount: sum["בנזין"] + askedExtra, diesel_amount: sum["סולר"],
-      reason: ["תגבור משמרות לקראת סוף הרבעון", "הצבת צוותי אבטחה באתרים חדשים", "חידוש מלאי חודשי לסניף", "סיורי לילה מוגברים"][bi],
+      reason: ["תגבור משמרות לקראת סוף הרבעון", "הצבת צוותי אבטחה באתרים חדשים", "חידוש מלאי חודשי לסניף", "סיורי לילה מוגברים"][bi % 4],
       created_on: day(createdAt), created_at: createdAt, status: "אושר", approved_amount: sum["בנזין"] + sum["סולר"],
       approver: ownerName, _approvedAt: allocAt, _requester: requester,
     });
   });
   // Older history: one approved and three rejected requests.
   const OLD = [
-    ["חיפה", 2400, 1800, 600, "אושר", 2000, 64, "אירוע חברה בפארק התעשיות"],
-    ["תל אביב", 5000, 3000, 2000, "נדחה", null, 41, "בקשה לרבעון מלא מראש"],
-    ["באר שבע", 1500, 1000, 500, "נדחה", null, 30, "כפילות לדרישה קודמת"],
-    ["ירושלים", 900, 500, 400, "נדחה", null, 6, "מלאי מפקחים טרם נוצל"],
+    [2400, 1800, 600, "אושר", 2000, 64, "אירוע לקוח באתר תעשייה"],
+    [5000, 3000, 2000, "נדחה", null, 41, "בקשה לרבעון מלא מראש"],
+    [1500, 1000, 500, "נדחה", null, 30, "כפילות לדרישה קודמת"],
+    [900, 500, 400, "נדחה", null, 6, "מלאי מפקחים טרם נוצל"],
   ];
-  for (const [b, amount, benz, dies, status, approved, dAgo, reason] of OLD) {
+  OLD.forEach(([amount, benz, dies, status, approved, dAgo, reason], k) => {
+    const b = ACT[k % ACT.length];
     const createdAt = at(dAgo, R.int(8, 15), R.int(0, 59));
-    const requester = managerOf(b);
+    const requester = requesterOf(b, false);
     requests.push({
       id: requestId(createdAt), requester: requester.name, requester_id: requester.nationalId, branch: b, amount,
       benzine_amount: benz, diesel_amount: dies, reason, created_on: day(createdAt), created_at: createdAt, status,
       approved_amount: approved, approver: ownerName, _approvedAt: later(createdAt, 0, 1), _requester: requester,
     });
-  }
+  });
   // Pending (ממתין לאישור): exactly four, recent.
   const PENDING = [
-    ["חיפה", null, 1500, 500, 1, "תגבור משמרות לילה באזור המפרץ"],
-    ["תל אביב", "מזרחי עידו", 1200, 0, 2, "אירוע אבטחה במרכז הכנסים — צוות מורחב"],
-    ["באר שבע", null, 2000, 1050, 3, "פתיחת אתר חדש בפארק ההייטק"],
-    ["ירושלים", "רוזן יעל", 300, 500, 0, "סיורי לילה במזרח העיר"],
+    [false, 1500, 500, 1, "תגבור משמרות לילה"],
+    [true, 1200, 0, 2, "אירוע אבטחה אצל לקוח — צוות מורחב"],
+    [false, 2000, 1050, 3, "פתיחת אתר חדש"],
+    [true, 300, 500, 0, "סיורי לילה מוגברים"],
   ];
-  for (const [b, who, benz, dies, dAgo, reason] of PENDING) {
+  PENDING.forEach(([bySupervisor, benz, dies, dAgo, reason], k) => {
+    const b = ACT[k % ACT.length];
     const createdAt = at(dAgo, R.int(7, 12), R.int(0, 59));
-    const requester = who ? staff.find((s) => s.name === who) : managerOf(b);
+    const requester = requesterOf(b, bySupervisor);
     requests.push({
       id: requestId(createdAt), requester: requester.name, requester_id: requester.nationalId, branch: b,
       amount: benz + dies, benzine_amount: benz, diesel_amount: dies, reason, created_on: day(createdAt), created_at: createdAt,
       status: "ממתין לאישור", approved_amount: null, approver: null, _requester: requester,
     });
-  }
+  });
 
   // ── 4. healthy central pool (מאגר ראשי) ──
   const CENTRAL = [["בנזין", 100, 100], ["בנזין", 500, 30], ["סולר", 50, 60], ["סולר", 100, 48], ["סולר", 500, 18]];
@@ -510,8 +567,10 @@ export async function seedLearning({ owner } = {}) {
     else entry(a.actor, "הקצאה למפקח", `${a.sup.name} · ${a.fuel} · ${a.amount} ₪`, a.time);
   }
   for (const l of links) entry(l._issuer, "הנפקת שובר לעובד", `קישור ${l.id} · ${l.total} ₪`, new Date(l.created_at.getTime() + 60000));
-  const loginPool = [{ ...ownerActor, phone: owner?.phone }, ...staff.filter((s) => s.role !== "viewer").map((s) => ({ ...s })),
-    staff.find((s) => s.role === "viewer")];
+  // Only people who really have an account "sign in" (real mode: users with a real login profile).
+  const canLogin = (s) => !realStaff.length || s.hasProfile;
+  const loginPool = [{ ...ownerActor, phone: owner?.phone }, ...staff.filter((s) => s.role !== "viewer" && canLogin(s)).slice(0, 30),
+    staff.find((s) => s.role === "viewer" && canLogin(s))].filter(Boolean);
   for (let k = 0; k < 14; k += 1) {
     const u = k < 3 ? loginPool[0] : R.pick(loginPool);
     entry(u, "כניסה למערכת", u.phone, at(k < 3 ? k * 6 : R.int(0, LOG_WINDOW), R.int(7, 9), R.int(0, 59)));
@@ -520,6 +579,14 @@ export async function seedLearning({ owner } = {}) {
 
   // ── write ──
   const strip = (rows) => rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !k.startsWith("_"))));
+  // Staff that appear as actors in the demo but have no login yet get a demo-only profile (unusable hash).
+  const actorIds = new Set([...vouchers.map((v) => v.supervisor_id), ...links.map((l) => l.supervisor_id)].filter(Boolean));
+  for (const st of staff) {
+    if (st.hasProfile || (realStaff.length && !actorIds.has(st.id)) || profiles.some((p) => p.national_id === st.nationalId || p.phone === st.phone)) continue;
+    profiles.push({ id: st.id, phone: st.phone, national_id: st.nationalId, full_name: st.name, branch: st.branch, role: st.role,
+      password_hash: DUMMY_HASH, requires_password_change: false, last_login_at: at(R.int(0, 6), R.int(7, 17), R.int(0, 59)) });
+  }
+
   await Profile.insertMany(profiles);
   await AppUser.insertMany(appUsers);
   await Branch.insertMany(branches);
@@ -548,6 +615,56 @@ export async function seedLearning({ owner } = {}) {
   }).map(async ([k, m]) => [k, await m.countDocuments()]));
   return { counts: Object.fromEntries(entries), centralBalance, demoLinks };
 }
+
+/** Bumped whenever the dataset's shape changes; an older learning copy is re-seeded on next activation. */
+export const SEED_VERSION = 2;
+
+/** Drops Mongo internals so a real document can be copied into its learning twin. */
+function stripDoc(doc) {
+  const { _id, __v, ...rest } = doc;
+  return rest;
+}
+
+/**
+ * Real reference data (branches, users, issue reasons, vehicle pools), read with the REAL models
+ * explicitly, so the copy is taken from the live system even though the seed runs in learning context.
+ * Read-only: nothing here is ever written to the real collections.
+ */
+async function loadReference() {
+  const [branches, users, profiles, reasons, b2b, regular, linkIds] = await Promise.all([
+    REAL.Branch.find().lean(), REAL.AppUser.find().lean(), REAL.Profile.find().lean(),
+    REAL.IssueReason.find().lean(), REAL.B2BClient.find().lean(), REAL.RegularClient.find().lean(),
+    REAL.WorkerLink.distinct("id"),
+  ]);
+  return { branches, users, profiles, reasons, b2b, regular, linkIds };
+}
+
+/** Fictional staff for a system without a users directory: the fixed table, or 1 manager + 2 supervisors per branch. */
+function fictionalStaff(R, branchNames) {
+  const known = new Set(BRANCHES.map((b) => b.name));
+  if (branchNames.every((n) => known.has(n))) {
+    return STAFF.filter(([, , , branch]) => !branch || branchNames.includes(branch))
+      .map(([last, first, role, branch, title, canRequest]) => ({ last, first, name: `${last} ${first}`, role, branch, title, canRequest }));
+  }
+  const used = new Set();
+  const person = () => {
+    for (;;) {
+      const last = R.pick(LAST);
+      const first = R.pick(FIRST_M);
+      if (!used.has(last + first)) { used.add(last + first); return { last, first, name: `${last} ${first}` }; }
+    }
+  };
+  const out = [];
+  branchNames.slice(0, 6).forEach((branch, i) => {
+    out.push({ ...person(), role: "branch", branch, title: "מנהל סניף", canRequest: true });
+    out.push({ ...person(), role: "supervisor", branch, title: "מפקח", canRequest: i % 2 === 0 });
+    out.push({ ...person(), role: "supervisor", branch, title: "מפקח", canRequest: false });
+  });
+  out.push({ ...person(), role: "viewer", branch: "", title: "צופה", canRequest: false });
+  return out;
+}
+
+const GENERIC_B2B = [["מרכז לוגיסטי", 3], ["פארק תעשייה", 2], ["קריית משרדים", 2]];
 
 /** Small inline SVG of a handwritten-looking signature stroke. */
 function signatureSvg(R) {

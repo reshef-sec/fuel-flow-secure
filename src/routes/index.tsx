@@ -15,6 +15,8 @@ import { SupervisorAllocationDialog } from "@/components/allocations/SupervisorA
 import { fullName, isReadOnlyRole, MAIN_POOL, seesAllData, useAppStore, useCurrentUser } from "@/store/appStore";
 import { BudgetUtilization, SupervisorDistribution } from "@/components/dashboard/BudgetUtilization";
 import { isAvailable, isIssued, mainBranch } from "@/components/dashboard/voucherData";
+import { branchStockTotal } from "@/lib/stockBalances";
+import { stockHolder } from "@/lib/issuanceStock";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 import { branchLabel } from "@/lib/branchLabels";
@@ -86,9 +88,10 @@ function Dashboard() {
   const value = (list: typeof vouchers) => list.reduce((t, v) => t + v.amount, 0);
   const available = vouchers.filter(isAvailable);
   // Branch-manager budget = branch vouchers not yet given to a supervisor.
-  const branchAvailable = available.filter((v) => !v.supervisor);
+  const branchAvailable = available.filter((v) => !stockHolder(v));
   const balance = isBranchManager ? value(branchAvailable) : isSupervisor ? value(available) : totalAvailableBalance ?? 0;
-  const branchesBudget = value(available.filter((v) => mainBranch(v.branch) !== MAIN_POOL));
+  // Shared with the allocations page (src/lib/stockBalances.ts) so both always show the same total.
+  const branchesBudget = branchStockTotal(vouchers);
 
   // Time-bound metrics use the selected period; budget metrics always show the live state.
   const since = periodStart(period);

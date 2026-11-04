@@ -4,7 +4,9 @@
 import { describe, it, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { startTestServer, stopTestServer, resetDb, loginAs, rpc, anon } from "./helpers.js";
+import mongoose from "mongoose";
 import { LEARNING, REAL } from "../models.js";
+import { SEED_VERSION } from "../lib/learningSeed.js";
 
 before(startTestServer);
 after(stopTestServer);
@@ -36,6 +38,8 @@ describe("learning environment", () => {
     const other = await loginAs("admin");
     await REAL.Voucher.create({ serial: "REAL-1", amount: 100 });
     await LEARNING.Voucher.create({ serial: "DEMO-1", amount: 500 });
+    // Mark the learning copy as current, so activation keeps it instead of re-seeding.
+    await mongoose.connection.collection("learning_meta").updateOne({ _id: "seed" }, { $set: { version: SEED_VERSION } }, { upsert: true });
 
     assert.deepEqual(await serials(o.agent), ["REAL-1"]);
     let r = await o.agent.post("/api/learning").send({ action: "activate" });

@@ -11,6 +11,7 @@
  * SQL shortage message. A card can therefore never be allocated twice.
  */
 import { Voucher, VoucherCode, WorkerLink, AppUser, Profile, InventoryLock } from "../models.js";
+import { scopedLockId } from "../lib/learningContext.js";
 import { withTransaction } from "../db.js";
 import { badRequest, forbidden } from "../errors.js";
 import { logAction } from "../lib/audit.js";
@@ -66,11 +67,11 @@ function roleFlags(user) {
 
 /** Serialises imports/reconciliation (SQL: LOCK TABLE public.vouchers IN SHARE ROW EXCLUSIVE MODE). */
 async function lockVouchers(session) {
-  await InventoryLock.updateOne({ _id: "vouchers" }, { $inc: { n: 1 } }, { session, upsert: true });
+  await InventoryLock.updateOne({ _id: scopedLockId("vouchers") }, { $inc: { n: 1 } }, { session, upsert: true });
 }
 async function ensureLockDoc() {
   try {
-    await InventoryLock.updateOne({ _id: "vouchers" }, { $setOnInsert: { n: 0 } }, { upsert: true });
+    await InventoryLock.updateOne({ _id: scopedLockId("vouchers") }, { $setOnInsert: { n: 0 } }, { upsert: true });
   } catch (e) {
     if (e?.code !== 11000) throw e;
   }

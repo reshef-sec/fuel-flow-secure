@@ -13,6 +13,7 @@ import {
   ActivityLog, AppSetting, Branch, SignatureArchive, Voucher, VoucherCode, VoucherRequest, WorkerLink,
 } from "../models.js";
 import { withTransaction } from "../db.js";
+import { scopedLockId } from "../lib/learningContext.js";
 import { isDevToolsOwner } from "../auth.js";
 import { logAction } from "../lib/audit.js";
 import { MAIN_POOL, STATUS } from "../lib/canonical.js";
@@ -37,8 +38,8 @@ function requireOwner(user) {
 async function lockDevelopmentTransactions(user, session) {
   requireOwner(user);
   const col = mongoose.connection.collection("rpc_locks");
-  await col.updateOne({ _id: "development" }, { $setOnInsert: { n: 0 } }, { upsert: true });
-  await col.updateOne({ _id: "development" }, { $inc: { n: 1 }, $set: { at: new Date() } }, { session });
+  await col.updateOne({ _id: scopedLockId("development") }, { $setOnInsert: { n: 0 } }, { upsert: true });
+  await col.updateOne({ _id: scopedLockId("development") }, { $inc: { n: 1 }, $set: { at: new Date() } }, { session });
 }
 
 const jerusalemDate = () => new Intl.DateTimeFormat("en-CA", {

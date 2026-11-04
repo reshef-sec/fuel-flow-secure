@@ -14,6 +14,7 @@
 import mongoose from "mongoose";
 import { B2BClient, RegularClient } from "../models.js";
 import { withTransaction } from "../db.js";
+import { scopedLockId } from "../lib/learningContext.js";
 import { logAction } from "../lib/audit.js";
 import { badRequest, forbidden } from "../errors.js";
 
@@ -44,12 +45,12 @@ function requireAdmin(user) {
  */
 async function prepareLock(name) {
   await mongoose.connection.collection("rpc_locks").updateOne(
-    { _id: name }, { $setOnInsert: { n: 0 } }, { upsert: true },
+    { _id: scopedLockId(name) }, { $setOnInsert: { n: 0 } }, { upsert: true },
   );
 }
 async function takeLock(name, session) {
   await mongoose.connection.collection("rpc_locks").updateOne(
-    { _id: name }, { $inc: { n: 1 }, $set: { at: new Date() } }, { session },
+    { _id: scopedLockId(name) }, { $inc: { n: 1 }, $set: { at: new Date() } }, { session },
   );
 }
 

@@ -11,11 +11,12 @@
  * users never enter it.
  */
 import { Router } from "express";
+import mongoose from "mongoose";
 import { ah, badRequest, forbidden, unauthorized } from "../errors.js";
 import { isDevToolsOwner } from "../auth.js";
 import { LEARNING } from "../models.js";
 import { runInLearning } from "../lib/learningContext.js";
-import { seedLearning } from "../lib/learningSeed.js";
+import { seedLearning, SEED_VERSION } from "../lib/learningSeed.js";
 import { logAction } from "../lib/audit.js";
 
 const router = Router();
@@ -34,14 +35,25 @@ async function counts() {
   return { vouchers, links, requests, users };
 }
 
+/** Internal marker (not exposed through /api/db): which dataset version the learning copy holds. */
+const meta = () => mongoose.connection.collection("learning_meta");
+
 async function wipe() {
   await Promise.all(Object.values(LEARNING).map((m) => m.deleteMany({})));
+  await meta().deleteOne({ _id: "seed" });
+}
+
+/** Wipes and rebuilds the learning copy from the current real reference data. */
+async function reseed(user) {
+  await wipe();
+  await runInLearning(() => seedLearning({ owner: user }));
+  await meta().updateOne({ _id: "seed" }, { $set: { version: SEED_VERSION, at: new Date() } }, { upsert: true });
 }
 
 async function ensureSeeded(user) {
-  if (await LEARNING.Voucher.countDocuments()) return false;
-  await wipe();
-  await runInLearning(() => seedLearning({ owner: user }));
+  const m = await meta().findOne({ _id: "seed" });
+  if (m?.version === SEED_VERSION && await LEARNING.Voucher.countDocuments()) return false;
+  await reseed(user);
   return true;
 }
 
@@ -64,8 +76,7 @@ router.post("/", ah(async (req, res) => {
     await user.save();
     logAction(user, "השהיית סביבת לימוד", "-");
   } else if (action === "reset") {
-    await wipe();
-    await runInLearning(() => seedLearning({ owner: user }));
+    await reseed(user);
     logAction(user, "איפוס סביבת לימוד", "נטענו נתוני דמו מחדש");
   } else {
     throw badRequest("פעולה לא מוכרת");
@@ -78,7 +89,7 @@ router.post("/", ah(async (req, res) => {
  * /api/auth and /api/learning always use the real data (login state lives there).
  */
 export function learningRouter(req, _res, next) {
-  if (req.path.startsWith("/auth") || req.path.startsWith("/learning")) return next();
+  if (/^\/(auth|learning)(\/|$)/.test(req.path)) return next();
   if (req.user?.learning_mode && isDevToolsOwner(req.user)) return runInLearning(next);
   next();
 }

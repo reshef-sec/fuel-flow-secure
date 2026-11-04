@@ -3,7 +3,7 @@
  * payloads as src/lib/backend.ts sends: bootstrap | activate | sync | reset | delete | change_password.
  */
 import { Router } from "express";
-import { AppUser, Profile } from "../models.js";
+import { AppUser, Profile, REAL } from "../models.js";
 import { ah, badRequest, forbidden, unauthorized } from "../errors.js";
 import { hashPassword, normalizePhone, passwordPolicyError, issueSession, verifyPassword } from "../auth.js";
 import { logAction } from "../lib/audit.js";
@@ -106,7 +106,8 @@ router.post("/", ah(async (req, res) => {
       req.user.requires_password_change = false;
       req.user.token_version = (req.user.token_version ?? 0) + 1;
       await req.user.save();
-      await AppUser.updateOne({ national_id: req.user.national_id }, { $set: { requires_password_change: false } });
+      // The signed-in identity is always real (req.user is a real profile), even inside סביבת לימוד.
+      await REAL.AppUser.updateOne({ national_id: req.user.national_id }, { $set: { requires_password_change: false } });
       issueSession(res, req.user);
       return res.json({ ok: true });
     }

@@ -11,12 +11,25 @@
  */
 import { RegularClient, B2BClient } from "../models.js";
 import { badRequest } from "../errors.js";
-import { STATUS } from "./canonical.js";
+import { STATUS, MAIN_POOL, CENTRAL_LABEL } from "./canonical.js";
 
 const blank = (v) => v == null || v === "";
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** Postgres btrim(x) = y, as a query on the stored column (btrim strips spaces only). */
 const btrimEq = (value) => ({ $regex: `^ *${escapeRe(String(value).replace(/^ +| +$/g, ""))} *$` });
+
+/** Branch name for comparison: trimmed, without a leading "סניף". */
+const branchKey = (v) => String(v ?? "").trim().replace(/^סניף\s+/, "").trim();
+/**
+ * Work-vehicle branch scope: a vehicle with no branch is open to every branch; a vehicle assigned to a
+ * branch can be issued only on that branch's cards (central-pool / admin cards may use any vehicle).
+ */
+export function workVehicleBranchAllowed(vehicleBranch, cardBranch) {
+  const v = branchKey(vehicleBranch);
+  const c = branchKey(cardBranch);
+  if (!v || !c || c === MAIN_POOL || c === CENTRAL_LABEL) return true;
+  return v === c;
+}
 
 /** Trigger short-circuit: only the initial assignment of a (new) link_id is checked. */
 function linkAssigned(row, previousRow) {
@@ -33,10 +46,11 @@ export async function requireActiveIssuanceClient(row, previousRow, session) {
     }).session(session ?? null);
     if (!ok) throw badRequest("הלקוח או האתר אינם פעילים");
   } else if (row.route === "b2b") {
-    const ok = row.client_code != null && row.standard != null && await B2BClient.exists({
+    const vehicle = row.client_code != null && row.standard != null ? await B2BClient.findOne({
       client_code: btrimEq(row.client_code), standard: btrimEq(row.standard), is_active: true,
-    }).session(session ?? null);
-    if (!ok) throw badRequest("רכב העבודה אינו פעיל");
+    }, { branch: 1 }).session(session ?? null).lean() : null;
+    if (!vehicle) throw badRequest("רכב העבודה אינו פעיל");
+    if (!workVehicleBranchAllowed(vehicle.branch, row.branch)) throw badRequest("רכב העבודה משויך לסניף אחר");
   } else {
     throw badRequest("יש לבחור מאגר לקוחות להנפקה");
   }

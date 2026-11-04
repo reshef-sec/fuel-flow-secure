@@ -77,6 +77,9 @@ const newBlock = (mode: Mode = "b2b"): Block => ({
 });
 
 const fmt = (n: number) => n.toLocaleString("he-IL");
+/** Branch names compared without a leading "סניף" (mirror of server/lib/issuanceGuard.js). */
+const branchKey = (v?: string | null) => String(v ?? "").trim().replace(/^סניף\s+/, "").trim();
+const sameBranch = (a?: string | null, b?: string | null) => branchKey(a) === branchKey(b);
 const fuelWord = (f: FuelType) => (f === "בנזין" ? "בנזין 95" : "סולר");
 const b2bSub = (c: B2BClientRecord) => [c.accountName, c.standard && `תקן ${c.standard}`, c.clientCode && `קוד ${c.clientCode}`].filter(Boolean).join(" · ");
 const regularSub = (c: ClientRecord) => [c.siteName, c.siteId && `אתר ${c.siteId}`, c.clientId && `לקוח ${c.clientId}`].filter(Boolean).join(" · ");
@@ -456,7 +459,8 @@ function ClientBlock({
 
   // Only active clients are offered.
   const allowedB2b = useMemo(
-    () => b2bClients.filter((c) => verifiedActive(c) && (role === "admin" || c.branch === branch)),
+    // A vehicle without a branch is open to every branch; an assigned vehicle only to its own branch.
+    () => b2bClients.filter((c) => verifiedActive(c) && (role === "admin" || !c.branch?.trim() || sameBranch(c.branch, branch))),
     [b2bClients, role, branch, activeKeys],
   );
   const modeReasons = reasons.filter((r) => r.category === (mode === "b2b" ? "B2B" : "Regular"));

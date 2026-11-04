@@ -9,13 +9,11 @@ import { DataTable, EmptyRow, KV, MobileCardList, TableCard } from "@/components
 import { ResultDialog, type ResultSummary } from "@/components/ui/ResultDialog";
 import { AdminAllocationForm } from "@/components/allocations/AdminAllocationForm";
 import { PoolSummary } from "@/components/allocations/AllocationForm";
-import { adminRecipients, recipientRoleText, recipientTarget } from "@/components/allocations/allocationRecipients";
-import { fuelOf, type FuelType } from "@/components/fuel/fuel";
 import { fullName, isReadOnlyRole, seesAllData, useAppStore } from "@/store/appStore";
 import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 import { useLiveInventory } from "@/lib/useLiveInventory";
 import { centralPoolOf } from "@/lib/centralInventory";
-import { issuancePool } from "@/lib/issuanceStock";
+import { branchBalanceRows, type BalanceRow } from "@/lib/stockBalances";
 import { branchLabel } from "@/lib/branchLabels";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 
@@ -38,15 +36,6 @@ export const Route = createFileRoute("/allocations")({
 
 const fmt = (n: number) => n.toLocaleString("he-IL");
 
-interface BalanceRow {
-  key: string;
-  name: string;
-  role: string;
-  roleTone: "branch" | "request" | "plain";
-  branch: string;
-  petrol: number;
-  diesel: number;
-}
 
 function AllocationsPage() {
   const branchList = useAppStore((s) => s.branchList);
@@ -63,36 +52,8 @@ function AllocationsPage() {
   const pools = useMemo(() => ({ "בנזין": centralPoolOf(vouchers, "בנזין"), "סולר": centralPoolOf(vouchers, "סולר") }), [vouchers]);
   const totals = summary ? { "בנזין": summary.gasoline_amount, "סולר": summary.diesel_amount } : null;
 
-  const rows = useMemo<BalanceRow[]>(() => {
-    const sumFuel = (list: { amount: number; fuelType?: FuelType }[], f: FuelType) =>
-      list.filter((v) => fuelOf(v) === f).reduce((t, v) => t + v.amount, 0);
-    const recipients = adminRecipients(users);
-    const out: BalanceRow[] = recipients.map((u) => {
-      const t = recipientTarget(u);
-      const pool = issuancePool(vouchers, t.supervisor
-        ? { role: "supervisor", branch: t.branch, supervisorName: t.supervisor }
-        : { role: "branch", branch: t.branch });
-      return {
-        key: u.id,
-        name: fullName(u),
-        role: recipientRoleText(u),
-        roleTone: u.role === "branch" ? "branch" : u.canRequest ? "request" : "plain",
-        branch: branchLabel(u.branch),
-        petrol: sumFuel(pool, "בנזין"),
-        diesel: sumFuel(pool, "סולר"),
-      };
-    });
-    // Branches with no eligible recipient still show their stock (never hide data).
-    const covered = new Set(recipients.filter((u) => !recipientTarget(u).supervisor).map((u) => branchLabel(u.branch)));
-    for (const b of branchList) {
-      const label = branchLabel(b.name);
-      if (covered.has(label)) continue;
-      covered.add(label);
-      const pool = issuancePool(vouchers, { role: "branch", branch: b.name });
-      out.push({ key: `branch-${b.id}`, name: b.manager || "—", role: "סניף", roleTone: "plain", branch: label, petrol: sumFuel(pool, "בנזין"), diesel: sumFuel(pool, "סולר") });
-    }
-    return out;
-  }, [users, vouchers, branchList]);
+  // Same definition as the dashboard's "יתרת תקציב בסניפים" (src/lib/stockBalances.ts): Σ rows === that card.
+  const rows = useMemo<BalanceRow[]>(() => branchBalanceRows(vouchers, users, branchList), [users, vouchers, branchList]);
   const tableTotal = rows.reduce((t, r) => t + r.petrol + r.diesel, 0);
 
   if (!adminView) return <NoAccess title="הקצאות לסניפים" />;

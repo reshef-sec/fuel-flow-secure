@@ -157,7 +157,7 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
                   <td className="text-slate-600">{roleOf(r)}</td>
                   <td><span className="ds-num font-semibold">{ils(r.amount)}</span></td>
                   <td className="text-ink-soft">{fuelSplit(r)}</td>
-                  <td className="min-w-[180px] !whitespace-normal text-slate-600">{r.reason}</td>
+                  <td className="min-w-[120px] text-slate-600">{r.reason}</td>
                   <td><span className="ds-num text-ink-soft">{r.createdAt ? formatIsraelDate(r.createdAt) : "—"}</span></td>
                   <td><StatusBadge status={r.status} size="sm" /></td>
                   <td>{actions(r)}</td>
