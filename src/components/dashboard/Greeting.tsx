@@ -3,6 +3,7 @@ import { Moon, Sparkles, Sun } from "lucide-react";
 
 import { useAuthContext } from "@/lib/auth-context";
 import { userDisplayName } from "@/lib/userDisplay";
+import { useAppStore, useCurrentUser } from "@/store/appStore";
 
 /** Current hour in Israel (Asia/Jerusalem), 0–23. */
 function israelHour() {
@@ -22,7 +23,7 @@ export const GREETING_SUBTITLE = "הנה תמונת המצב העדכנית של
 
 /**
  * Time-of-day greeting for the dashboard PageHero title (on navy): icon + "בוקר טוב, <name>".
- * Always the signed-in account, never a role-preview user.
+ * The signed-in account — except in סביבת לימוד, where a role preview greets the demo person shown.
  */
 export function Greeting() {
   const { profile } = useAuthContext();
@@ -33,7 +34,9 @@ export function Greeting() {
     const t = setInterval(() => setHour(israelHour()), 60_000);
     return () => clearInterval(t);
   }, []);
-  const name = userDisplayName(profile);
+  const me = useCurrentUser();
+  const learningPersona = useAppStore((s) => s.learningActive) && me && me.role !== profile?.role;
+  const name = learningPersona ? `${me.firstName} ${me.lastName}`.trim() : userDisplayName(profile);
   if (hour === null) return <span className="inline-block min-h-[1.2em]" aria-hidden>{" "}</span>;
   const g = slot(hour);
 

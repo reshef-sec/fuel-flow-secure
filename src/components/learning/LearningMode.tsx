@@ -129,7 +129,7 @@ export function LearningSwitch({ tone = "light", className }: { tone?: "light" |
 
   const toggle = () => (active ? void run("pause") : setConfirming(true));
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div data-learning-ui className={cn("flex items-center gap-2", className)}>
       <span className={cn("flex items-center gap-1.5 whitespace-nowrap text-xs font-bold", tone === "dark" ? "text-white" : "text-navy-900")}>
         <GraduationCap className="size-4" aria-hidden />
         סביבת לימוד
@@ -152,7 +152,7 @@ export function LearningBanner() {
   const { busy, run } = useLearningToggle();
   if (!active) return null;
   return (
-    <div
+    <div data-learning-ui
       role="status"
       className="flex items-center justify-center gap-x-3 gap-y-1.5 border-b border-[#f0d48a] px-3.5 py-2 text-[13px] text-amber-700 max-[899.98px]:flex-wrap min-[900px]:px-8"
       style={{ background: "linear-gradient(90deg, #fff4d9 0%, #fff8e6 55%, #e6faf5 100%)" }}
@@ -183,7 +183,7 @@ export function DemoChip({ className }: { className?: string }) {
   const active = useLearningActive();
   if (!active) return null;
   return (
-    <span
+    <span data-learning-ui
       className={cn(
         "inline-flex items-center rounded-pill bg-pending px-2 py-[2px] text-[11px] font-extrabold leading-4 tracking-wide text-navy-900 shadow-sm",
         className,

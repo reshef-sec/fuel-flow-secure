@@ -17,5 +17,6 @@ describe("workVehicleBranchAllowed", () => {
   it("central-pool cards may use any vehicle", () => {
     assert.equal(workVehicleBranchAllowed("חיפה", "מאגר ראשי"), true);
     assert.equal(workVehicleBranchAllowed("חיפה", ""), true);
+    assert.equal(workVehicleBranchAllowed("חיפה", "הנהלה"), true);
   });
 });

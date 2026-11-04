@@ -89,4 +89,25 @@ if (!(await M.Profile.countDocuments())) {
   console.log(`Seeded demo data: ${vouchers.length} cards, ${DEMO_USERS.length} users`);
 }
 
+/**
+ * DEV_LOCAL_RICH=1 (local only): replace the small activity sample with the full, realistic
+ * learning-environment dataset (built on the local users/branches/vehicles), so every role —
+ * admin, branch manager, supervisor — sees a busy system. Used for recording training videos.
+ */
+if (process.env.DEV_LOCAL_RICH === "1") {
+  const { seedLearning } = await import("../server/lib/learningSeed.js");
+  const { runInLearning } = await import("../server/lib/learningContext.js");
+  const owner = await M.Profile.findOne({ national_id: process.env.DEV_TOOLS_OWNER_NATIONAL_ID }).lean();
+  const wipeLearning = () => Promise.all(Object.values(M.LEARNING).map((m) => m.deleteMany({})));
+  await wipeLearning();
+  await runInLearning(() => seedLearning({ owner }));
+  for (const name of ["Voucher", "VoucherCode", "VoucherRequest", "WorkerLink", "SignatureArchive", "ActivityLog", "AppSetting"]) {
+    await M.REAL[name].deleteMany({});
+    const docs = await M.LEARNING[name].find().lean();
+    if (docs.length) await M.REAL[name].insertMany(docs);
+  }
+  await wipeLearning();
+  console.log(`Rich local data: ${await M.REAL.Voucher.countDocuments()} cards, ${await M.REAL.WorkerLink.countDocuments()} links`);
+}
+
 createApp({ staticDir: "/nonexistent" }).listen(3000, "0.0.0.0", () => console.log("Local API ready on http://localhost:3000"));

@@ -1,4 +1,4 @@
-const PUBLIC_PREFIXES = ["/login", "/worker", "/voucher", "/__mockup", "/__component"];
+const PUBLIC_PREFIXES = ["/login", "/worker", "/voucher", "/training", "/__mockup", "/__component"];
 export const isWorkerPublicPath = (path: string) =>
   path === "/voucher" || path.startsWith("/voucher/") || path === "/worker" || path.startsWith("/worker/");
 export const isPublicPath = (path: string) =>

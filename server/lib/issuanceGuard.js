@@ -27,7 +27,8 @@ const branchKey = (v) => String(v ?? "").trim().replace(/^סניף\s+/, "").trim
 export function workVehicleBranchAllowed(vehicleBranch, cardBranch) {
   const v = branchKey(vehicleBranch);
   const c = branchKey(cardBranch);
-  if (!v || !c || c === MAIN_POOL || c === CENTRAL_LABEL) return true;
+  // "הנהלה" = issued by the central administration (admin) — not a branch.
+  if (!v || !c || c === MAIN_POOL || c === CENTRAL_LABEL || c === "הנהלה") return true;
   return v === c;
 }
 
@@ -38,7 +39,11 @@ function linkAssigned(row, previousRow) {
   return true;
 }
 
-export async function requireActiveIssuanceClient(row, previousRow, session) {
+/**
+ * opts.vehicleScope: the issuer's branch for the work-vehicle branch check; null = unrestricted (admin);
+ * undefined = use the card's own branch (generic table writes).
+ */
+export async function requireActiveIssuanceClient(row, previousRow, session, opts = {}) {
   if (!linkAssigned(row, previousRow)) return row;
   if (row.route === "regular") {
     const ok = row.client_id != null && row.site_id != null && await RegularClient.exists({
@@ -50,7 +55,8 @@ export async function requireActiveIssuanceClient(row, previousRow, session) {
       client_code: btrimEq(row.client_code), standard: btrimEq(row.standard), is_active: true,
     }, { branch: 1 }).session(session ?? null).lean() : null;
     if (!vehicle) throw badRequest("רכב העבודה אינו פעיל");
-    if (!workVehicleBranchAllowed(vehicle.branch, row.branch)) throw badRequest("רכב העבודה משויך לסניף אחר");
+    const scope = opts.vehicleScope === undefined ? row.branch : opts.vehicleScope;
+    if (scope !== null && !workVehicleBranchAllowed(vehicle.branch, scope)) throw badRequest("רכב העבודה משויך לסניף אחר");
   } else {
     throw badRequest("יש לבחור מאגר לקוחות להנפקה");
   }

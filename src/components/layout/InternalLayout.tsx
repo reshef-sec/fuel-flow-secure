@@ -25,7 +25,7 @@ import { useIsSuperAdmin } from "@/lib/superAdmin";
 import { signOut } from "@/lib/useAuth";
 import { RealtimeNotifications } from "@/components/layout/RealtimeNotifications";
 import { DemoChip, LearningBanner, LearningSwitch } from "@/components/learning/LearningMode";
-import { roleLabels, storedRole, useAppStore, type Role } from "@/store/appStore";
+import { roleLabels, storedRole, useAppStore, useCurrentUser, type Role } from "@/store/appStore";
 
 type NavTo = "/" | "/vouchers" | "/allocations" | "/supervisor" | "/produced" | "/reports" | "/signatures" | "/settings";
 
@@ -74,6 +74,11 @@ export function InternalLayout({ title, children }: { title: string; children: R
   const setRole = useAppStore((s) => s.setRole);
   const { profile } = useAuthContext();
   const canSimulate = useIsSuperAdmin();
+  const setLearningActive = useAppStore((s) => s.setLearningActive);
+  const learningOn = profile?.learning_mode === true;
+  useEffect(() => setLearningActive(learningOn), [learningOn, setLearningActive]);
+  const persona = useCurrentUser();
+  const personaName = learningOn && persona && persona.role === role && role !== profile?.role ? `${persona.lastName} ${persona.firstName}`.trim() : "";
   const navigate = useNavigate();
 
   // Restore the simulated role after hydration so permissions survive a reload.
@@ -110,7 +115,12 @@ export function InternalLayout({ title, children }: { title: string; children: R
   const logout = () => void signOut().then(() => navigate({ to: "/login", replace: true }));
 
   const roleSelect = canSimulate ? (
-    <label className="relative flex items-center">
+    <label className="relative flex items-center gap-2">
+      {personaName ? (
+        <span data-learning-ui className="whitespace-nowrap rounded-full bg-pending px-2.5 py-1 text-[11.5px] font-bold text-navy-900" title="סביבת לימוד: מוצג כמשתמש דמו">
+          מוצג כ: {personaName}
+        </span>
+      ) : null}
       <span className="sr-only">תפקיד לצפייה</span>
       <select
         value={role}

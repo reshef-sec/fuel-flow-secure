@@ -132,9 +132,9 @@ async function claimCard(serial, set, session) {
 }
 
 /** Trigger emulation for a voucher whose link_id is being assigned. */
-async function guardIssuance(row, session) {
+async function guardIssuance(row, session, opts = {}) {
   const prev = { link_id: null };
-  await requireActiveIssuanceClient(row, prev, session);
+  await requireActiveIssuanceClient(row, prev, session, opts);
   await requireActivePrivateVehicle(row, prev, session);
 }
 /** set_voucher_expiry applied to one card's merged row; returns trigger-assigned columns. */
@@ -221,7 +221,8 @@ async function issueVoucherToWorker(params, { user }) {
         updated_on: day, delivered_at: day, issued_at: stamp, expires_at: expires,
       };
       // BEFORE UPDATE OF link_id triggers (identical for every card of this item).
-      await guardIssuance(base, session);
+      // Admins issue central stock to any vehicle; branch staff only to unassigned or own-branch vehicles.
+      await guardIssuance(base, session, { vehicleScope: role.admin ? null : callerBranch });
 
       const rows = [];
       for (const c of picked) {

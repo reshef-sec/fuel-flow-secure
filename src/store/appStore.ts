@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { FUEL_TYPES, fuelOf, type FuelType } from "@/components/fuel/fuel";
 import { create } from "zustand";
 import { toast } from "sonner";
@@ -216,6 +217,9 @@ interface AppState {
   authId: string | null;
   myNationalId: string | null;
   setIdentity: (authId: string | null, nationalId: string | null) => void;
+  /** סביבת לימוד active for the signed-in owner (set from the server profile; never true for anyone else). */
+  learningActive: boolean;
+  setLearningActive: (on: boolean) => void;
   /** Loads every table from the cloud database. */
   loadFromCloud: () => Promise<void>;
   role: Role;
@@ -294,6 +298,8 @@ export const useAppStore = create<AppState>()(
   authId: null,
   myNationalId: null,
   setIdentity: (authId, myNationalId) => set({ authId, myNationalId }),
+  learningActive: false,
+  setLearningActive: (learningActive) => set({ learningActive }),
   loadFromCloud: async () => {
     try {
       // Clean up the old browser-only copy; the cloud is the only source now.
@@ -711,8 +717,29 @@ export function pickCurrentUser(users: UserRecord[], role: Role) {
 export function useCurrentUser() {
   const users = useAppStore((s) => s.users);
   const nid = useAppStore((s) => s.myNationalId);
+  const role = useAppStore((s) => s.role);
+  const learning = useAppStore((s) => s.learningActive);
+  const vouchers = useAppStore((s) => s.vouchers);
   const mine = nid ? users.find((u) => u.id === nid) : undefined;
-  return mine;
+  const persona = useMemo(
+    () => (learning && mine && mine.role !== role ? learningPersona(users, vouchers, role) : undefined),
+    [learning, mine, role, users, vouchers],
+  );
+  return persona ?? mine;
+}
+
+/**
+ * סביבת לימוד: when the owner previews another role ("תצוגה"), the pages act as a demo person of that
+ * role — the branch manager / supervisor holding the most demo stock — so every screen shows real-looking data.
+ */
+export function learningPersona(users: UserRecord[], vouchers: VoucherRecord[], role: Role): UserRecord | undefined {
+  if (role !== "branch" && role !== "supervisor") return undefined;
+  const branchOf = (b: string | null | undefined) => (b ?? "").replace(/\s*\([^)]*\)\s*$/, "").replace(/^סניף\s+/, "").trim();
+  const score = (u: UserRecord) => role === "branch"
+    ? vouchers.filter((v) => branchOf(v.branch) === branchOf(u.branch)).length
+    : vouchers.filter((v) => (v.supervisor ?? "").trim() === fullName(u)).length;
+  const candidates = users.filter((u) => u.role === role && u.branch?.trim());
+  return candidates.map((u) => [u, score(u)] as const).sort((a, b) => b[1] - a[1])[0]?.[0];
 }
 
 export { MAIN_POOL };

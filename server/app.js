@@ -13,6 +13,7 @@ import accountRoutes from "./routes/accounts.js";
 import tableRoutes from "./routes/table.js";
 import rpcRoutes from "./routes/rpc.js";
 import notificationRoutes from "./routes/notifications.js";
+import trainingRoutes from "./routes/training.js";
 import learningRoutes, { learningRouter } from "./routes/learning.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -68,6 +69,7 @@ export function createApp({ staticDir = path.resolve(here, "../dist/client") } =
   app.use("/api/rpc", rpcRoutes);
   app.use("/api/notifications", notificationRoutes);
   app.use("/api/learning", learningRoutes);
+  app.use("/api/training", trainingRoutes);
   app.use("/api", (_req, _res, next) => next(new HttpError(404, "Not found")));
 
   // Production: serve the built SPA with client-side routing fallback.

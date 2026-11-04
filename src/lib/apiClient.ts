@@ -25,7 +25,7 @@ export function onAuthChange(l: Listener) {
 /** Low-level JSON call. Resolves with the parsed body or a normalized error; never throws. */
 export async function apiFetch<T = unknown>(
   path: string,
-  init: { method?: "GET" | "POST"; body?: unknown } = {},
+  init: { method?: "GET" | "POST" | "DELETE"; body?: unknown } = {},
 ): Promise<{ status: number; body: T | null; error: ApiError | null }> {
   const method = init.method ?? (init.body === undefined ? "GET" : "POST");
   try {

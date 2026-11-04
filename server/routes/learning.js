@@ -89,7 +89,7 @@ router.post("/", ah(async (req, res) => {
  * /api/auth and /api/learning always use the real data (login state lives there).
  */
 export function learningRouter(req, _res, next) {
-  if (/^\/(auth|learning)(\/|$)/.test(req.path)) return next();
+  if (/^\/(auth|learning|training)(\/|$)/.test(req.path)) return next();
   if (req.user?.learning_mode && isDevToolsOwner(req.user)) return runInLearning(next);
   next();
 }
