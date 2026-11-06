@@ -7,7 +7,7 @@ export interface Actor {
   role: string;
 }
 
-/** Fire-and-forget insert into activity_log. Never blocks or breaks the UI. The server stamps user_id. */
+/** Fire-and-forget insert into activity_log. Never blocks or breaks the UI. The server stamps user_id and the IP address. */
 export function logActivity(actor: Actor, action: string, target?: string | null) {
   void (async () => {
     try {
@@ -16,7 +16,6 @@ export function logActivity(actor: Actor, action: string, target?: string | null
         role: roleHe[actor.role] ?? actor.role,
         action,
         target: target || "-",
-        ip_address: "-",
       });
       if (error) console.warn("activity_log insert failed:", error.message);
     } catch (e) {

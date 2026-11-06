@@ -15,6 +15,7 @@ import { TABLES } from "../models.js";
 import { ah, badRequest, forbidden } from "../errors.js";
 import { requireAuth } from "../auth.js";
 import { guardVoucherWrite } from "../lib/issuanceGuard.js";
+import { currentIp } from "../lib/requestContext.js";
 
 const router = Router();
 
@@ -62,7 +63,7 @@ const POLICIES = {
     read: adminOnly, write: NONE, del: NONE,
     // Users may only append entries in their own name.
     insert: ALL,
-    stamp: (u, row) => ({ ...row, user_id: u.id }),
+    stamp: (u, row) => ({ ...row, user_id: u.id, ip_address: currentIp() }),
   },
 };
 

@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { loadUser } from "./auth.js";
 import { HttpError } from "./errors.js";
 import { createRateLimits } from "./lib/rateLimits.js";
+import { requestContext } from "./lib/requestContext.js";
 import authRoutes from "./routes/auth.js";
 import accountRoutes from "./routes/accounts.js";
 import tableRoutes from "./routes/table.js";
@@ -60,6 +61,7 @@ export function createApp({ staticDir = path.resolve(here, "../dist/client"), ra
     if (!allowed.has(originHost.toLowerCase())) return next(new HttpError(403, "Cross-origin request blocked"));
     next();
   });
+  app.use("/api", requestContext);
   app.use("/api", limits.publicApi);
   app.use("/api", loadUser);
   app.use("/api", limits.internalApi);

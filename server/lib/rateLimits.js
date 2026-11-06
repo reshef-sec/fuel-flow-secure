@@ -4,6 +4,7 @@
  * Counters live in this process. Override with RATE_LIMIT_PUBLIC_PER_MIN / RATE_LIMIT_INTERNAL_PER_MIN.
  */
 import rateLimit from "express-rate-limit";
+import { clientAddress } from "./requestContext.js";
 
 const PUBLIC_RPC = new Set(["worker_link_status", "open_worker_wallet", "reveal_worker_code", "sign_worker_link"]);
 
@@ -12,9 +13,6 @@ export function isPublicRequest(req) {
   const rpc = /^\/rpc\/([^/]+)$/.exec(req.path);
   return Boolean(rpc && PUBLIC_RPC.has(rpc[1])) || req.path.startsWith("/training/public/");
 }
-
-/** The site sits behind Cloudflare, so the visitor is in CF-Connecting-IP; req.ip can be a shared edge address. */
-const clientAddress = (req) => req.get("cf-connecting-ip") || req.ip;
 
 const limiter = (limit, keyGenerator) => rateLimit({
   windowMs: 60_000,

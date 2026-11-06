@@ -98,3 +98,29 @@ describe("rate limits", () => {
     assert.equal((await pub(a)).status, 200);
   });
 });
+
+describe("activity log IP address", () => {
+  const CF = { "cf-connecting-ip": "203.0.113.7" };
+  it("is stamped by the server on rows the server writes", async () => {
+    await anon().post("/api/auth/login").set(CF).send({ phone: "0500000000", password: "x" });
+    const u = await loginAs("admin");
+    const agent = request.agent(createApp({ staticDir: "/nonexistent" }));
+    assert.equal((await agent.post("/api/auth/login").set(CF).send({ phone: u.phone, password: u.password })).status, 200);
+    await new Promise((r) => setTimeout(r, 200));
+    const row = await REAL.ActivityLog.findOne({ action: "כניסה למערכת", ip_address: "203.0.113.7" }).lean();
+    assert.ok(row, "login row carries the visitor's address");
+  });
+  it("cannot be set or faked from the browser", async () => {
+    const { agent } = await loginAs("supervisor");
+    const r = await agent.post("/api/db/activity_log").set(CF).send({ op: "insert", values: { action: "בדיקה", ip_address: "1.2.3.4" } });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal((await REAL.ActivityLog.findOne({ action: "בדיקה" }).lean()).ip_address, "203.0.113.7");
+  });
+  it("rows written without the field still get the address", async () => {
+    const { agent } = await loginAs("supervisor");
+    await agent.post("/api/db/activity_log").send({ op: "insert", values: { action: "בדיקה 2" } });
+    const ip = (await REAL.ActivityLog.findOne({ action: "בדיקה 2" }).lean()).ip_address;
+    assert.notEqual(ip, "-");
+    assert.ok(ip.length > 0);
+  });
+});

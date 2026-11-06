@@ -535,7 +535,7 @@ export async function seedLearning({ owner } = {}) {
   const entry = (actor, action, target, time, details = null) => {
     if (daysAgoOf(time) > LOG_WINDOW) return;
     log.push({ id: null, user_id: actor.id, user_name: actor.name, role: roleLabel(actor.role), action, target: target || "-",
-      ip_address: "-", details, created_at: time });
+      ip_address: `198.51.100.${R.int(2, 250)}`, details, created_at: time }); // reserved documentation range: never a real address
   };
   for (const b of BATCHES) {
     entry(ownerActor, "ייבוא מלאי שוברים", `${b.n} נוספו, 0 כפולים דולגו`, b.time, { added: b.n, skipped: 0 });

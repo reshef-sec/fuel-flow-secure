@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { pazMatchKey } from "./lib/canonical.js";
 import { learningContext } from "./lib/learningContext.js";
 import { forgetAllLinks, forgetLink } from "./lib/linkStatusCache.js";
+import { currentIp } from "./lib/requestContext.js";
 
 const { Schema } = mongoose;
 const uuid = { type: String, default: () => randomUUID() };
@@ -197,7 +198,9 @@ signatureSchema.index({ id: 1 }, { unique: true });
 
 const activitySchema = new Schema({
   id: uuid, user_id: str(), user_name: str(""), role: str(""), action: { type: String, required: true },
-  target: str("-"), ip_address: str("-"),
+  target: str("-"),
+  /** Stamped by the server from the request; never taken from the browser (see routes/table.js). */
+  ip_address: { type: String, default: currentIp },
   /** Structured audit payload for imports/reconciliation (counts, card numbers). */
   details: { type: Schema.Types.Mixed, default: null },
 }, opts("activity_log"));
