@@ -6,7 +6,8 @@
  * SAFETY: it writes real data (accounts, cards, vehicle pools, a system reset), so it
  * REFUSES to run unless the target database is empty (needs_setup === true).
  * Point it at a staging service with its own empty MongoDB database — never production.
- * The staging service must have DEV_TOOLS_OWNER_NATIONAL_ID=300000001 (or set E2E_OWNER_ID).
+ * NOT YET UPDATED for email sign-in: it still activates accounts with a national id and needs
+ * rewriting before its next use. The local checks are server/tests/ (npm test).
  */
 const BASE = (process.argv[2] ?? process.env.E2E_BASE_URL ?? "").replace(/\/$/, "");
 if (!BASE) { console.error("Usage: node scripts/e2e-live.mjs <base-url>"); process.exit(2); }

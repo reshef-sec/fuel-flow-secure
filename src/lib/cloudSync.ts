@@ -59,13 +59,13 @@ const rowToVoucher = (r: Row, codes: Map<string, string>): VoucherRecord => {
 };
 
 export const userToRow = (u: UserRecord) => ({
-  national_id: u.id, last_name: u.lastName, first_name: u.firstName, role: u.role, title: u.title,
+  id: u.id, email: u.email || null, last_name: u.lastName, first_name: u.firstName, role: u.role, title: u.title,
   phone: u.phone, branch: u.branch, can_request: !!u.canRequest,
   requires_password_change: u.requiresPasswordChange ?? true,
 });
 export const userPatch = (p: Partial<UserRecord>) => {
   const m: Row = {};
-  if (p.id !== undefined) m.national_id = p.id;
+  if (p.email !== undefined) m.email = p.email || null;
   if (p.lastName !== undefined) m.last_name = p.lastName;
   if (p.firstName !== undefined) m.first_name = p.firstName;
   if (p.role !== undefined) m.role = p.role;
@@ -138,7 +138,7 @@ export async function loadAll() {
     })) as ClientRecord[],
     vouchers: vouchers.map((r) => rowToVoucher(r, codes)).reverse(),
     users: users.map((r) => ({
-      id: String(r.national_id), lastName: String(r.last_name), firstName: String(r.first_name),
+      id: String(r.id), email: String(r.email ?? ""), lastName: String(r.last_name), firstName: String(r.first_name),
       role: r.role as UserRecord["role"], title: String(r.title), phone: String(r.phone), branch: String(r.branch),
       canRequest: !!r.can_request, requiresPasswordChange: !!r.requires_password_change,
     })).reverse() as UserRecord[],

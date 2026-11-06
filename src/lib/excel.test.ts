@@ -64,9 +64,10 @@ describe("import templates round-trip through the real parsers", () => {
   it("users template (8 columns) parses with the UsersPanel mapping", async () => {
     const rows = await roundTrip("users");
     assert.deepEqual(rows[0], userImportHeaders);
-    const users = parseUserRows(stripHeader(rows, "ת.ז"));
+    const users = parseUserRows(stripHeader(rows, "אימייל"));
     assert.equal(users.length, 1);
-    assert.equal(users[0]?.id, "123456782");
+    assert.equal(users[0]?.email, "israel@outlook.com");
+    assert.ok(users[0]?.id);
     assert.equal(users[0]?.role, "supervisor");
     assert.equal(users[0]?.canRequest, false);
   });

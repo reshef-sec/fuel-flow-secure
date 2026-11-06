@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { AlertCircle, ArrowLeft, Eye, EyeOff, Info, Lock, LogIn, Smartphone, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, Eye, EyeOff, Info, Lock, LogIn, Mail, User } from "lucide-react";
 import { toast } from "sonner";
 
-import { bootstrapAdmin, getSetupStatus } from "@/lib/backend";
+import { bootstrapAdmin, getAuthOptions, getSetupStatus } from "@/lib/backend";
 import { signIn } from "@/lib/useAuth";
 import { AuthAlert, AuthCard, AuthLayout, authInputClass } from "@/components/layout/AuthLayout";
 
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/login")({
       { title: "כניסה למערכת | רשף ביטחון" },
       { name: "description", content: "כניסה מאובטחת למערכת ניהול שוברי הדלק של רשף ביטחון." },
       { property: "og:title", content: "כניסה למערכת | רשף ביטחון" },
-      { property: "og:description", content: "כניסה מאובטחת עם מספר נייד וסיסמה." },
+      { property: "og:description", content: "כניסה מאובטחת עם חשבון Microsoft או אימייל וסיסמה." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -21,11 +21,29 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+/** Why Microsoft sent the user back here (/login?error=…). */
+const MICROSOFT_ERRORS: Record<string, string> = {
+  not_authorized: "כתובת המייל אינה מורשית במערכת",
+  microsoft_failed: "הכניסה דרך Microsoft נכשלה. נסו שוב",
+};
+
+function MicrosoftLogo() {
+  return (
+    <svg viewBox="0 0 21 21" className="size-[18px]" aria-hidden>
+      <path fill="#f25022" d="M1 1h9v9H1z" />
+      <path fill="#7fba00" d="M11 1h9v9h-9z" />
+      <path fill="#00a4ef" d="M1 11h9v9H1z" />
+      <path fill="#ffb900" d="M11 11h9v9h-9z" />
+    </svg>
+  );
+}
+
 function LoginPage() {
   const status = getSetupStatus;
   const bootstrap = bootstrapAdmin;
   const [needsSetup, setNeedsSetup] = useState(false);
-  const [phone, setPhone] = useState("");
+  const [identifier, setIdentifier] = useState("");
+  const [microsoft, setMicrosoft] = useState(false);
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,25 +52,26 @@ function LoginPage() {
 
   useEffect(() => {
     status().then((r) => setNeedsSetup(r.needsSetup)).catch(() => undefined);
+    getAuthOptions().then((r) => setMicrosoft(r.microsoft)).catch(() => undefined);
+    const reason = new URLSearchParams(window.location.search).get("error");
+    if (reason && MICROSOFT_ERRORS[reason]) setError(MICROSOFT_ERRORS[reason]);
   }, [status]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!phone.trim() || !password) {
-      setError("יש למלא מספר נייד וסיסמה");
+    if (!identifier.trim() || !password) {
+      setError("יש למלא אימייל וסיסמה");
       return;
     }
     setBusy(true);
     try {
       if (needsSetup) {
-        if (!/^\d{9}$/.test(password)) throw new Error("בהגדרה הראשונית יש להזין ת.ז בת 9 ספרות");
-        await bootstrap({ data: { phone, nationalId: password, fullName, branch: "" } });
+        await bootstrap({ data: { email: identifier, password, fullName } });
         toast.success("חשבון מנהל ראשי נוצר");
       }
-      // The server activates first-time staff (initial password = ת.ז), sets the
-      // httpOnly session cookie and records "כניסה למערכת" in the activity log.
-      await signIn(phone, password);
+      // The server sets the httpOnly session cookie and records "כניסה למערכת" in the activity log.
+      await signIn(identifier, password);
     } catch (err) {
       setError(err instanceof Error ? err.message : "הכניסה נכשלה");
     } finally {
@@ -74,14 +93,31 @@ function LoginPage() {
             {needsSetup ? "הגדרת מנהל ראשי" : "כניסה למערכת"}
           </h1>
           <p className="m-0 text-[14.5px] text-slate-600">
-            {needsSetup ? "המערכת טרם הוגדרה. צרו את חשבון המנהל הראשי כדי להתחיל." : "הזינו מספר נייד וסיסמה כדי להמשיך."}
+            {needsSetup ? "המערכת טרם הוגדרה. צרו את חשבון המנהל הראשי כדי להתחיל." : "התחברו עם חשבון Microsoft, או עם אימייל וסיסמה."}
           </p>
         </div>
+
+        {microsoft && !needsSetup ? (
+          <>
+            <a
+              href="/api/auth/microsoft/start"
+              className="inline-flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-[13px] border border-line-strong bg-white text-[15px] font-bold text-navy-900 no-underline transition hover:bg-slate-50 focus-visible:shadow-focus-mint focus-visible:outline-none"
+            >
+              <MicrosoftLogo />
+              התחבר באמצעות Microsoft
+            </a>
+            <div className="flex items-center gap-3 text-xs text-slate-500" aria-hidden>
+              <span className="h-px flex-1 bg-table-line" />
+              או
+              <span className="h-px flex-1 bg-table-line" />
+            </div>
+          </>
+        ) : null}
 
         {needsSetup ? (
           <>
             <AuthAlert tone="info" title="התקנה ראשונה" icon={<Info className="size-[18px]" aria-hidden />}>
-              החשבון הראשון שנוצר יקבל הרשאת אדמין מרכזי. בהגדרה הראשונית יש להזין ת.ז בת 9 ספרות.
+              החשבון הראשון שנוצר יקבל הרשאת אדמין מרכזי.
             </AuthAlert>
             <label className="flex flex-col gap-[7px] text-[13.5px] font-semibold text-ink-soft">
               שם מלא
@@ -100,18 +136,17 @@ function LoginPage() {
         ) : null}
 
         <label className="flex flex-col gap-[7px] text-[13.5px] font-semibold text-ink-soft">
-          מספר נייד
+          {needsSetup ? "אימייל" : "אימייל או מספר נייד"}
           <span className="relative block">
-            <Smartphone className={iconCls} aria-hidden />
+            <Mail className={iconCls} aria-hidden />
             <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              inputMode="tel"
-              type="tel"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              inputMode="email"
               autoComplete="username"
               dir="ltr"
-              placeholder="05X-XXXXXXX"
-              aria-label="מספר נייד"
+              placeholder="name@company.com"
+              aria-label={needsSetup ? "אימייל" : "אימייל או מספר נייד"}
               aria-invalid={error ? true : undefined}
               className={authInputClass}
             />
@@ -119,7 +154,7 @@ function LoginPage() {
         </label>
 
         <label className="flex flex-col gap-[7px] text-[13.5px] font-semibold text-ink-soft">
-          {needsSetup ? "ת.ז" : "סיסמה"}
+          סיסמה
           <span className="relative block">
             <Lock className={iconCls} aria-hidden />
             <input
@@ -128,7 +163,6 @@ function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               dir="ltr"
-              placeholder={needsSetup ? "9 ספרות" : undefined}
               aria-label="סיסמה"
               aria-invalid={error ? true : undefined}
               className={`${authInputClass} pl-12`}
@@ -156,11 +190,6 @@ function LoginPage() {
           {busy ? null : <ArrowLeft className="size-[18px]" aria-hidden />}
         </button>
 
-        {needsSetup ? null : (
-          <p className="m-0 border-t border-table-line pt-3.5 text-center text-[13.5px] text-slate-600">
-            כניסה ראשונה? הזינו ת.ז כסיסמה
-          </p>
-        )}
       </AuthCard>
     </AuthLayout>
   );

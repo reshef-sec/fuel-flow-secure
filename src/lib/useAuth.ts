@@ -7,7 +7,7 @@ export type ProfileRole = "admin" | "branch" | "supervisor" | "viewer";
 export interface Profile {
   id: string;
   phone: string;
-  national_id: string;
+  email: string;
   full_name: string;
   branch: string;
   role: ProfileRole;
@@ -23,8 +23,8 @@ export interface Session { user: { id: string } }
 export { emitAuthChange };
 
 /** POST /api/auth/login → profile. Throws with the server's Hebrew message. */
-export async function signIn(phone: string, password: string): Promise<Profile> {
-  const { body, error } = await apiFetch<{ profile: Profile }>("/api/auth/login", { body: { phone, password } });
+export async function signIn(identifier: string, password: string): Promise<Profile> {
+  const { body, error } = await apiFetch<{ profile: Profile }>("/api/auth/login", { body: { identifier, password } });
   if (error || !body?.profile) throw new Error(error?.message || "הכניסה נכשלה");
   emitAuthChange();
   return body.profile;

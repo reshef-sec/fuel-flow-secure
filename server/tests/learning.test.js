@@ -17,7 +17,7 @@ beforeEach(async () => {
 
 async function owner() {
   const o = await loginAs("admin", { fullName: "קורן מאיה" });
-  process.env.DEV_TOOLS_OWNER_NATIONAL_ID = o.nationalId;
+  process.env.DEV_TOOLS_OWNER_EMAIL = o.email;
   return o;
 }
 const serials = async (agent) => ((await agent.post("/api/db/vouchers").send({ op: "select" })).body.data ?? []).map((v) => v.serial).sort();

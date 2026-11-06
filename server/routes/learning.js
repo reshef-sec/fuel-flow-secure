@@ -106,9 +106,9 @@ export function learningRouter(req, _res, next) {
  * this can never act on real data or as a real login.
  */
 async function actAsPersona(req) {
-  const nationalId = String(req.get("x-learning-persona") ?? "");
-  if (!/^\d{9}$/.test(nationalId) || !/^\/(db|rpc|notifications)(\/|$)/.test(req.path)) return;
-  const persona = await Profile.findOne({ national_id: nationalId });
+  const id = String(req.get("x-learning-persona") ?? "");
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !/^\/(db|rpc|notifications)(\/|$)/.test(req.path)) return;
+  const persona = await Profile.findOne({ id });
   if (!persona || !["branch", "supervisor"].includes(persona.role)) return;
   persona.requires_password_change = false;
   req.user = persona;

@@ -43,12 +43,14 @@ export function normalizePhone(value) {
   return digits;
 }
 
+export const normalizeEmail = (value) => String(value ?? "").trim().toLowerCase();
+
 /** Password policy for the mandatory first-login change. Returns an error message or null. */
 export function passwordPolicyError(pw, profile) {
   const p = String(pw ?? "");
   if (p.length < 8) return "הסיסמה חייבת להכיל לפחות 8 תווים";
   if (!/[A-Za-zא-ת]/.test(p) || !/\d/.test(p)) return "הסיסמה חייבת להכיל אותיות וספרות";
-  if (profile && (p === profile.national_id || p === profile.phone)) return "אין להשתמש בת.ז או במספר הנייד כסיסמה";
+  if (profile && (p === profile.email || p === profile.phone)) return "אין להשתמש באימייל או במספר הנייד כסיסמה";
   return null;
 }
 
@@ -84,18 +86,14 @@ export const requireRole = (...roles) => (req, _res, next) => {
 /** Development tools (demo data / reset) are pinned to one immutable owner identity: מאיה קורן. */
 export function isDevToolsOwner(user) {
   if (!user || user.role !== "admin" || user.requires_password_change) return false;
-  const ownerId = String(process.env.DEV_TOOLS_OWNER_NATIONAL_ID ?? "").trim();
-  const ownerPhone = normalizePhone(process.env.DEV_TOOLS_OWNER_PHONE ?? "");
-  if (!ownerId && !ownerPhone) return false; // fail closed when not configured
-  if (ownerId && user.national_id !== ownerId) return false;
-  if (ownerPhone && user.phone !== ownerPhone) return false;
-  return true;
+  const owner = normalizeEmail(process.env.DEV_TOOLS_OWNER_EMAIL);
+  return Boolean(owner) && normalizeEmail(user.email) === owner; // fail closed when not configured
 }
 
 export const publicProfile = (p) => p && ({
   id: p.id,
   phone: p.phone,
-  national_id: p.national_id,
+  email: p.email ?? "",
   full_name: p.full_name,
   branch: p.branch,
   role: p.role,

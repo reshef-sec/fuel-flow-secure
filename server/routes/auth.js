@@ -1,41 +1,39 @@
 import { Router } from "express";
+import jwt from "jsonwebtoken";
 import { AppUser, Profile } from "../models.js";
 import { ah, badRequest, unauthorized, HttpError } from "../errors.js";
 import {
-  clearSession, hashPassword, issueSession, normalizePhone, passwordPolicyError, publicProfile, verifyPassword,
+  clearSession, hashPassword, issueSession, normalizeEmail, normalizePhone, passwordPolicyError, publicProfile, verifyPassword,
 } from "../auth.js";
 import { logAction } from "../lib/audit.js";
 import { claimHeldCards } from "../lib/claimHeldCards.js";
+import {
+  authorizeUrl, identityFrom, microsoftConfigured, newAttempt, redirectUri, transport, verifyIdToken,
+} from "../lib/microsoftAuth.js";
 
 const router = Router();
 const MAX_FAILED = 5;
 const LOCK_MS = 15 * 60 * 1000;
-const INVALID = "מספר נייד או סיסמה שגויים";
+const INVALID = "פרטי הכניסה שגויים";
+const NOT_ALLOWED = "כתובת המייל אינה מורשית במערכת";
+const ATTEMPT_COOKIE = "rsf_ms";
+const ATTEMPT_PATH = "/api/auth/microsoft";
 
 const fullNameOf = (u) => `${u.first_name ?? ""} ${u.last_name ?? ""}`.replace(/\s+/g, " ").trim();
 
-/**
- * Login with phone + password. A staff member listed in Settings → Users but with no
- * login yet is activated on first sign-in with their ת.ז as the initial password and
- * is then forced through /change-password (requires_password_change = is_first_login).
- */
-router.post("/login", ah(async (req, res) => {
-  const phone = normalizePhone(req.body?.phone);
-  const password = String(req.body?.password ?? "");
-  if (!phone || !password) throw badRequest("יש למלא מספר נייד וסיסמה");
+/** What the login screen may offer. */
+router.get("/options", (_req, res) => res.json({ microsoft: microsoftConfigured() }));
 
-  let profile = await Profile.findOne({ phone });
-  if (!profile && /^\d{9}$/.test(password)) {
-    const staff = await AppUser.findOne({ national_id: password });
-    if (staff && normalizePhone(staff.phone) === phone) {
-      profile = await Profile.create({
-        phone, national_id: staff.national_id, full_name: fullNameOf(staff), branch: staff.branch ?? "",
-        role: staff.role, password_hash: await hashPassword(password), requires_password_change: true,
-      });
-      await claimHeldCards(profile);
-    }
-  }
-  if (!profile) throw unauthorized(INVALID);
+/** Password sign-in with email, or with the mobile number for accounts that have no email yet. */
+router.post("/login", ah(async (req, res) => {
+  const identifier = String(req.body?.identifier ?? "").trim();
+  const password = String(req.body?.password ?? "");
+  if (!identifier || !password) throw badRequest("יש למלא אימייל וסיסמה");
+
+  const profile = await Profile.findOne(identifier.includes("@")
+    ? { email: normalizeEmail(identifier) }
+    : { phone: normalizePhone(identifier) });
+  if (!profile || !profile.password_hash) throw unauthorized(INVALID);
   if (profile.locked_until && profile.locked_until > new Date()) {
     throw new HttpError(429, "החשבון ננעל זמנית עקב ניסיונות כושלים. נסו שוב בעוד 15 דקות", "locked");
   }
@@ -54,8 +52,67 @@ router.post("/login", ah(async (req, res) => {
   profile.last_login_at = new Date();
   await profile.save();
   issueSession(res, profile);
-  logAction(profile, "כניסה למערכת", phone);
+  logAction(profile, "כניסה למערכת", profile.email || profile.phone);
   res.json({ profile: publicProfile(profile) });
+}));
+
+/** Step 1: send the browser to Microsoft, remembering this attempt in a signed, short-lived cookie. */
+router.get("/microsoft/start", (req, res) => {
+  if (!microsoftConfigured()) return res.redirect(302, "/login?error=microsoft_off");
+  const attempt = newAttempt();
+  res.cookie(ATTEMPT_COOKIE, jwt.sign(attempt, process.env.JWT_SECRET, { expiresIn: 600, algorithm: "HS256" }), {
+    // Lax, not Strict: it has to arrive with the redirect back from Microsoft.
+    httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", maxAge: 600_000, path: ATTEMPT_PATH,
+  });
+  res.redirect(302, authorizeUrl(attempt, redirectUri(req)));
+});
+
+/** Step 2: Microsoft sends the browser back. Only a verified, known address gets a session. */
+router.get("/microsoft/callback", ah(async (req, res) => {
+  const fail = (reason) => res.redirect(302, `/login?error=${reason}`);
+  const cookie = req.cookies?.[ATTEMPT_COOKIE];
+  res.clearCookie(ATTEMPT_COOKIE, { path: ATTEMPT_PATH });
+  if (!microsoftConfigured() || !cookie || req.query.error) return fail("microsoft_failed");
+
+  let identity = null;
+  try {
+    const attempt = jwt.verify(cookie, process.env.JWT_SECRET, { algorithms: ["HS256"] });
+    if (typeof req.query.state !== "string" || req.query.state !== attempt.state || typeof req.query.code !== "string") {
+      return fail("microsoft_failed");
+    }
+    const tokens = await transport.exchangeCode({ code: req.query.code, redirect: redirectUri(req), verifier: attempt.verifier });
+    identity = identityFrom(await verifyIdToken(tokens.id_token, attempt.nonce));
+  } catch (e) {
+    console.warn("Microsoft sign-in failed:", e.message);
+    return fail("microsoft_failed");
+  }
+  if (!identity) return fail("not_authorized");
+
+  const staff = await AppUser.findOne({ email: identity.email });
+  if (!staff) {
+    logAction(null, "ניסיון כניסה נדחה", identity.email);
+    return fail("not_authorized");
+  }
+  let profile = await Profile.findOne({ id: staff.id });
+  if (profile?.microsoft_sub && profile.microsoft_sub !== identity.subject) {
+    logAction(profile, "ניסיון כניסה נדחה", identity.email);
+    return fail("not_authorized");
+  }
+  if (!profile) {
+    profile = await Profile.create({
+      id: staff.id, email: identity.email, phone: normalizePhone(staff.phone), full_name: fullNameOf(staff),
+      branch: staff.branch ?? "", role: staff.role, requires_password_change: false,
+    });
+    await claimHeldCards(profile);
+  }
+  profile.email = identity.email;
+  profile.microsoft_sub = identity.subject;
+  profile.requires_password_change = false;
+  profile.last_login_at = new Date();
+  await profile.save();
+  issueSession(res, profile);
+  logAction(profile, "כניסה למערכת (Microsoft)", identity.email);
+  res.redirect(302, "/");
 }));
 
 router.post("/logout", (req, res) => {
@@ -66,7 +123,7 @@ router.post("/logout", (req, res) => {
 router.get("/me", ah(async (req, res) => {
   if (!req.user) return res.json({ profile: null });
   // Display name prefers the live staff directory entry.
-  const staff = await AppUser.findOne({ national_id: req.user.national_id }).lean();
+  const staff = await AppUser.findOne({ id: req.user.id }).lean();
   const p = publicProfile(req.user);
   if (staff) p.full_name = fullNameOf(staff) || p.full_name;
   res.json({ profile: p });
@@ -83,7 +140,7 @@ router.post("/change-password", ah(async (req, res) => {
   req.user.requires_password_change = false;
   req.user.token_version = (req.user.token_version ?? 0) + 1;
   await req.user.save();
-  await AppUser.updateOne({ national_id: req.user.national_id }, { $set: { requires_password_change: false } });
+  await AppUser.updateOne({ id: req.user.id }, { $set: { requires_password_change: false } });
   issueSession(res, req.user);
   logAction(req.user, "עדכון סיסמה", req.user.phone);
   res.json({ ok: true, profile: publicProfile(req.user) });

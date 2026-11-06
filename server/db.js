@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import * as models from "./models.js";
+import { migrateUserIdentity } from "./lib/migrateUsers.js";
 
 mongoose.set("strictQuery", true);
 
@@ -11,6 +12,7 @@ export async function connectDb(uri = process.env.MONGODB_URI) {
     retryWrites: true,
     w: "majority",
   });
+  await migrateUserIdentity(mongoose.connection.db);
   await Promise.all([...Object.values(models.REAL), ...Object.values(models.LEARNING)].map((m) => m.createIndexes()));
   await models.AppSetting.updateOne({ key: "main" }, { $setOnInsert: { key: "main", balance: 0 } }, { upsert: true });
   return mongoose.connection;

@@ -43,8 +43,10 @@ export const seesAllData = (role: Role) => role === "admin" || role === "viewer"
 export const isReadOnlyRole = (role: Role) => role === "viewer";
 
 export interface UserRecord {
-  /** ת.ז */
+  /** Stable internal id (the same as the login account's id). */
   id: string;
+  /** Sign-in address (Microsoft / Outlook); empty for users who have not been given one yet. */
+  email: string;
   /** משפחה */
   lastName: string;
   /** פרטי */
@@ -59,7 +61,7 @@ export interface UserRecord {
   branch: string;
   /** רשאי להקים דרישה */
   canRequest?: boolean;
-  /** Must choose a new password on next login (initial password = ת.ז). */
+  /** Must choose a new password on next login (after an admin reset). */
   requiresPasswordChange?: boolean;
 }
 
@@ -217,10 +219,9 @@ export function siteStandard(clients: ClientRecord[], clientId?: string, siteId?
 
 interface AppState {
   loaded: boolean;
-  /** Signed-in login account id and ת.ז */
+  /** Signed-in login account id */
   authId: string | null;
-  myNationalId: string | null;
-  setIdentity: (authId: string | null, nationalId: string | null) => void;
+  setIdentity: (authId: string | null) => void;
   /** סביבת לימוד active for the signed-in owner (set from the server profile; never true for anyone else). */
   learningActive: boolean;
   setLearningActive: (on: boolean) => void;
@@ -253,7 +254,7 @@ interface AppState {
   addUser: (user: UserRecord) => void;
   updateUser: (id: string, patch: Partial<UserRecord>) => void;
   removeUser: (id: string) => void;
-  /** Adds only rows whose ת.ז is new. Returns added/skipped counts. */
+  /** Adds only rows whose email is new. Returns added/skipped counts. */
   importUsers: (rows: UserRecord[]) => { added: number; skipped: number };
   setUserCanRequest: (id: string, value: boolean) => void;
 
@@ -300,8 +301,7 @@ export const useAppStore = create<AppState>()(
   (set, get) => ({
   loaded: false,
   authId: null,
-  myNationalId: null,
-  setIdentity: (authId, myNationalId) => set({ authId, myNationalId }),
+  setIdentity: (authId) => set({ authId }),
   learningActive: false,
   setLearningActive: (learningActive) => set({ learningActive }),
   loadFromCloud: async () => {
@@ -458,24 +458,24 @@ export const useAppStore = create<AppState>()(
   },
   updateUser: (id, patch) => {
     set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) }));
-    run(db.from("app_users").update(userPatch(patch)).eq("national_id", id));
+    run(db.from("app_users").update(userPatch(patch)).eq("id", id));
     logActivity(actorOf(get()), "עדכון משתמש", id);
   },
   removeUser: (id) => {
     set((s) => ({ users: s.users.filter((u) => u.id !== id) }));
-    run(db.from("app_users").delete().eq("national_id", id));
+    run(db.from("app_users").delete().eq("id", id));
     logActivity(actorOf(get()), "מחיקת משתמש", id);
   },
   importUsers: (rows) => {
-    const existing = new Set(get().users.map((u) => u.id));
+    const existing = new Set(get().users.map((u) => u.email));
     const fresh: UserRecord[] = [];
     let skipped = 0;
     for (const row of rows) {
-      if (existing.has(row.id)) {
+      if (existing.has(row.email)) {
         skipped += 1;
         continue;
       }
-      existing.add(row.id);
+      existing.add(row.email);
       fresh.push(row);
     }
     if (fresh.length) {
@@ -722,11 +722,11 @@ export function pickCurrentUser(users: UserRecord[], role: Role) {
 
 export function useCurrentUser() {
   const users = useAppStore((s) => s.users);
-  const nid = useAppStore((s) => s.myNationalId);
+  const authId = useAppStore((s) => s.authId);
   const role = useAppStore((s) => s.role);
   const learning = useAppStore((s) => s.learningActive);
   const vouchers = useAppStore((s) => s.vouchers);
-  const mine = nid ? users.find((u) => u.id === nid) : undefined;
+  const mine = authId ? users.find((u) => u.id === authId) : undefined;
   const persona = useMemo(
     () => (learning && mine && mine.role !== role ? learningPersona(users, vouchers, role) : undefined),
     [learning, mine, role, users, vouchers],
@@ -761,7 +761,7 @@ export { MAIN_POOL };
 export const currentActor = () => actorOf(useAppStore.getState());
 
 function actorOf(st: AppState) {
-  const mine = st.myNationalId ? st.users.find((u) => u.id === st.myNationalId) : undefined;
+  const mine = st.authId ? st.users.find((u) => u.id === st.authId) : undefined;
   const u = mine;
   return { name: u ? fullName(u) : "", role: st.role };
 }

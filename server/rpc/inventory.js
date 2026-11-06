@@ -54,9 +54,9 @@ function intParam(v) {
   return Number.isInteger(n) ? n : NaN;
 }
 
-/** trim(concat_ws(' ', u.last_name, u.first_name)) from app_users joined on national_id. */
-async function staffName(nationalId, session) {
-  const u = nationalId ? await AppUser.findOne({ national_id: nationalId }, { last_name: 1, first_name: 1 }).session(session ?? null).lean() : null;
+/** trim(concat_ws(' ', u.last_name, u.first_name)) from the users directory. */
+async function staffName(userId, session) {
+  const u = userId ? await AppUser.findOne({ id: userId }, { last_name: 1, first_name: 1 }).session(session ?? null).lean() : null;
   if (!u) return "";
   return [u.last_name, u.first_name].filter((x) => x != null).join(" ").trim();
 }
@@ -158,7 +158,7 @@ async function issueVoucherToWorker(params, { user }) {
   const role = roleFlags(user);
   if (!(role.admin || role.branch || role.sup)) throw forbidden("אין הרשאה");
   const callerBranch = user.branch ?? null;
-  const callerName = await staffName(user.national_id);
+  const callerName = await staffName(user.id);
   if (!role.admin && canonicalBranch(p_branch) !== canonicalBranch(callerBranch)) throw forbidden("אין הרשאה לסניף זה");
   const link = validateLink(p_link);
   if (!Array.isArray(p_items) || p_items.length === 0) throw badRequest("יש לבחור שוברים");
@@ -255,7 +255,7 @@ async function transferVoucherStock(params, { user }) {
   const role = roleFlags(user);
   if (!(role.admin || role.branch || role.sup)) throw forbidden("אין הרשאה");
   const callerBranch = user.branch ?? null;
-  const callerName = await staffName(user.national_id);
+  const callerName = await staffName(user.id);
   if (p_branch == null || sqlTrim(p_branch).length === 0) throw badRequest("יש לבחור סניף");
   if (!role.admin && canonicalBranch(p_branch) !== canonicalBranch(callerBranch)) throw forbidden("אין הרשאה לסניף זה");
   if (p_link == null && role.sup) throw forbidden("אין הרשאה להקצאה");
@@ -265,11 +265,11 @@ async function transferVoucherStock(params, { user }) {
   if (p_supervisor != null) {
     // The users directory decides who belongs to a branch. A supervisor who never signed in has no
     // login profile yet: the cards are held by name and are theirs as soon as they sign in.
-    const staff = await AppUser.find({ role: "supervisor" }, { national_id: 1, last_name: 1, first_name: 1, branch: 1 }).sort({ _id: 1 }).lean();
+    const staff = await AppUser.find({ role: "supervisor" }, { id: 1, last_name: 1, first_name: 1, branch: 1 }).sort({ _id: 1 }).lean();
     const target = staff.find((s) => canonicalBranch(s.branch) === canonicalBranch(p_branch)
       && [s.last_name, s.first_name].filter((x) => x != null).join(" ").trim() === p_supervisor);
     if (!target) throw badRequest("המפקח אינו משויך לסניף");
-    targetId = (await Profile.findOne({ national_id: target.national_id }, { id: 1 }).lean())?.id ?? null;
+    targetId = (await Profile.exists({ id: target.id })) ? target.id : null;
     if (p_link != null && !role.admin && !role.branch && targetId !== user.id) throw forbidden("אין הרשאה למפקח זה");
   }
   const link = p_link != null ? validateLink(p_link) : null;

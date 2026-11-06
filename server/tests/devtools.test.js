@@ -6,20 +6,20 @@ import {
 } from "../models.js";
 import { isValidDenomination } from "../lib/canonical.js";
 
-const OWNER_ID = "039999998";
+const OWNER_EMAIL = "owner@example.com";
 const CONFIRM = "איפוס וניקוי נתונים";
 
 before(startTestServer);
 after(async () => {
-  delete process.env.DEV_TOOLS_OWNER_NATIONAL_ID;
+  delete process.env.DEV_TOOLS_OWNER_EMAIL;
   await stopTestServer();
 });
 beforeEach(async () => {
   await resetDb();
-  process.env.DEV_TOOLS_OWNER_NATIONAL_ID = OWNER_ID;
+  process.env.DEV_TOOLS_OWNER_EMAIL = OWNER_EMAIL;
 });
 
-const owner = () => loginAs("admin", { nationalId: OWNER_ID, fullName: "מאיה קורן" });
+const owner = () => loginAs("admin", { email: OWNER_EMAIL, fullName: "מאיה קורן" });
 
 describe("can_use_development_tools", () => {
   it("is true only for the pinned owner admin, false for everyone else", async () => {
@@ -34,7 +34,7 @@ describe("can_use_development_tools", () => {
 
   it("fails closed when the owner is not configured", async () => {
     const o = await owner();
-    delete process.env.DEV_TOOLS_OWNER_NATIONAL_ID;
+    delete process.env.DEV_TOOLS_OWNER_EMAIL;
     assert.equal((await rpc(o.agent, "can_use_development_tools")).data, false);
     assert.equal((await rpc(o.agent, "generate_demo_data")).status, 403);
   });

@@ -61,9 +61,9 @@ export function mapPrivateVehicleRows(raw: string[][]) {
   }));
 }
 
-/* ── Users (UsersPanel.handleFile) — 8 columns, header detected by "ת.ז" ── */
-export const userImportHeaders = ["סניף", "ת.ז", "משפחה", "פרטי", "הרשאה", "תפקיד", "נייד", "רשאי להקים דרישה"];
-export const userImportExample = ["צפון", "123456782", "ישראלי", "ישראל", "מפקח", "מפקח משמרת", "0501234567", "לא"];
+/* ── Users (UsersPanel.handleFile) — 8 columns, header detected by "אימייל" ── */
+export const userImportHeaders = ["סניף", "אימייל", "משפחה", "פרטי", "הרשאה", "תפקיד", "נייד", "רשאי להקים דרישה"];
+export const userImportExample = ["צפון", "israel@outlook.com", "ישראלי", "ישראל", "מפקח", "מפקח משמרת", "0501234567", "לא"];
 
 export const roleFromLabel = (value: string): Role => {
   const v = value.trim();
@@ -80,12 +80,13 @@ export const truthy = (value: string) =>
 export function parseUserRows(raw: string[][]): UserRecord[] {
   const parsed: UserRecord[] = [];
   for (const r of raw) {
-    const [branch = "", id = "", lastName = "", firstName = "", roleCell = "", title = "", phone = "", canReq = ""] = r;
-    const cleanId = id.replace(/\D/g, "");
-    if (cleanId.length !== 9 || !lastName.trim()) continue;
+    const [branch = "", email = "", lastName = "", firstName = "", roleCell = "", title = "", phone = "", canReq = ""] = r;
+    const cleanEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail) || !lastName.trim()) continue;
     parsed.push({
       branch: branch.trim(),
-      id: cleanId,
+      id: crypto.randomUUID(),
+      email: cleanEmail,
       lastName: lastName.trim(),
       firstName: firstName.trim(),
       role: roleFromLabel(roleCell),

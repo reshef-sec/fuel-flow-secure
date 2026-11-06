@@ -8,11 +8,15 @@ after(stopTestServer);
 beforeEach(resetDb);
 
 describe("QA Test A — first login forces a password change", () => {
-  it("activates a listed staff member with ת.ז, blocks every module until the password is changed", async () => {
-    await AppUser.create({ national_id: "123456782", first_name: "דנה", last_name: "לוי", role: "supervisor", phone: "0521234567", branch: "חיפה" });
+  it("a temporary password blocks every module until it is changed", async () => {
+    const admin = await loginAs("admin");
+    const user = await AppUser.create({ email: "dana@example.com", first_name: "דנה", last_name: "לוי", role: "supervisor", phone: "0521234567", branch: "חיפה" });
+    const reset = await admin.agent.post("/api/accounts").send({ action: "reset", id: user.id, email: user.email, phone: user.phone, fullName: "לוי דנה", role: "supervisor", branch: "חיפה" });
+    assert.equal(reset.status, 200);
+    const temporary = reset.body.temporaryPassword;
     const a = anon();
 
-    const login = await a.post("/api/auth/login").send({ phone: "052-123-4567", password: "123456782" });
+    const login = await a.post("/api/auth/login").send({ identifier: "052-123-4567", password: temporary });
     assert.equal(login.status, 200);
     assert.equal(login.body.profile.requires_password_change, true);
     assert.equal(login.body.profile.is_first_login, true);
@@ -25,31 +29,31 @@ describe("QA Test A — first login forces a password change", () => {
     assert.equal((await a.get("/api/notifications?since=2020-01-01")).status, 403);
 
     // Non-compliant passwords are rejected.
-    for (const pw of ["short1", "onlyletters", "12345678", "123456782"]) {
+    for (const pw of ["short1", "onlyletters", "12345678", "0521234567"]) {
       assert.equal((await a.post("/api/auth/change-password").send({ password: pw })).status, 400, pw);
     }
     const ok = await a.post("/api/auth/change-password").send({ password: "Delek2026x" });
     assert.equal(ok.status, 200);
     assert.equal(ok.body.profile.requires_password_change, false);
-    assert.equal((await AppUser.findOne({ national_id: "123456782" })).requires_password_change, false);
+    assert.equal((await AppUser.findOne({ id: user.id })).requires_password_change, false);
 
     // Now the modules open, and the old initial password no longer works.
     assert.equal((await a.post("/api/db/vouchers").send({ op: "select" })).status, 200);
-    assert.equal((await anon().post("/api/auth/login").send({ phone: "0521234567", password: "123456782" })).status, 401);
-    assert.equal((await anon().post("/api/auth/login").send({ phone: "0521234567", password: "Delek2026x" })).status, 200);
+    assert.equal((await anon().post("/api/auth/login").send({ identifier: "dana@example.com", password: temporary })).status, 401);
+    assert.equal((await anon().post("/api/auth/login").send({ identifier: "dana@example.com", password: "Delek2026x" })).status, 200);
   });
 
   it("rejects wrong credentials and locks after 5 failures", async () => {
-    const { phone } = await loginAs("supervisor");
-    for (let i = 0; i < 5; i += 1) assert.equal((await anon().post("/api/auth/login").send({ phone, password: "wrong" })).status, 401);
-    assert.equal((await anon().post("/api/auth/login").send({ phone, password: "Passw0rd!" })).status, 429);
+    const { email } = await loginAs("supervisor");
+    for (let i = 0; i < 5; i += 1) assert.equal((await anon().post("/api/auth/login").send({ identifier: email, password: "wrong" })).status, 401);
+    assert.equal((await anon().post("/api/auth/login").send({ identifier: email, password: "Passw0rd!" })).status, 429);
   });
 
   it("old sessions die after a password reset by an admin", async () => {
     const admin = await loginAs("admin");
     const sup = await loginAs("supervisor", { branch: "חיפה" });
     assert.equal((await sup.agent.get("/api/auth/me")).body.profile.role, "supervisor");
-    const r = await admin.agent.post("/api/accounts").send({ action: "reset", phone: sup.phone, nationalId: sup.nationalId, role: "supervisor", branch: "חיפה" });
+    const r = await admin.agent.post("/api/accounts").send({ action: "reset", id: sup.profile.id, email: sup.email, phone: sup.phone, role: "supervisor", branch: "חיפה" });
     assert.equal(r.status, 200);
     assert.equal((await sup.agent.get("/api/auth/me")).body.profile, null);
   });
@@ -57,9 +61,9 @@ describe("QA Test A — first login forces a password change", () => {
   it("bootstrap is only possible while no admin exists", async () => {
     const a = anon();
     assert.equal((await a.post("/api/rpc/needs_setup").send({})).body.data, true);
-    assert.equal((await a.post("/api/accounts").send({ action: "bootstrap", phone: "0501111111", nationalId: "111111118", fullName: "מאיה קורן" })).status, 200);
+    assert.equal((await a.post("/api/accounts").send({ action: "bootstrap", email: "maya@example.com", password: "Passw0rd1", fullName: "מאיה קורן" })).status, 200);
     assert.equal((await a.post("/api/rpc/needs_setup").send({})).body.data, false);
-    assert.equal((await a.post("/api/accounts").send({ action: "bootstrap", phone: "0502222222", nationalId: "222222226", fullName: "x" })).status, 403);
+    assert.equal((await a.post("/api/accounts").send({ action: "bootstrap", email: "x@example.com", password: "Passw0rd1", fullName: "x" })).status, 403);
   });
 
   it("rejects cross-origin and non-JSON writes", async () => {
@@ -113,7 +117,7 @@ describe("RBAC + branch isolation (table API)", () => {
 
   it("only admins write settings tables and read the audit log", async () => {
     const sup = await loginAs("supervisor", { branch: "חיפה" });
-    assert.equal((await sup.agent.post("/api/db/app_users").send({ op: "update", values: { role: "admin" }, filters: [{ col: "national_id", op: "eq", value: sup.nationalId }] })).status, 403);
+    assert.equal((await sup.agent.post("/api/db/app_users").send({ op: "update", values: { role: "admin" }, filters: [{ col: "id", op: "eq", value: sup.profile.id }] })).status, 403);
     assert.equal((await sup.agent.post("/api/db/activity_log").send({ op: "select" })).status, 403);
     // Supervisors may append audit entries, always stamped with their own id.
     await sup.agent.post("/api/db/activity_log").send({ op: "insert", values: { action: "x", user_id: "someone-else" } });

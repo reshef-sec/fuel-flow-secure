@@ -18,7 +18,11 @@ services:
         sync: false # mongodb+srv://USER:PASS@cluster.xxxx.mongodb.net/reshef?retryWrites=true&w=majority
       - key: JWT_SECRET
         generateValue: true
-      - key: DEV_TOOLS_OWNER_NATIONAL_ID
-        sync: false # ת.ז של מאיה קורן — only this admin sees demo/reset tools
-      - key: DEV_TOOLS_OWNER_PHONE
-        sync: false # optional second factor for the dev-tools owner
+      - key: DEV_TOOLS_OWNER_EMAIL
+        sync: false # the owner's sign-in email: only this admin sees the owner-only tools
+      - key: MICROSOFT_CLIENT_ID
+        sync: false # Azure app registration → Application (client) ID
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false # Azure app registration → Certificates & secrets
+      - key: MICROSOFT_TENANT_ID
+        sync: false # your organisation's tenant id; leave empty to also allow personal Outlook accounts

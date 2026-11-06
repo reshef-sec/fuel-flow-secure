@@ -11,7 +11,7 @@ beforeEach(async () => { await resetDb(); await TrainingShare.deleteMany({}); })
 
 async function owner() {
   const o = await loginAs("admin", { fullName: "קורן מאיה" });
-  process.env.DEV_TOOLS_OWNER_NATIONAL_ID = o.nationalId;
+  process.env.DEV_TOOLS_OWNER_EMAIL = o.email;
   return o;
 }
 

@@ -58,7 +58,7 @@ function ChangePasswordPage() {
   const checks = [
     { label: "לפחות 8 תווים", ok: pw.length >= 8 },
     { label: "אותיות וספרות", ok: /[A-Za-zא-ת]/.test(pw) && /\d/.test(pw) },
-    { label: "לא ת.ז או מספר הנייד", ok: pw.length > 0 && !(profile && (pw === profile.national_id || pw === profile.phone)) },
+    { label: "לא האימייל או מספר הנייד", ok: pw.length > 0 && !(profile && (pw === profile.email || pw === profile.phone)) },
     { label: "הסיסמאות תואמות", ok: confirm.length > 0 && confirm === pw },
   ];
   const passed = checks.filter((c) => c.ok).length;

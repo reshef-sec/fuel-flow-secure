@@ -47,8 +47,12 @@ npm test                    # server integration tests + frontend unit tests
 3. Environment variables:
    - `MONGODB_URI` — Atlas connection string (Atlas clusters are replica sets, required for transactions).
    - `JWT_SECRET` — 32+ random characters.
-   - `DEV_TOOLS_OWNER_NATIONAL_ID` (and optionally `DEV_TOOLS_OWNER_PHONE`) — מאיה קורן's ID; nobody else ever sees demo/reset tools.
+   - `DEV_TOOLS_OWNER_EMAIL` — מאיה קורן's sign-in email; nobody else ever sees demo/reset tools.
    - `NODE_ENV=production`.
+   - Sign in with Microsoft (the button appears once the first two are set):
+     - In Azure → App registrations, add the redirect URI `https://<your-site>/api/auth/microsoft/callback` (type Web).
+     - `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` from that registration.
+     - `MICROSOFT_TENANT_ID`: your organisation's tenant id, to trust that tenant's email addresses. Leave it empty to accept personal Outlook accounts; other organisations' accounts are then accepted only if the `xms_edov` optional claim is enabled on the app.
 4. In Atlas → Network Access, allow Render's outbound IPs (or 0.0.0.0/0 with a strong DB password).
 
 ## Moving the existing data

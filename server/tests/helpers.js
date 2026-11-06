@@ -41,20 +41,20 @@ let seq = 0;
  */
 export async function loginAs(role = "admin", opts = {}) {
   seq += 1;
-  const nationalId = opts.nationalId ?? String(100000000 + seq);
+  const email = (opts.email ?? `user${seq}@example.com`).toLowerCase();
   const phone = opts.phone ?? `05${String(10000000 + seq).slice(-8)}`;
   const password = opts.password ?? "Passw0rd!";
   const fullName = opts.fullName ?? `${role} user ${seq}`;
   const [first, ...rest] = fullName.split(" ");
-  await AppUser.create({ national_id: nationalId, first_name: first, last_name: rest.join(" "), role, phone, branch: opts.branch ?? "", requires_password_change: false });
+  const user = await AppUser.create({ email, first_name: first, last_name: rest.join(" "), role, phone, branch: opts.branch ?? "", requires_password_change: false });
   const profile = await Profile.create({
-    phone, national_id: nationalId, full_name: fullName, branch: opts.branch ?? "", role,
+    id: user.id, phone, email, full_name: fullName, branch: opts.branch ?? "", role,
     password_hash: await hashPassword(password), requires_password_change: opts.requiresPasswordChange ?? false,
   });
   const agent = request.agent(app);
-  const res = await agent.post("/api/auth/login").send({ phone, password });
+  const res = await agent.post("/api/auth/login").send({ identifier: email, password });
   if (res.status !== 200) throw new Error(`login failed: ${res.status} ${JSON.stringify(res.body)}`);
-  return { agent, profile, phone, nationalId, password };
+  return { agent, profile, phone, email, password };
 }
 
 /** Calls an RPC and returns { status, data, error }. */

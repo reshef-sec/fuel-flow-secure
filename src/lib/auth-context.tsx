@@ -23,8 +23,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadFromCloud = useAppStore((s) => s.loadFromCloud);
   const setIdentity = useAppStore((s) => s.setIdentity);
   useEffect(() => {
-    setIdentity(auth.profile?.id ?? null, auth.profile?.national_id ?? null);
-  }, [auth.profile?.id, auth.profile?.national_id, setIdentity]);
+    setIdentity(auth.profile?.id ?? null);
+  }, [auth.profile?.id, setIdentity]);
   const signedIn = Boolean(auth.session && auth.profile && !auth.profile.requires_password_change);
 
   useEffect(() => {

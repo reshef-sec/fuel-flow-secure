@@ -203,7 +203,7 @@ test("branch isolation and role checks", async () => {
 test("a branch manager allocates to a supervisor who has never signed in; the cards are theirs on first login", async () => {
   await seed([{ serial: "F1", branch: "צפון" }]);
   const { agent: mgr } = await loginAs("branch", { branch: "צפון", fullName: "Dana Levi" });
-  await AppUser.create({ national_id: "212121212", first_name: "Roni", last_name: "Peretz", role: "supervisor", phone: "0521212121", branch: "צפון", can_request: false });
+  await AppUser.create({ email: "roni@example.com", first_name: "Roni", last_name: "Peretz", role: "supervisor", phone: "0521212121", branch: "צפון", can_request: false });
   const r = await rpc(mgr, "transfer_voucher_stock", { p_items: [{ amount: 100, fuel_type: "בנזין", serials: ["F1"] }], p_branch: "צפון", p_supervisor: "Peretz Roni" });
   assert.equal(r.status, 200, r.error);
   const card = await Voucher.findOne({ serial: "F1" }).lean();
@@ -212,11 +212,14 @@ test("a branch manager allocates to a supervisor who has never signed in; the ca
   const other = await rpc(mgr, "transfer_voucher_stock", { p_items: [{ amount: 100, fuel_type: "בנזין", serials: ["F1"] }], p_branch: "צפון", p_supervisor: "Not Here" });
   assert.equal(other.error, "המפקח אינו משויך לסניף");
 
-  // First login activates the account (the national id is the first password) and links the card.
-  const first = await anon().post("/api/auth/login").send({ phone: "0521212121", password: "212121212" });
-  assert.equal(first.status, 200);
-  const profile = await Profile.findOne({ national_id: "212121212" }).lean();
-  assert.equal((await Voucher.findOne({ serial: "F1" }).lean()).supervisor_id, profile.id);
+  // Creating the account (first sign-in, or an admin reset) links the held card.
+  const { agent: admin2 } = await loginAs("admin");
+  const staff = await AppUser.findOne({ email: "roni@example.com" }).lean();
+  const made = await admin2.post("/api/accounts").send({ action: "reset", id: staff.id, email: staff.email, phone: staff.phone, fullName: "Roni Peretz", branch: "צפון", role: "supervisor" });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  assert.equal((await Voucher.findOne({ serial: "F1" }).lean()).supervisor_id, staff.id);
+  assert.ok(await Profile.exists({ id: staff.id }));
+  assert.equal((await anon().post("/api/auth/login").send({ identifier: staff.email, password: made.body.temporaryPassword })).status, 200);
 });
 
 test("transfer allocates exact serials to a supervisor, who can then issue them", async () => {

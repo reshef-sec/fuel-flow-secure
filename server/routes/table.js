@@ -45,7 +45,7 @@ const notViewer = (u) => (u.role === "viewer" ? null : {});
 
 const POLICIES = {
   app_settings: { read: signedInRead, write: adminOnly },
-  app_users: { read: signedInRead, write: adminOnly },
+  app_users: { read: signedInRead, write: adminOnly, hidden: ["national_id"] },
   branches: { read: signedInRead, write: adminOnly },
   issue_reasons: { read: signedInRead, write: adminOnly },
   b2b_clients: { read: signedInRead, write: adminOnly },
@@ -194,7 +194,7 @@ router.post("/:table", requireAuth, ah(async (req, res) => {
 
 function defaultKey(table) {
   return {
-    app_users: "national_id", app_settings: "key", branches: "id", issue_reasons: "id",
+    app_users: "id", app_settings: "key", branches: "id", issue_reasons: "id",
     regular_clients: "client_id,site_id", b2b_clients: "client_code,standard", vouchers: "serial",
     voucher_requests: "id", worker_links: "id", signatures_archive: "id",
   }[table] ?? "id";

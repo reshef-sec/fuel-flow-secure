@@ -147,7 +147,7 @@ export async function seedLearning({ owner } = {}) {
   const ref = await loadReference();
 
   // ── identities (unique, never colliding with the owner or any real person) ──
-  const usedIds = new Set([String(owner?.national_id ?? ""), ...ref.users.map((u) => u.national_id), ...ref.profiles.map((p) => p.national_id)]);
+  const usedIds = new Set();
   const usedPhones = new Set([String(owner?.phone ?? ""), ...ref.users.map((u) => u.phone), ...ref.profiles.map((p) => p.phone)]);
   const nationalId = () => {
     for (;;) {
@@ -179,23 +179,23 @@ export async function seedLearning({ owner } = {}) {
   const branchNames = branchRows.map((b) => b.name);
 
   // ── staff: the real users directory (names, roles, branches, phones) when present ──
-  const profileByNid = new Map(ref.profiles.map((p) => [p.national_id, p]));
+  const profileById = new Map(ref.profiles.map((p) => [p.id, p]));
   const realStaff = ref.users.filter((u) => ["branch", "supervisor", "viewer"].includes(u.role)
-    && u.national_id !== owner?.national_id);
+    && u.id !== owner?.id);
   let staff;
   if (realStaff.length) {
     staff = realStaff.map((u) => {
-      const p = profileByNid.get(u.national_id);
+      const p = profileById.get(u.id);
       const last = String(u.last_name ?? "").trim();
       const first = String(u.first_name ?? "").trim();
       return {
-        id: p?.id ?? R.uuid(), hasProfile: Boolean(p), last, first, name: [last, first].filter(Boolean).join(" ") || p?.full_name || "",
+        id: u.id, hasProfile: Boolean(p), last, first, name: [last, first].filter(Boolean).join(" ") || p?.full_name || "",
         role: u.role, branch: String(u.branch ?? ""), title: u.title ?? "", canRequest: Boolean(u.can_request),
-        nationalId: u.national_id, phone: u.phone || p?.phone || "",
+        email: u.email ?? null, phone: u.phone || p?.phone || "",
       };
     });
   } else {
-    staff = fictionalStaff(R, branchNames).map((s) => ({ ...s, id: R.uuid(), hasProfile: false, nationalId: nationalId(), phone: phone() }));
+    staff = fictionalStaff(R, branchNames).map((s) => ({ ...s, id: R.uuid(), hasProfile: false, email: null, phone: phone() }));
   }
   const withProfileFirst = (list) => {
     const p = list.filter((s) => s.hasProfile);
@@ -219,11 +219,11 @@ export async function seedLearning({ owner } = {}) {
   const appUsers = realStaff.length
     ? ref.users.map(stripDoc)
     : [...ref.users.map(stripDoc), ...staff.map((s) => ({
-      national_id: s.nationalId, last_name: s.last, first_name: s.first, role: s.role, title: s.title,
+      id: s.id, email: s.email, last_name: s.last, first_name: s.first, role: s.role, title: s.title,
       phone: s.phone, branch: s.branch, can_request: s.canRequest, requires_password_change: false,
     }))];
-  if (!appUsers.some((u) => u.national_id === owner?.national_id)) {
-    appUsers.unshift({ national_id: owner?.national_id, last_name: ownerLast, first_name: ownerFirst.join(" "), role: "admin",
+  if (!appUsers.some((u) => u.id === owner?.id)) {
+    appUsers.unshift({ id: owner?.id, email: owner?.email ?? null, last_name: ownerLast, first_name: ownerFirst.join(" "), role: "admin",
       title: "מנהלת מערכת", phone: owner?.phone, branch: "", can_request: true, requires_password_change: false });
   }
   // Login accounts: copies of the real ones with an unusable password hash (nobody can sign in with them;
@@ -231,8 +231,8 @@ export async function seedLearning({ owner } = {}) {
   const profiles = ref.profiles.map((p) => ({
     ...stripDoc(p), password_hash: DUMMY_HASH, token_version: 0, failed_logins: 0, locked_until: null, learning_mode: false,
   }));
-  if (!profiles.some((p) => p.national_id === owner?.national_id)) {
-    profiles.unshift({ id: owner?.id, phone: owner?.phone, national_id: owner?.national_id, full_name: ownerName, branch: owner?.branch ?? "",
+  if (!profiles.some((p) => p.id === owner?.id)) {
+    profiles.unshift({ id: owner?.id, phone: owner?.phone, email: owner?.email ?? null, full_name: ownerName, branch: owner?.branch ?? "",
       role: "admin", password_hash: DUMMY_HASH, requires_password_change: false, last_login_at: at(0, 8, 12) });
   }
   const branches = realBranches.length
@@ -475,7 +475,7 @@ export async function seedLearning({ owner } = {}) {
     const askedExtra = bi % 2 === 0 ? 500 : 0;
     const createdAt = at(allocDay + R.int(1, 3), R.int(8, 15), R.int(0, 59));
     requests.push({
-      id: requestId(createdAt), requester: requester.name, requester_id: requester.nationalId, branch: b,
+      id: requestId(createdAt), requester: requester.name, requester_id: requester.id, branch: b,
       amount: sum["בנזין"] + sum["סולר"] + askedExtra, benzine_amount: sum["בנזין"] + askedExtra, diesel_amount: sum["סולר"],
       reason: ["תגבור משמרות לקראת סוף הרבעון", "הצבת צוותי אבטחה באתרים חדשים", "חידוש מלאי חודשי לסניף", "סיורי לילה מוגברים"][bi % 4],
       created_on: day(createdAt), created_at: createdAt, status: "אושר", approved_amount: sum["בנזין"] + sum["סולר"],
@@ -494,7 +494,7 @@ export async function seedLearning({ owner } = {}) {
     const createdAt = at(dAgo, R.int(8, 15), R.int(0, 59));
     const requester = requesterOf(b, false);
     requests.push({
-      id: requestId(createdAt), requester: requester.name, requester_id: requester.nationalId, branch: b, amount,
+      id: requestId(createdAt), requester: requester.name, requester_id: requester.id, branch: b, amount,
       benzine_amount: benz, diesel_amount: dies, reason, created_on: day(createdAt), created_at: createdAt, status,
       approved_amount: approved, approver: ownerName, _approvedAt: later(createdAt, 0, 1), _requester: requester,
     });
@@ -511,7 +511,7 @@ export async function seedLearning({ owner } = {}) {
     const createdAt = at(dAgo, R.int(7, 12), R.int(0, 59));
     const requester = requesterOf(b, bySupervisor);
     requests.push({
-      id: requestId(createdAt), requester: requester.name, requester_id: requester.nationalId, branch: b,
+      id: requestId(createdAt), requester: requester.name, requester_id: requester.id, branch: b,
       amount: benz + dies, benzine_amount: benz, diesel_amount: dies, reason, created_on: day(createdAt), created_at: createdAt,
       status: "ממתין לאישור", approved_amount: null, approver: null, _requester: requester,
     });
@@ -582,8 +582,8 @@ export async function seedLearning({ owner } = {}) {
   // Staff that appear as actors in the demo but have no login yet get a demo-only profile (unusable hash).
   const actorIds = new Set([...vouchers.map((v) => v.supervisor_id), ...links.map((l) => l.supervisor_id)].filter(Boolean));
   for (const st of staff) {
-    if (st.hasProfile || (realStaff.length && !actorIds.has(st.id)) || profiles.some((p) => p.national_id === st.nationalId || p.phone === st.phone)) continue;
-    profiles.push({ id: st.id, phone: st.phone, national_id: st.nationalId, full_name: st.name, branch: st.branch, role: st.role,
+    if (st.hasProfile || (realStaff.length && !actorIds.has(st.id)) || profiles.some((p) => p.id === st.id || (st.phone && p.phone === st.phone))) continue;
+    profiles.push({ id: st.id, phone: st.phone, email: st.email, full_name: st.name, branch: st.branch, role: st.role,
       password_hash: DUMMY_HASH, requires_password_change: false, last_login_at: at(R.int(0, 6), R.int(7, 17), R.int(0, 59)) });
   }
 
@@ -617,7 +617,7 @@ export async function seedLearning({ owner } = {}) {
 }
 
 /** Bumped whenever the dataset's shape changes; an older learning copy is re-seeded on next activation. */
-export const SEED_VERSION = 3;
+export const SEED_VERSION = 4;
 
 /** Drops Mongo internals so a real document can be copied into its learning twin. */
 function stripDoc(doc) {

@@ -83,9 +83,10 @@ export async function unlockWorkerLink({ data }: Args<{ id: string }>) {
   return { ok: true as const };
 }
 
-export async function lookupAuthId({ data }: Args<{ nationalId: string }>) {
-  const id = await rpc<string | null>("lookup_auth_id", { p_national_id: data.nationalId });
-  return { id: id ?? null };
+/** What the login screen may offer. */
+export async function getAuthOptions() {
+  const { body } = await apiFetch<{ microsoft?: boolean }>("/api/auth/options");
+  return { microsoft: body?.microsoft === true };
 }
 
 export async function getSetupStatus() {
@@ -95,31 +96,25 @@ export async function getSetupStatus() {
 
 // ---------- Accounts (POST /api/accounts) ----------
 
-type AccountInput = { phone: string; nationalId: string; fullName?: string; branch?: string; role?: string };
+type AccountInput = { id: string; email: string; phone: string; fullName?: string; branch?: string; role?: string };
 
 async function accounts(action: string, payload: Record<string, unknown>) {
   // Same-origin call; the httpOnly session cookie authenticates it.
-  const { body, error } = await apiFetch<{ ok?: boolean; error?: string }>("/api/accounts", { body: { action, ...payload } });
+  const { body, error } = await apiFetch<{ ok?: boolean; error?: string; temporaryPassword?: string }>("/api/accounts", { body: { action, ...payload } });
   if (error) {
-    if (error.status === 401 && action !== "bootstrap" && action !== "activate") throw new Error("פג תוקף ההתחברות — יש להתחבר מחדש");
+    if (error.status === 401 && action !== "bootstrap") throw new Error("פג תוקף ההתחברות — יש להתחבר מחדש");
     throw new Error(error.message);
   }
   if (body?.error) throw new Error(body.error);
-  return body as { ok: boolean };
+  return body as { ok: boolean; temporaryPassword?: string };
 }
 
 const norm = (d: AccountInput) => ({ ...d, phone: normalizePhone(d.phone) });
 
-export const bootstrapAdmin = ({ data }: Args<Omit<AccountInput, "role">>) => accounts("bootstrap", norm(data));
-export async function activateAccount(phone: string, nationalId: string) {
-  try {
-    const r = await accounts("activate", { phone: normalizePhone(phone), nationalId });
-    return Boolean(r?.ok);
-  } catch { return false; }
-}
+export const bootstrapAdmin = ({ data }: Args<{ email: string; password: string; fullName: string }>) => accounts("bootstrap", data);
 export const syncAccount = ({ data }: Args<AccountInput>) => accounts("sync", norm(data));
 export const resetAccountPassword = ({ data }: Args<AccountInput>) => accounts("reset", norm(data));
-export const deleteAccount = ({ data }: Args<{ nationalId: string }>) => accounts("delete", data);
+export const deleteAccount = ({ data }: Args<{ id: string }>) => accounts("delete", data);
 export const completePasswordChange = ({ data }: Args<{ password: string }>) => accounts("change_password", data);
 
 // Authorization is decided server-side (can_use_development_tools).

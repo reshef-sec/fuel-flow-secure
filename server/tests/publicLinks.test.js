@@ -105,7 +105,7 @@ describe("activity log IP address", () => {
     await anon().post("/api/auth/login").set(CF).send({ phone: "0500000000", password: "x" });
     const u = await loginAs("admin");
     const agent = request.agent(createApp({ staticDir: "/nonexistent" }));
-    assert.equal((await agent.post("/api/auth/login").set(CF).send({ phone: u.phone, password: u.password })).status, 200);
+    assert.equal((await agent.post("/api/auth/login").set(CF).send({ identifier: u.email, password: u.password })).status, 200);
     await new Promise((r) => setTimeout(r, 200));
     const row = await REAL.ActivityLog.findOne({ action: "כניסה למערכת", ip_address: "203.0.113.7" }).lean();
     assert.ok(row, "login row carries the visitor's address");

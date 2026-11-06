@@ -6,9 +6,4 @@ export default {
     auth: "public",
     handler: async () => !(await Profile.exists({ role: "admin" })),
   },
-  lookup_auth_id: {
-    auth: "staff",
-    handler: async ({ p_national_id }) =>
-      (await Profile.findOne({ national_id: String(p_national_id ?? "") }, { id: 1 }).lean())?.id ?? null,
-  },
 };

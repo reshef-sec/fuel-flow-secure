@@ -7,12 +7,12 @@
  * Seeds demo data only when the database has no users. Demo logins (local testing only):
  */
 export const DEMO_USERS = [
-  { role: "admin", national_id: "300000001", phone: "0500000001", first_name: "מאיה", last_name: "קורן", branch: "", title: "מנהלת מערכת", can_request: true },
-  { role: "branch", national_id: "300000003", phone: "0500000003", first_name: "מיכל", last_name: "לוי", branch: "חיפה", title: "מנהלת סניף", can_request: true },
-  { role: "branch", national_id: "300000004", phone: "0500000004", first_name: "רון", last_name: "גבאי", branch: "תל אביב", title: "מנהל סניף", can_request: true },
-  { role: "supervisor", national_id: "300000005", phone: "0500000005", first_name: "דני", last_name: "כהן", branch: "חיפה", title: "מפקח", can_request: true },
-  { role: "supervisor", national_id: "300000007", phone: "0500000007", first_name: "יוסי", last_name: "פרץ", branch: "חיפה", title: "מפקח", can_request: false },
-  { role: "viewer", national_id: "300000006", phone: "0500000006", first_name: "נועה", last_name: "אברהם", branch: "", title: "צופה", can_request: false },
+  { role: "admin", email: "maya@demo.test", phone: "0500000001", first_name: "מאיה", last_name: "קורן", branch: "", title: "מנהלת מערכת", can_request: true },
+  { role: "branch", email: "michal@demo.test", phone: "0500000003", first_name: "מיכל", last_name: "לוי", branch: "חיפה", title: "מנהלת סניף", can_request: true },
+  { role: "branch", email: "ron@demo.test", phone: "0500000004", first_name: "רון", last_name: "גבאי", branch: "תל אביב", title: "מנהל סניף", can_request: true },
+  { role: "supervisor", email: "dani@demo.test", phone: "0500000005", first_name: "דני", last_name: "כהן", branch: "חיפה", title: "מפקח", can_request: true },
+  { role: "supervisor", email: "yossi@demo.test", phone: "0500000007", first_name: "יוסי", last_name: "פרץ", branch: "חיפה", title: "מפקח", can_request: false },
+  { role: "viewer", email: "noa@demo.test", phone: "0500000006", first_name: "נועה", last_name: "אברהם", branch: "", title: "צופה", can_request: false },
 ];
 export const DEMO_PASSWORD = "Demo2026x"; // every demo user; local in-memory database only
 
@@ -24,7 +24,7 @@ import * as M from "../server/models.js";
 import { hashPassword } from "../server/auth.js";
 
 process.env.JWT_SECRET ??= "local-dev-secret-local-dev-secret-0123456789";
-process.env.DEV_TOOLS_OWNER_NATIONAL_ID ??= "300000001";
+process.env.DEV_TOOLS_OWNER_EMAIL ??= "maya@demo.test";
 
 let uri = process.env.MONGODB_URI;
 if (!uri) {
@@ -39,9 +39,9 @@ await connectDb(uri);
 if (!(await M.Profile.countDocuments())) {
   const hash = await hashPassword(DEMO_PASSWORD);
   for (const u of DEMO_USERS) {
-    await M.AppUser.create({ ...u, requires_password_change: false });
+    const user = await M.AppUser.create({ ...u, requires_password_change: false });
     await M.Profile.create({
-      phone: u.phone, national_id: u.national_id, full_name: `${u.last_name} ${u.first_name}`, branch: u.branch,
+      id: user.id, phone: u.phone, email: u.email, full_name: `${u.last_name} ${u.first_name}`, branch: u.branch,
       role: u.role, password_hash: hash, requires_password_change: false,
     });
   }
@@ -74,7 +74,7 @@ if (!(await M.Profile.countDocuments())) {
     }
   };
   add("בנזין", 50, 30); add("בנזין", 100, 20); add("בנזין", 500, 6); add("סולר", 100, 40); add("סולר", 500, 12);
-  const sup = await M.Profile.findOne({ national_id: "300000005" });
+  const sup = await M.Profile.findOne({ phone: "0500000005" });
   add("בנזין", 100, 8, { branch: "חיפה", supervisor: "כהן דני", supervisor_id: sup.id });
   add("סולר", 100, 6, { branch: "חיפה", supervisor: "כהן דני", supervisor_id: sup.id });
   add("בנזין", 100, 5, { branch: "חיפה", supervisor: "כהן דני", supervisor_id: sup.id, status: "הוקצה לעובד", employee_name: "ישראלי אבי", worker_name: "ישראלי אבי", route: "regular", client_id: "5521", site_id: "12", site_name: "סניף מרכזי", issued_at: new Date(), expires_at: new Date(Date.now() + 90 * 864e5) });
@@ -97,7 +97,7 @@ if (!(await M.Profile.countDocuments())) {
 if (process.env.DEV_LOCAL_RICH === "1") {
   const { seedLearning } = await import("../server/lib/learningSeed.js");
   const { runInLearning } = await import("../server/lib/learningContext.js");
-  const owner = await M.Profile.findOne({ national_id: process.env.DEV_TOOLS_OWNER_NATIONAL_ID }).lean();
+  const owner = await M.Profile.findOne({ email: process.env.DEV_TOOLS_OWNER_EMAIL }).lean();
   const wipeLearning = () => Promise.all(Object.values(M.LEARNING).map((m) => m.deleteMany({})));
   await wipeLearning();
   await runInLearning(() => seedLearning({ owner }));

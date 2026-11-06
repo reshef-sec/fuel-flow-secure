@@ -35,7 +35,7 @@ async function seedRealReference() {
   const mgrN = await loginAs("branch", { fullName: "מנהל צפון", branch: "סניף צפון" });
   const mgrS = await loginAs("branch", { fullName: "מנהלת דרום", branch: "סניף דרום" });
   const supN = await loginAs("supervisor", { fullName: "מפקח צפוני", branch: "סניף צפון" });
-  await REAL.AppUser.create({ national_id: "212121212", last_name: "מפקחת", first_name: "דרומית", role: "supervisor",
+  await REAL.AppUser.create({ email: "south@example.com", last_name: "מפקחת", first_name: "דרומית", role: "supervisor",
     phone: "0521212121", branch: "סניף דרום", can_request: true });
   await REAL.IssueReason.create([
     { id: "r1", name: "סיבת עבודה אמיתית", category: "B2B" },
@@ -58,7 +58,7 @@ describe("learning environment — real reference data, sterile", () => {
   it("copies branches, users, reasons and vehicle pools from the real system", async () => {
     const { supN } = await seedRealReference();
     const o = await loginAs("admin", { fullName: "קורן מאיה" });
-    process.env.DEV_TOOLS_OWNER_NATIONAL_ID = o.nationalId;
+    process.env.DEV_TOOLS_OWNER_EMAIL = o.email;
     assert.equal((await o.agent.post("/api/learning").send({ action: "activate" })).status, 200);
 
     const L = LEARNING;
@@ -67,8 +67,8 @@ describe("learning environment — real reference data, sterile", () => {
     assert.deepEqual((await L.B2BClient.find().lean()).map((c) => c.standard).sort(), ["80600000", "80612345", "80654321"]);
     assert.equal((await L.B2BClient.findOne({ standard: "80600000" }).lean()).is_active, false);
     assert.equal(await L.RegularClient.countDocuments(), 2);
-    const realUsers = (await REAL.AppUser.find().lean()).map((u) => u.national_id).sort();
-    assert.deepEqual((await L.AppUser.find().lean()).map((u) => u.national_id).sort(), realUsers);
+    const realUsers = (await REAL.AppUser.find().lean()).map((u) => u.id).sort();
+    assert.deepEqual((await L.AppUser.find().lean()).map((u) => u.id).sort(), realUsers);
 
     // Demo activity uses only the real names, branches, reasons and vehicles.
     const vouchers = await L.Voucher.find({ route: { $ne: null } }).lean();
@@ -83,14 +83,14 @@ describe("learning environment — real reference data, sterile", () => {
     assert.equal(await L.VoucherRequest.countDocuments({ status: "ממתין לאישור" }), 4);
 
     // Copied logins are unusable; demo link numbers never reuse a real one.
-    for (const p of await L.Profile.find().lean()) assert.ok(p.password_hash.startsWith("!learning"), p.national_id);
+    for (const p of await L.Profile.find().lean()) assert.ok(p.password_hash.startsWith("!learning"), p.id);
     assert.equal(await L.WorkerLink.countDocuments({ id: "12345678" }), 0);
   });
 
   it("a full learning-mode session leaves every real collection unchanged", async () => {
     await seedRealReference();
     const o = await loginAs("admin", { fullName: "קורן מאיה" });
-    process.env.DEV_TOOLS_OWNER_NATIONAL_ID = o.nationalId;
+    process.env.DEV_TOOLS_OWNER_EMAIL = o.email;
     const before = await snapshotReal();
 
     await o.agent.post("/api/learning").send({ action: "activate" });
@@ -99,11 +99,11 @@ describe("learning environment — real reference data, sterile", () => {
     ok(await o.agent.post("/api/db/branches").send({ op: "insert", values: { id: "demo-b", name: "סניף דמו" } }));
     ok(await o.agent.post("/api/db/branches").send({ op: "update", values: { manager: "שונה בדמו" }, filters: [{ col: "id", op: "eq", value: "br-n" }] }));
     ok(await o.agent.post("/api/db/issue_reasons").send({ op: "delete", filters: [{ col: "id", op: "eq", value: "r1" }] }));
-    ok(await o.agent.post("/api/db/app_users").send({ op: "delete", filters: [{ col: "national_id", op: "eq", value: "212121212" }] }));
+    ok(await o.agent.post("/api/db/app_users").send({ op: "delete", filters: [{ col: "email", op: "eq", value: "south@example.com" }] }));
     const sync = await rpc(o.agent, "sync_work_vehicles", { p_rows: [{ standard: "80699999", client_code: "1", client_name: "חדש בדמו" }] });
     assert.equal(sync.status, 200, JSON.stringify(sync.error));
     await rpc(o.agent, "sync_private_vehicles", { p_rows: [{ client_id: "1", site_id: "1", client_name: "דמו" }] });
-    const acc = await o.agent.post("/api/accounts").send({ action: "sync", nationalId: "313131313", phone: "0531313131", role: "supervisor", fullName: "חשבון דמו" });
+    const acc = await o.agent.post("/api/accounts").send({ action: "reset", id: "demo-account", email: "demo@example.com", phone: "0531313131", role: "supervisor", fullName: "חשבון דמו" });
     assert.equal(acc.status, 200, JSON.stringify(acc.body));
     const pending = await LEARNING.VoucherRequest.findOne({ status: "ממתין לאישור" }).lean();
     ok(await o.agent.post("/api/db/voucher_requests").send({ op: "update", values: { status: "נדחה" }, filters: [{ col: "id", op: "eq", value: pending.id }] }));
@@ -112,14 +112,14 @@ describe("learning environment — real reference data, sterile", () => {
 
     assert.deepEqual(await snapshotReal(), before, "real data must be untouched");
     // The account created in the demo cannot sign in to the real system.
-    const login = await anon().post("/api/auth/login").send({ phone: "0531313131", password: "Passw0rd!" });
+    const login = await anon().post("/api/auth/login").send({ identifier: "demo@example.com", password: acc.body.temporaryPassword });
     assert.notEqual(login.status, 200);
   });
 
   it("the role preview acts as the demo branch manager, on demo data only", async () => {
     const { mgrN } = await seedRealReference();
     const o = await loginAs("admin", { fullName: "קורן מאיה" });
-    process.env.DEV_TOOLS_OWNER_NATIONAL_ID = o.nationalId;
+    process.env.DEV_TOOLS_OWNER_EMAIL = o.email;
     await o.agent.post("/api/learning").send({ action: "activate" });
     const before = await snapshotReal();
 
@@ -130,14 +130,14 @@ describe("learning environment — real reference data, sterile", () => {
 
     // Without the preview the owner is the admin, who may only move central-pool cards.
     assert.equal((await rpc(o.agent, "transfer_voucher_stock", params)).status, 400);
-    const r = await o.agent.post("/api/rpc/transfer_voucher_stock").set("X-Learning-Persona", mgrN.nationalId).send(params);
+    const r = await o.agent.post("/api/rpc/transfer_voucher_stock").set("X-Learning-Persona", mgrN.profile.id).send(params);
     assert.equal(r.status, 200, JSON.stringify(r.body));
     assert.equal((await LEARNING.Voucher.findOne({ serial: card.serial }).lean()).supervisor, "צפוני מפקח");
     assert.deepEqual(await snapshotReal(), before, "real data must be untouched");
 
     // Nobody else can use the header: an ordinary admin stays an admin, on real data.
     const other = await loginAs("admin");
-    const stranger = await other.agent.post("/api/rpc/transfer_voucher_stock").set("X-Learning-Persona", mgrN.nationalId).send(params);
+    const stranger = await other.agent.post("/api/rpc/transfer_voucher_stock").set("X-Learning-Persona", mgrN.profile.id).send(params);
     assert.equal(stranger.status, 400);
     assert.equal(await LEARNING.ActivityLog.countDocuments({ user_id: other.profile.id }), 0);
   });

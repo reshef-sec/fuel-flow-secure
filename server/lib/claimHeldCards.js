@@ -7,7 +7,7 @@ import { AppUser, Voucher } from "../models.js";
  */
 export async function claimHeldCards(profile) {
   if (profile.role !== "supervisor") return;
-  const u = await AppUser.findOne({ national_id: profile.national_id }, { last_name: 1, first_name: 1 }).lean();
+  const u = await AppUser.findOne({ id: profile.id }, { last_name: 1, first_name: 1 }).lean();
   const name = u ? [u.last_name, u.first_name].filter((x) => x != null).join(" ").trim() : "";
   if (!name) return;
   await Voucher.updateMany({ supervisor: name, supervisor_id: null, branch: profile.branch }, { $set: { supervisor_id: profile.id } });

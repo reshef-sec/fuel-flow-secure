@@ -26,12 +26,15 @@ const role = { type: String, enum: ROLES, default: "supervisor" };
 /** Login accounts (replaces Supabase auth.users + profiles + user_roles). */
 const profileSchema = new Schema({
   id: uuid,
-  phone: { type: String, required: true },
-  national_id: { type: String, required: true },
+  email: { type: String, lowercase: true, trim: true, default: null },
+  phone: str(""),
   full_name: str(""),
   branch: str(""),
   role,
-  password_hash: { type: String, required: true },
+  /** Empty for accounts that only sign in with Microsoft. */
+  password_hash: str(""),
+  /** The Microsoft identity (tenant:object id) this account is pinned to at first sign-in. */
+  microsoft_sub: str(),
   requires_password_change: { type: Boolean, default: true },
   token_version: { type: Number, default: 0 },
   failed_logins: { type: Number, default: 0 },
@@ -41,19 +44,21 @@ const profileSchema = new Schema({
   learning_mode: { type: Boolean, default: false },
 }, opts("profiles"));
 profileSchema.index({ id: 1 }, { unique: true });
-profileSchema.index({ phone: 1 }, { unique: true });
-profileSchema.index({ national_id: 1 }, { unique: true });
+profileSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: "string" } } });
+profileSchema.index({ phone: 1 }, { unique: true, partialFilterExpression: { phone: { $type: "string", $gt: "" } } });
 profileSchema.virtual("is_first_login").get(function () { return this.requires_password_change; });
 
 /** Staff directory managed in Settings → Users. */
 const appUserSchema = new Schema({
-  national_id: { type: String, required: true },
+  id: uuid,
+  email: { type: String, lowercase: true, trim: true, default: null },
   last_name: str(""), first_name: str(""), role,
   title: str(""), phone: str(""), branch: str(""),
   can_request: { type: Boolean, default: false },
   requires_password_change: { type: Boolean, default: true },
 }, opts("app_users"));
-appUserSchema.index({ national_id: 1 }, { unique: true });
+appUserSchema.index({ id: 1 }, { unique: true });
+appUserSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { email: { $type: "string" } } });
 
 const appSettingSchema = new Schema({
   key: { type: String, required: true },

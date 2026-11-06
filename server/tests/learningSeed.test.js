@@ -20,7 +20,7 @@ beforeEach(async () => {
 });
 
 const OWNER = {
-  id: "11111111-2222-4333-8444-555555555555", national_id: "300000001", phone: "0500000001",
+  id: "11111111-2222-4333-8444-555555555555", email: "owner@example.com", phone: "0500000001",
   full_name: "קורן מאיה", branch: "", role: "admin",
 };
 const inRange = (n, lo, hi, what) => assert.ok(n >= lo && n <= hi, `${what}: ${n} not in [${lo}, ${hi}]`);
@@ -57,13 +57,13 @@ describe("learning demo seed", () => {
       inRange(users.filter((u) => u.role === "supervisor" && u.branch === b.name).length, 2, 3, `supervisors ${b.name}`);
     }
     assert.equal(users.filter((u) => u.role === "viewer").length, 1);
-    const ownerUser = users.find((u) => u.national_id === OWNER.national_id);
+    const ownerUser = users.find((u) => u.id === OWNER.id);
     assert.equal(ownerUser.role, "admin");
-    const ownerProfile = await L.Profile.findOne({ national_id: OWNER.national_id }).lean();
+    const ownerProfile = await L.Profile.findOne({ id: OWNER.id }).lean();
     assert.equal(ownerProfile.id, OWNER.id);
     assert.equal(ownerProfile.phone, OWNER.phone);
     for (const u of users) {
-      assert.match(u.national_id, /^\d{9}$/);
+      assert.ok(u.id);
       assert.match(u.phone, /^05\d{8}$/);
     }
     assert.ok(users.some((u) => u.role === "supervisor" && u.can_request));
@@ -159,7 +159,7 @@ describe("learning demo seed", () => {
       assert.equal(r.amount, r.benzine_amount + r.diesel_amount);
       assert.equal(r.benzine_amount % 50, 0);
       assert.equal(r.diesel_amount % 100, 0);
-      assert.ok(users.some((u) => u.national_id === r.requester_id && (u.role === "branch" || u.can_request)));
+      assert.ok(users.some((u) => u.id === r.requester_id && (u.role === "branch" || u.can_request)));
     }
     assert.ok(reqs.some((r) => r.status === "אושר" && r.approved_amount !== r.amount));
     assert.ok(reqs.some((r) => r.status === "נדחה"));
@@ -188,7 +188,7 @@ describe("learning demo seed", () => {
 
   it("serves the owner's learning mode and the public demo links through the RPCs", async () => {
     const o = await loginAs("admin", { fullName: "קורן מאיה" });
-    process.env.DEV_TOOLS_OWNER_NATIONAL_ID = o.nationalId;
+    process.env.DEV_TOOLS_OWNER_EMAIL = o.email;
     const realVouchers = await REAL.Voucher.countDocuments();
     const summary = await runInLearning(() => seedLearning({ owner: o.profile }));
     await REAL.Profile.updateOne({ id: o.profile.id }, { $set: { learning_mode: true } });

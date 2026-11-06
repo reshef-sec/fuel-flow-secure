@@ -19,9 +19,9 @@ const DIESEL = "סולר";
 
 describe("QA", () => {
   it("Test A — first-time user is forced to change password before any module", async () => {
-    await AppUser.create({ national_id: "314159265", first_name: "יוסי", last_name: "כהן", role: "branch", phone: "0549876543", branch: "חיפה" });
+    const u = await loginAs("branch", { branch: "חיפה", requiresPasswordChange: true });
     const a = anon();
-    const login = await a.post("/api/auth/login").send({ phone: "0549876543", password: "314159265" });
+    const login = await a.post("/api/auth/login").send({ identifier: u.email, password: u.password });
     assert.equal(login.status, 200);
     assert.equal(login.body.profile.is_first_login, true);
     assert.equal((await a.post("/api/db/vouchers").send({ op: "select" })).status, 403);

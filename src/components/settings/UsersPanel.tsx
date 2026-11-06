@@ -80,7 +80,8 @@ export function UsersPanel() {
   const deleteFn = deleteAccount;
   const accountData = (u: UserRecord) => ({
     phone: u.phone,
-    nationalId: u.id,
+    id: u.id,
+    email: u.email,
     fullName: `${u.firstName} ${u.lastName}`.trim(),
     branch: u.branch,
     role: u.role,
@@ -88,9 +89,14 @@ export function UsersPanel() {
 
   async function resetPassword(u: UserRecord) {
     try {
-      await resetFn({ data: accountData(u) });
+      const r = await resetFn({ data: accountData(u) });
       updateUser(u.id, { requiresPasswordChange: true });
-      toast.success("סיסמת המשתמש אופסה בהצלחה לתעודת הזהות שלו");
+      setResult({
+        tone: "success",
+        title: "נוצרה סיסמה זמנית",
+        line: r.temporaryPassword ?? "",
+        detail: "מוצגת פעם אחת בלבד. המשתמש יתבקש להחליף אותה בכניסה הראשונה.",
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "איפוס הסיסמה נכשל");
     }
@@ -103,7 +109,7 @@ export function UsersPanel() {
   const [result, setResult] = useState<ResultSummary | null>(null);
   const [form, setForm] = useState({
     branch: branchNames[0] ?? "",
-    id: "",
+    email: "",
     lastName: "",
     firstName: "",
     role: "supervisor" as Role,
@@ -119,7 +125,7 @@ export function UsersPanel() {
       return;
     }
     try {
-      const raw = stripHeader(await parseSheetFile(file), "ת.ז");
+      const raw = stripHeader(await parseSheetFile(file), "אימייל");
       // Row parsing lives in src/lib/importTemplates.ts (moved unchanged; covered by excel.test.ts).
       const parsed: UserRecord[] = parseUserRows(raw);
       if (!parsed.length) {
@@ -127,7 +133,7 @@ export function UsersPanel() {
         return;
       }
       const { added, skipped } = importUsers(parsed);
-      setResult({ tone: "success", title: "ייבוא המשתמשים הושלם", line: `נוספו ${added} משתמשים, ${skipped} דולגו (ת.ז קיימת)`, detail: file.name });
+      setResult({ tone: "success", title: "ייבוא המשתמשים הושלם", line: `נוספו ${added} משתמשים, ${skipped} דולגו (אימייל קיים)`, detail: file.name });
     } catch {
       setResult({ tone: "error", title: "שגיאה בקריאת הקובץ", detail: file.name });
     }
@@ -138,7 +144,7 @@ export function UsersPanel() {
     return users.filter((u) => {
       if (roleFilter !== "all" && u.role !== roleFilter) return false;
       if (!q) return true;
-      return [u.id, u.lastName, u.firstName, u.title, u.phone, u.branch].some((v) =>
+      return [u.email, u.lastName, u.firstName, u.title, u.phone, u.branch].some((v) =>
         v.includes(q),
       );
     });
@@ -147,7 +153,7 @@ export function UsersPanel() {
 
   const blankForm = () => ({
     branch: branchNames[0] ?? "",
-    id: "",
+    email: "",
     lastName: "",
     firstName: "",
     role: "supervisor" as Role,
@@ -158,8 +164,10 @@ export function UsersPanel() {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^\d{9}$/.test(form.id)) {
-      setError("ת.ז חייבת להכיל 9 ספרות");
+    const email = form.email.trim().toLowerCase();
+    // Existing users may stay without an address for now; every new user needs one to sign in.
+    if (email ? !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) : !editingId) {
+      setError("יש להזין כתובת אימייל תקינה");
       return;
     }
     if (!form.lastName.trim() || !form.firstName.trim()) {
@@ -170,13 +178,15 @@ export function UsersPanel() {
       setError("יש למלא תפקיד וטלפון נייד");
       return;
     }
-    if (users.some((u) => u.id === form.id && u.id !== editingId)) {
-      setError("משתמש עם ת.ז זו קיים במערכת");
+    if (email && users.some((u) => u.email === email && u.id !== editingId)) {
+      setError("משתמש עם אימייל זה קיים במערכת");
       return;
     }
     setError(null);
     const payload: UserRecord = {
       ...form,
+      id: editingId ?? crypto.randomUUID(),
+      email,
       lastName: form.lastName.trim(),
       firstName: form.firstName.trim(),
       title: form.title.trim(),
@@ -186,8 +196,8 @@ export function UsersPanel() {
       updateUser(editingId, payload);
       toast.success("פרטי המשתמש עודכנו");
     } else {
-      addUser({ ...payload, requiresPasswordChange: true });
-      toast.success("המשתמש נוסף בהצלחה — סיסמה ראשונית: ת.ז");
+      addUser({ ...payload, requiresPasswordChange: false });
+      toast.success("המשתמש נוסף בהצלחה — הכניסה דרך Microsoft עם האימייל שהוזן");
     }
     syncFn({ data: accountData(payload) }).catch((err) =>
       toast.error(err instanceof Error ? `חשבון הכניסה לא עודכן: ${err.message}` : "חשבון הכניסה לא עודכן"),
@@ -202,7 +212,7 @@ export function UsersPanel() {
     setError(null);
     setForm({
       branch: u.branch,
-      id: u.id,
+      email: u.email,
       lastName: u.lastName,
       firstName: u.firstName,
       role: u.role,
@@ -213,7 +223,7 @@ export function UsersPanel() {
     setOpen(true);
   };
   const remove = (u: UserRecord) => {
-    deleteFn({ data: { nationalId: u.id } }).catch(() => undefined);
+    deleteFn({ data: { id: u.id } }).catch(() => undefined);
     removeUser(u.id);
     toast.success("המשתמש הוסר");
   };
@@ -225,7 +235,7 @@ export function UsersPanel() {
         title={<>משתמשי המערכת <span className="ms-1 text-sm font-semibold text-slate-600"><span className="ds-num">{rows.length}</span> מתוך <span className="ds-num">{users.length}</span></span></>}
         sub={<><span className="ds-num font-bold text-navy-900">{requesters}</span> רשאים להקים דרישה (יכולים לקבל הקצאות)</>}
         tools={<>
-          <SearchField value={query} onChange={setQuery} placeholder="ת.ז, שם, תפקיד או סניף" label="חיפוש משתמשים" />
+          <SearchField value={query} onChange={setQuery} placeholder="אימייל, שם, תפקיד או סניף" label="חיפוש משתמשים" />
           <Select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as Role | "all")}
@@ -285,7 +295,7 @@ export function UsersPanel() {
         <DataTable minWidth={1100} caption="משתמשי המערכת">
           <thead>
             <tr>
-              <th scope="col">ת.ז</th>
+              <th scope="col">דוא״ל / Microsoft Account</th>
               <th scope="col">שם</th>
               <th scope="col">הרשאה</th>
               <th scope="col">רשאי להקים דרישה</th>
@@ -301,7 +311,7 @@ export function UsersPanel() {
             ) : (
               rows.map((u) => (
                 <tr key={u.id}>
-                  <td><span className="ds-num">{u.id}</span></td>
+                  <td><span dir="ltr" className="break-all">{u.email || "—"}</span></td>
                   <td className="font-semibold text-navy-900">{fullName(u)}</td>
                   <td><RoleBadge role={u.role} /></td>
                   <td><CanRequestToggle user={u} disabled={!isAdmin} onChange={(v) => setUserCanRequest(u.id, v)} /></td>
@@ -340,7 +350,7 @@ export function UsersPanel() {
                 <span className="font-bold text-navy-900">{fullName(u)}</span>
                 <RoleBadge role={u.role} />
               </div>
-              <KV label="ת.ז"><span className="ds-num">{u.id}</span></KV>
+              <KV label="דוא״ל"><span dir="ltr">{u.email || "—"}</span></KV>
               <KV label="תפקיד · סניף">{u.title} · {u.branch ? branchLabel(u.branch) : "—"}</KV>
               <KV label="נייד"><span className="ds-num" dir="ltr">{u.phone}</span></KV>
               <div className="flex items-center justify-between gap-2 border-t border-table-line pt-1 text-[13.5px]">
@@ -380,16 +390,15 @@ export function UsersPanel() {
             </Select>
           </FormField>
 
-          <FormField label="ת.ז">
+          <FormField label="אימייל (Microsoft / Outlook)">
             <Input
-              value={form.id}
-              onChange={(e) =>
-                setForm({ ...form, id: e.target.value.replace(/\D/g, "").slice(0, 9) })
-              }
-              inputMode="numeric"
-              placeholder="123456789"
-              aria-label="ת.ז"
-              className="tabular-nums"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              type="email"
+              inputMode="email"
+              dir="ltr"
+              placeholder="name@company.com"
+              aria-label="אימייל (Microsoft / Outlook)"
             />
           </FormField>
 
@@ -460,7 +469,6 @@ export function UsersPanel() {
               </p>
             ) : null}
           </div>
-          {editingId ? null : <p className="text-xs text-slate-600">סיסמה ראשונית: ת.ז</p>}
 
           {error ? <p role="alert" className="text-sm font-semibold text-danger">{error}</p> : null}
 
