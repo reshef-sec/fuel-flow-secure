@@ -3,7 +3,8 @@ import { toast } from "sonner";
 
 import { FormField, Textarea } from "@/design-system/delek-1ea111";
 import { Modal } from "@/components/ui/Modal";
-import { FuelSplitFields, emptySplit, readSplit } from "@/components/fuel/fuel";
+import { SizePicker } from "@/components/allocations/SizePicker";
+import { emptySizeCounts, readSizeCounts } from "@/lib/allocationSizes";
 import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
 
@@ -12,22 +13,25 @@ export function RequestDialog({ open, onClose }: { open: boolean; onClose: () =>
   const addRequest = useAppStore((s) => s.addRequest);
   const me = useCurrentUser();
 
-  const [split, setSplit] = useState(emptySplit);
+  const [counts, setCounts] = useState(emptySizeCounts);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setSplit(emptySplit());
+    setCounts(emptySizeCounts());
     setReason("");
     setError(null);
   }, [open]);
 
+  const selected = readSizeCounts(counts, null);
+  const total = typeof selected === "string" ? 0 : selected.split["בנזין"] + selected.split["סולר"];
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = readSplit(split);
-    if (typeof parsed === "string") return setError(parsed);
-    if (!reason.trim()) return setError("יש למלא את סיבת הדרישה");
+    const selection = readSizeCounts(counts, null);
+    if (typeof selection === "string") return setError(selection);
+    const parsed = selection.split;
     const numeric = parsed["בנזין"] + parsed["סולר"];
     if (!me) {
       setError("לא נמצא משתמש מחובר");
@@ -41,6 +45,7 @@ export function RequestDialog({ open, onClose }: { open: boolean; onClose: () =>
       amount: numeric,
       benzineAmount: parsed["בנזין"],
       dieselAmount: parsed["סולר"],
+      sizes: selection.sizes,
       reason: reason.trim(),
     });
     onClose();
@@ -48,23 +53,26 @@ export function RequestDialog({ open, onClose }: { open: boolean; onClose: () =>
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="הגשת דרישת שוברים" description="הדרישה תישלח לאישור אדמין מרכזי">
+    <Modal open={open} onClose={onClose} title="הגשת דרישת שוברים" description="בחרו כמה שוברים מכל גודל. האדמין יאשר לפי המלאי הקיים." size="lg">
       <form onSubmit={submit} className="space-y-5">
         <div className="rounded-xl border border-table-line bg-table-head px-3.5 py-3 text-sm">
           <p className="m-0 font-semibold text-navy-900">{me ? fullName(me) : "—"}</p>
           <p className="m-0 text-slate-600">סניף {me?.branch ? branchLabel(me.branch) : "—"}</p>
         </div>
 
-        <FuelSplitFields values={split} onChange={setSplit} />
+        <SizePicker idPrefix="request" counts={counts} onCounts={setCounts} stock={null} />
+        <p className="m-0 text-sm text-slate-600">
+          סה״כ לדרישה: <span className="ds-num font-bold text-navy-900">{total.toLocaleString("he-IL")} ₪</span>
+        </p>
 
-        <FormField label="סיבת הדרישה">
+        <FormField label="סיבת הדרישה (רשות)">
           <Textarea
             aria-label="סיבת הדרישה"
             value={reason}
             onChange={(e) => setReason(e.target.value.slice(0, 500))}
             maxLength={500}
             rows={3}
-            placeholder="פרט את סיבת הדרישה…"
+            placeholder="אפשר להשאיר ריק"
           />
         </FormField>
 

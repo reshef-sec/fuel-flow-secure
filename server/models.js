@@ -175,6 +175,8 @@ const requestSchema = new Schema({
   status: str("ממתין לאישור"),
   approved_amount: { type: Number, default: null }, approver: str(),
   benzine_amount: { type: Number, default: null }, diesel_amount: { type: Number, default: null },
+  /** Cards asked for: { בנזין: { 100: 3 }, סולר: { 500: 1 } }. Null on older requests. */
+  sizes: { type: Schema.Types.Mixed, default: null },
 }, opts("voucher_requests"));
 requestSchema.index({ id: 1 }, { unique: true });
 requestSchema.index({ created_at: 1 });

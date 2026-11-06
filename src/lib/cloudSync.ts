@@ -2,6 +2,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/apiClient";
 import { notifyCentralInventoryChanged } from "@/lib/centralInventorySummary";
 import { normalizeVoucherStatus } from "@/lib/importIntegrity";
+import type { FuelSizes } from "@/lib/allocationSizes";
 import type { VoucherRecord } from "@/components/dashboard/voucherData";
 import type {
   B2BClientRecord,
@@ -92,7 +93,7 @@ export const requestToRow = (r: VoucherRequest) => ({
   id: r.id, requester: r.requester, requester_id: r.requesterId, branch: r.branch, amount: r.amount,
   reason: r.reason, created_on: r.createdAt, status: r.status,
   approved_amount: r.approvedAmount ?? null, approver: r.approver ?? null,
-  benzine_amount: r.benzineAmount ?? null, diesel_amount: r.dieselAmount ?? null,
+  benzine_amount: r.benzineAmount ?? null, diesel_amount: r.dieselAmount ?? null, sizes: r.sizes ?? null,
 });
 export const linkToRow = (l: WorkerLink) => ({
   id: l.id, total: l.total, serials: l.serials, created_on: l.createdAt,
@@ -138,6 +139,7 @@ export async function loadEssentials() {
       ...(r.benzine_amount != null || r.diesel_amount != null
         ? { benzineAmount: Number(r.benzine_amount ?? 0), dieselAmount: Number(r.diesel_amount ?? 0) }
         : {}),
+      ...(r.sizes ? { sizes: r.sizes as FuelSizes } : {}),
     })).reverse() as VoucherRequest[],
     balance: Number(settings.find((r) => r.key === "main")?.balance ?? 0),
   };

@@ -16,7 +16,7 @@ import { fuelStockError, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issua
 import { transferInventory, issueVoucherToWorker } from "@/lib/transferInventory";
 import { cardsOfFuel, issuancePool } from "@/lib/issuanceStock";
 import { pickExact } from "@/lib/inventorySelection";
-import { pickBySize } from "@/lib/allocationSizes";
+import { pickBySize, type FuelSizes } from "@/lib/allocationSizes";
 export { pickExact } from "@/lib/inventorySelection";
 import { centralPoolOf, centralFuelLimitError } from "@/lib/centralInventory";
 import { notifyCentralInventoryChanged } from "@/lib/centralInventorySummary";
@@ -201,6 +201,8 @@ export interface VoucherRequest {
   /** Requested split by fuel type (sums to amount). */
   benzineAmount?: number;
   dieselAmount?: number;
+  /** Cards asked for, per fuel and face value. Absent on older requests. */
+  sizes?: FuelSizes;
 }
 
 /** Metadata attached to created vouchers for audit tracking. */
@@ -245,7 +247,7 @@ interface AppState {
   requests: VoucherRequest[];
   addRequest: (req: Omit<VoucherRequest, "id" | "createdAt" | "status">) => void;
   /** Approves a request (full or custom amount) and allocates to the requester branch. */
-  approveRequest: (id: string, amount: number, approver: string, split?: Record<FuelType, number>) => Promise<void>;
+  approveRequest: (id: string, amount: number, approver: string, sizes?: FuelSizes) => Promise<boolean>;
   rejectRequest: (id: string, approver: string) => void;
   assignToSupervisor: (branch: string, supervisor: string, amount: number, fuelType?: FuelType) => Promise<string | null>;
   /** Marks vouchers redeemed by serial numbers from the Paz feedback file. */
@@ -416,27 +418,45 @@ export const useAppStore = create<AppState>()(
     run(db.from("voucher_requests").insert(requestToRow(row)));
     logActivity(actorOf(get()), "הגשת דרישת שוברים", `${row.branch} · ${row.amount} ₪`);
   },
-  approveRequest: async (id, amount, approver, split) => {
+  approveRequest: async (id, amount, approver, chosen) => {
     const req = get().requests.find((r) => r.id === id);
-    if (!req) return;
+    if (!req) return false;
+    // The admin's sizes, or exactly what was asked for.
+    const sizes = chosen ?? req.sizes;
+    if (sizes) {
+      const fuels = FUEL_TYPES.filter((f) => Object.values(sizes[f] ?? {}).some(Boolean));
+      const latest = await loadIssuanceStock();
+      set({ vouchers: latest });
+      for (const f of fuels) {
+        if (!pickBySize(centralPoolOf(latest, f), sizes[f])) {
+          toast.error(`${STOCK_SHORTAGE}. אפשר לאשר גדלים אחרים ב"אשר סכום אחר"`);
+          return false;
+        }
+      }
+      for (const fuelType of fuels) {
+        const fuelAmount = Object.entries(sizes[fuelType]).reduce((t, [size, n]) => t + Number(size) * n, 0);
+        const error = await get().allocate(req.branch, undefined, fuelAmount, { requester: req.requester, approver, fuelType, sizes: sizes[fuelType] });
+        if (error) { toast.error(error); return false; }
+      }
+    } else {
     const asked = (req.benzineAmount ?? 0) + (req.dieselAmount ?? 0);
-    if (split || asked > 0) {
-      // The admin's own split wins; otherwise keep the requested split, scaled down if approving less.
+    if (asked > 0) {
+      // Older requests have no sizes: keep the requested split, scaled down if approving less.
       // Diesel moves in 100 ₪ steps; any remainder goes to petrol (50 ₪ steps).
       let diesel = Math.floor(((req.dieselAmount ?? 0) * Math.min(amount, asked)) / asked / 100) * 100;
       if (amount > asked) diesel = Math.floor((req.dieselAmount ?? 0) / 100) * 100;
-      if (split) diesel = split["סולר"];
-      const benzine = split ? split["בנזין"] : Math.max(0, amount - diesel);
+      const benzine = Math.max(0, amount - diesel);
       const fail = poolShortage({ "בנזין": benzine, "סולר": diesel }, get().vouchers);
-      if (fail) return void toast.error(fail);
+      if (fail) { toast.error(fail); return false; }
       for (const [fuelType, fuelAmount] of [["בנזין", benzine], ["סולר", diesel]] as const) {
         if (!fuelAmount) continue;
         const error = await get().allocate(req.branch, undefined, fuelAmount, { requester: req.requester, approver, fuelType });
-        if (error) return void toast.error(error);
+        if (error) { toast.error(error); return false; }
       }
     } else {
       const err = await get().allocate(req.branch, undefined, amount, { requester: req.requester, approver });
-      if (err) return void toast.error(err);
+      if (err) { toast.error(err); return false; }
+    }
     }
     set((s) => ({
       requests: s.requests.map((r) =>
@@ -445,6 +465,7 @@ export const useAppStore = create<AppState>()(
     }));
     run(db.from("voucher_requests").update({ status: "אושר", approved_amount: amount, approver }).eq("id", id));
     logActivity(actorOf(get()), "אישור דרישה", `${req.requester} · ${amount} ₪`);
+    return true;
   },
   rejectRequest: (id, approver) => {
     set((s) => ({

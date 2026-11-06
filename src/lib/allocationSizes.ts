@@ -21,8 +21,8 @@ export function stockFromSummary(rows: { amount: number; fuel_type: IssuanceFuel
 }
 
 /** The standard sizes, plus any other face value that really exists in stock (never hidden). */
-export const sizesFor = (fuel: IssuanceFuel, stock: SizeStock) =>
-  [...new Set([...FACE_VALUES[fuel], ...Object.keys(stock[fuel]).map(Number)])].sort((a, b) => a - b);
+export const sizesFor = (fuel: IssuanceFuel, stock: SizeStock | null) =>
+  [...new Set([...FACE_VALUES[fuel], ...Object.keys(stock?.[fuel] ?? {}).map(Number)])].sort((a, b) => a - b);
 
 /** Exactly the requested number of cards of each face value (each card once), or null when a size runs short. */
 export function pickBySize<T extends { amount: number }>(pool: T[], sizes: Record<number, number>): T[] | null {
@@ -36,10 +36,21 @@ export function pickBySize<T extends { amount: number }>(pool: T[], sizes: Recor
   return picked.length ? picked : null;
 }
 
+/** Saved sizes back into form fields. */
+export function countsFromSizes(sizes: FuelSizes | undefined): SizeCounts {
+  const counts = emptySizeCounts();
+  for (const fuel of FUELS) for (const [size, n] of Object.entries(sizes?.[fuel] ?? {})) counts[fuel][Number(size)] = String(n);
+  return counts;
+}
+
+/** "3×500 + 2×50" */
+export const sizesText = (sizes: Record<number, number> | undefined) =>
+  Object.entries(sizes ?? {}).filter(([, n]) => n).sort((a, b) => Number(b[0]) - Number(a[0])).map(([size, n]) => `${n}×${size}`).join(" + ");
+
 export interface SizeSelection { sizes: FuelSizes; split: Record<IssuanceFuel, number> }
 
-/** Validates the counts against the stock: the selection, or a Hebrew reason. */
-export function readSizeCounts(counts: SizeCounts, stock: SizeStock): SizeSelection | string {
+/** Validates the counts: the selection, or a Hebrew reason. `stock` null = a request, not limited by stock. */
+export function readSizeCounts(counts: SizeCounts, stock: SizeStock | null): SizeSelection | string {
   const sizes: FuelSizes = { "בנזין": {}, "סולר": {} };
   const split: Record<IssuanceFuel, number> = { "בנזין": 0, "סולר": 0 };
   for (const fuel of FUELS) {
@@ -49,7 +60,7 @@ export function readSizeCounts(counts: SizeCounts, stock: SizeStock): SizeSelect
       const n = Number(text);
       if (!Number.isSafeInteger(n) || n < 0) return "כמות שוברים לא תקינה";
       if (!n) continue;
-      if (n > (stock[fuel][size] ?? 0)) return `אין מספיק שוברים של ${size} ₪ ב${fuel === "בנזין" ? "בנזין 95" : "סולר"}`;
+      if (stock && n > (stock[fuel][size] ?? 0)) return `אין מספיק שוברים של ${size} ₪ ב${fuel === "בנזין" ? "בנזין 95" : "סולר"}`;
       sizes[fuel][size] = n;
       split[fuel] += n * size;
     }

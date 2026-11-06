@@ -129,6 +129,17 @@ const REGULAR_CLIENTS = [
 /** Paz denominations only: petrol 50/100/500, diesel 100/500. */
 const DENOMS = { "בנזין": [[50, 45], [100, 40], [500, 15]], "סולר": [[100, 80], [500, 20]] };
 
+/** An amount as whole cards, largest first: { 500: 2, 100: 1 }. */
+function asCards(amount, sizes) {
+  const cards = {};
+  let left = amount;
+  for (const size of sizes) {
+    const n = Math.floor(left / size);
+    if (n) { cards[size] = n; left -= n * size; }
+  }
+  return cards;
+}
+
 // ───────────────────────────── generator ─────────────────────────────
 
 export async function seedLearning({ owner } = {}) {
@@ -502,6 +513,7 @@ export async function seedLearning({ owner } = {}) {
       id: requestId(createdAt), requester: requester.name, requester_id: requester.id, branch: b,
       amount: benz + dies, benzine_amount: benz, diesel_amount: dies, reason, created_on: day(createdAt), created_at: createdAt,
       status: "ממתין לאישור", approved_amount: null, approver: null, _requester: requester,
+      sizes: { "בנזין": asCards(benz, [500, 100, 50]), "סולר": asCards(dies, [500, 100]) },
     });
   });
 
@@ -610,7 +622,7 @@ export async function seedLearning({ owner } = {}) {
 }
 
 /** Bumped whenever the dataset's shape changes; an older learning copy is re-seeded on next activation. */
-export const SEED_VERSION = 6;
+export const SEED_VERSION = 7;
 
 /** Drops Mongo internals so a real document can be copied into its learning twin. */
 function stripDoc(doc) {

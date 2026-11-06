@@ -11,16 +11,21 @@ import { fullName, roleLabels, useAppStore, useCurrentUser, type VoucherRequest 
 import { useCentralInventorySummary } from "@/lib/useCentralInventorySummary";
 import { branchLabel } from "@/lib/branchLabels";
 import { formatIsraelDate } from "@/lib/israelDate";
-import { emptySplit, FUEL_TYPES, fuelLabel, type FuelType } from "@/components/fuel/fuel";
-import { issuanceAmountRules, validateFuelSplit } from "@/lib/issuanceInventory";
+import { FUEL_TYPES, fuelLabel, type FuelType } from "@/components/fuel/fuel";
+import { SizePicker } from "@/components/allocations/SizePicker";
+import { countsFromSizes, emptySizeCounts, readSizeCounts, sizesText, stockFromSummary, type FuelSizes } from "@/lib/allocationSizes";
 
-const splitText = (split: Record<FuelType, number>) =>
-  FUEL_TYPES.filter((f) => split[f]).map((f) => `${split[f].toLocaleString("he-IL")} ₪ ${fuelLabel(f)}`).join(" ו־");
+const sizesLine = (sizes: FuelSizes) =>
+  FUEL_TYPES.filter((f) => sizesText(sizes[f])).map((f: FuelType) => `${sizesText(sizes[f])} ${fuelLabel(f)}`).join(" ו־");
 
 const ils = (n: number) => `${n.toLocaleString("he-IL")} ₪`;
 
 /** "בנזין 95 300 ₪ · סולר 200 ₪" from the requested split, or "—" for legacy requests. */
 function fuelSplit(r: VoucherRequest) {
+  if (r.sizes) {
+    const bySize = FUEL_TYPES.filter((f) => sizesText(r.sizes?.[f])).map((f) => `${fuelLabel(f)}: ${sizesText(r.sizes?.[f])}`);
+    if (bySize.length) return bySize.join(" · ");
+  }
   const parts = [
     r.benzineAmount ? `בנזין 95 ${ils(r.benzineAmount)}` : "",
     r.dieselAmount ? `סולר ${ils(r.dieselAmount)}` : "",
@@ -47,7 +52,7 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
   const approver = me ? fullName(me) : "אדמין מרכזי";
 
   const [customId, setCustomId] = useState<string | null>(null);
-  const [customSplit, setCustomSplit] = useState(emptySplit);
+  const [customCounts, setCustomCounts] = useState(emptySizeCounts);
   const [result, setResult] = useState<ResultSummary | null>(null);
   const closeCustom = useCallback(() => setCustomId(null), []);
   const closeResult = useCallback(() => setResult(null), []);
@@ -55,14 +60,13 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
   const pending = requests.filter((r) => r.status === "ממתין לאישור");
   const pendingSum = pending.reduce((t, r) => t + r.amount, 0);
   const customReq = pending.find((r) => r.id === customId) ?? null;
+  const customStock = stockFromSummary(summary?.denominations);
+  const customSelection = readSizeCounts(customCounts, customStock);
+  const customTotal = typeof customSelection === "string" ? 0 : customSelection.split["בנזין"] + customSelection.split["סולר"];
 
-  async function approve(id: string, amount: number, split?: Record<FuelType, number>) {
+  async function approve(id: string, amount: number, sizes?: FuelSizes) {
     if (amount % 50 !== 0 || amount <= 0) {
       toast.error("הסכום חייב להיות בכפולות של 50 ₪");
-      return;
-    }
-    if (split && summary && (split["בנזין"] > summary.gasoline_amount || split["סולר"] > summary.diesel_amount)) {
-      toast.error("הסכום גבוה מהיתרה הזמינה במאגר עבור סוג דלק זה");
       return;
     }
     if (!summary || amount > summary.total_available_amount) {
@@ -70,14 +74,13 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
       return;
     }
     const req = requests.find((r) => r.id === id);
-    await approveRequest(id, amount, approver, split);
-    if (useAppStore.getState().requests.find(r => r.id === id)?.status !== "אושר") return;
+    if (!(await approveRequest(id, amount, approver, sizes))) return;
     setCustomId(null);
-    setCustomSplit(emptySplit());
+    setCustomCounts(emptySizeCounts());
     setResult({
       tone: "success",
       title: "הדרישה אושרה",
-      line: `הדרישה אושרה והוקצו ${split ? splitText(split) : `${amount.toLocaleString("he-IL")} ₪`}`,
+      line: `הדרישה אושרה והוקצו ${sizes ? sizesLine(sizes) : `${amount.toLocaleString("he-IL")} ₪`}`,
       detail: req ? `${req.requester} · ${branchLabel(req.branch)}` : undefined,
     });
   }
@@ -89,12 +92,8 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
 
   function openCustom(r: VoucherRequest) {
     setCustomId(r.id);
-    // Opens with what was requested, per fuel (older requests without a split start as petrol).
-    const hasSplit = (r.benzineAmount ?? 0) + (r.dieselAmount ?? 0) > 0;
-    setCustomSplit({
-      "בנזין": hasSplit ? String(r.benzineAmount ?? "") : String(r.amount),
-      "סולר": hasSplit ? String(r.dieselAmount ?? "") : "",
-    });
+    // Opens with the sizes that were requested; the admin changes them to what exists.
+    setCustomCounts(countsFromSizes(r.sizes));
   }
 
   const actions = (r: VoucherRequest, mobile = false) =>
@@ -171,7 +170,7 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
                   <td className="text-slate-600">{roleOf(r)}</td>
                   <td><span className="ds-num font-semibold">{ils(r.amount)}</span></td>
                   <td className="text-ink-soft">{fuelSplit(r)}</td>
-                  <td className="min-w-[120px] text-slate-600">{r.reason}</td>
+                  <td className="min-w-[120px] text-slate-600">{r.reason || "—"}</td>
                   <td><span className="ds-num text-ink-soft">{r.createdAt ? formatIsraelDate(r.createdAt) : "—"}</span></td>
                   <td><StatusBadge status={r.status} size="sm" /></td>
                   <td>{actions(r)}</td>
@@ -193,7 +192,7 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
               <span className="ds-num text-[17px] font-bold">{ils(r.amount)}</span>
               <KV label="סניף · תפקיד">{branchLabel(r.branch)} · {roleOf(r)}</KV>
               <KV label="סוג דלק">{fuelSplit(r)}</KV>
-              <KV label="סיבה">{r.reason}</KV>
+              <KV label="סיבה">{r.reason || "—"}</KV>
               <KV label="הוגש"><span className="ds-num">{r.createdAt ? formatIsraelDate(r.createdAt) : "—"}</span></KV>
               {actions(r, true)}
             </>
@@ -201,15 +200,14 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
         />
       </TableCard>
 
-      <Modal open={!!customReq} onClose={closeCustom} title="אישור סכום אחר" size="sm">
+      <Modal open={!!customReq} onClose={closeCustom} title="אישור סכום אחר" size="lg">
         {customReq ? (
           <form
             className="flex flex-col gap-3.5"
             onSubmit={(e) => {
               e.preventDefault();
-              const parsed = validateFuelSplit(customSplit);
-              if (typeof parsed === "string") return void toast.error(parsed);
-              void approve(customReq.id, parsed["בנזין"] + parsed["סולר"], parsed);
+              if (typeof customSelection === "string") return void toast.error(customSelection);
+              void approve(customReq.id, customSelection.split["בנזין"] + customSelection.split["סולר"], customSelection.sizes);
             }}
           >
             <div className="flex flex-col gap-2 rounded-xl border border-table-line bg-table-head px-3.5 py-3">
@@ -217,33 +215,9 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
               <KV label="סכום מבוקש"><span className="ds-num font-bold">{ils(customReq.amount)}</span></KV>
               <KV label="סוג דלק">{fuelSplit(customReq)}</KV>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {FUEL_TYPES.map((f, i) => {
-                const rules = issuanceAmountRules(f);
-                return (
-                  <label key={f} className="flex min-w-0 flex-col gap-1.5">
-                    <span className="text-[13.5px] font-bold">{fuelLabel(f)} (₪)</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      step={rules.step}
-                      aria-label={`סכום מאושר ${fuelLabel(f)}`}
-                      value={customSplit[f]}
-                      onChange={(e) => setCustomSplit({ ...customSplit, [f]: e.target.value })}
-                      placeholder="0"
-                      autoFocus={i === 0}
-                      className="ds-num h-11 w-full rounded-control border border-line-strong bg-surface px-3 text-[15px] text-navy-900 outline-none focus:shadow-focus-mint"
-                    />
-                    <span className="text-xs text-slate-600">
-                      {rules.hint} · זמין: <span className="ds-num">{summary ? ils(f === "בנזין" ? summary.gasoline_amount : summary.diesel_amount) : "—"}</span>
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
+            <SizePicker idPrefix="approve" counts={customCounts} onCounts={setCustomCounts} stock={customStock} />
             <p className="m-0 text-sm text-slate-600">
-              סה״כ לאישור: <span className="ds-num font-bold text-navy-900">{ils((Number(customSplit["בנזין"]) || 0) + (Number(customSplit["סולר"]) || 0))}</span>
+              סה״כ לאישור: <span className="ds-num font-bold text-navy-900">{ils(customTotal)}</span>
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button type="submit" className={`${okBtn} min-h-11`}>אישור בסכום זה</button>

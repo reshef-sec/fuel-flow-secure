@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { emptySizeCounts, pickBySize, readSizeCounts, sizesFor, stockFromSummary } from "./allocationSizes";
+import { countsFromSizes, emptySizeCounts, pickBySize, readSizeCounts, sizesFor, sizesText, stockFromSummary } from "./allocationSizes";
 
 const card = (serial: string, amount: number) => ({ serial, amount });
 const pools = {
@@ -39,5 +39,18 @@ describe("allocation by voucher size", () => {
     const c = emptySizeCounts();
     c["סולר"][100] = "1.5";
     assert.equal(typeof readSizeCounts(c, stock), "string");
+  });
+});
+
+describe("requests by voucher size", () => {
+  it("a request is not limited by stock, and saved sizes return to the form", () => {
+    const c = emptySizeCounts();
+    c["בנזין"][500] = "40"; c["סולר"][100] = "3";
+    const r = readSizeCounts(c, null);
+    assert.notEqual(typeof r, "string");
+    if (typeof r === "string") return;
+    assert.deepEqual(r.split, { "בנזין": 20000, "סולר": 300 });
+    assert.deepEqual(countsFromSizes(r.sizes), c);
+    assert.equal(sizesText({ 50: 2, 500: 3 }), "3×500 + 2×50");
   });
 });
