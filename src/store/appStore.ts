@@ -241,7 +241,7 @@ interface AppState {
   requests: VoucherRequest[];
   addRequest: (req: Omit<VoucherRequest, "id" | "createdAt" | "status">) => void;
   /** Approves a request (full or custom amount) and allocates to the requester branch. */
-  approveRequest: (id: string, amount: number, approver: string) => Promise<void>;
+  approveRequest: (id: string, amount: number, approver: string, split?: Record<FuelType, number>) => Promise<void>;
   rejectRequest: (id: string, approver: string) => void;
   assignToSupervisor: (branch: string, supervisor: string, amount: number, fuelType?: FuelType) => Promise<string | null>;
   /** Marks vouchers redeemed by serial numbers from the Paz feedback file. */
@@ -412,16 +412,17 @@ export const useAppStore = create<AppState>()(
     run(db.from("voucher_requests").insert(requestToRow(row)));
     logActivity(actorOf(get()), "הגשת דרישת שוברים", `${row.branch} · ${row.amount} ₪`);
   },
-  approveRequest: async (id, amount, approver) => {
+  approveRequest: async (id, amount, approver, split) => {
     const req = get().requests.find((r) => r.id === id);
     if (!req) return;
     const asked = (req.benzineAmount ?? 0) + (req.dieselAmount ?? 0);
-    if (asked > 0) {
-      // Keep the requested fuel split; scale down proportionally if approving less.
+    if (split || asked > 0) {
+      // The admin's own split wins; otherwise keep the requested split, scaled down if approving less.
       // Diesel moves in 100 ₪ steps; any remainder goes to petrol (50 ₪ steps).
       let diesel = Math.floor(((req.dieselAmount ?? 0) * Math.min(amount, asked)) / asked / 100) * 100;
       if (amount > asked) diesel = Math.floor((req.dieselAmount ?? 0) / 100) * 100;
-      const benzine = Math.max(0, amount - diesel);
+      if (split) diesel = split["סולר"];
+      const benzine = split ? split["בנזין"] : Math.max(0, amount - diesel);
       const fail = poolShortage({ "בנזין": benzine, "סולר": diesel }, get().vouchers);
       if (fail) return void toast.error(fail);
       for (const [fuelType, fuelAmount] of [["בנזין", benzine], ["סולר", diesel]] as const) {
