@@ -52,7 +52,13 @@ export async function loginAs(role = "admin", opts = {}) {
     password_hash: await hashPassword(password), requires_password_change: opts.requiresPasswordChange ?? false,
   });
   const agent = request.agent(app);
+  // Tests sign in with a password even where a provider is configured for the test.
+  const { MICROSOFT_CLIENT_ID: ms, GOOGLE_CLIENT_ID: g } = process.env;
+  delete process.env.MICROSOFT_CLIENT_ID;
+  delete process.env.GOOGLE_CLIENT_ID;
   const res = await agent.post("/api/auth/login").send({ identifier: email, password });
+  if (ms) process.env.MICROSOFT_CLIENT_ID = ms;
+  if (g) process.env.GOOGLE_CLIENT_ID = g;
   if (res.status !== 200) throw new Error(`login failed: ${res.status} ${JSON.stringify(res.body)}`);
   return { agent, profile, phone, email, password };
 }

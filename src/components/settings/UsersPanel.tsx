@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FileSpreadsheet, Plus, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
@@ -14,7 +14,7 @@ import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 import { DataTable, EmptyRow, KV, MobileCardList } from "@/components/ui/DataTable";
 import { ResultDialog, type ResultSummary } from "@/components/ui/ResultDialog";
-import { deleteAccount, resetAccountPassword, syncAccount } from "@/lib/backend";
+import { deleteAccount, resetAccountPassword, syncAccount, getAuthOptions } from "@/lib/backend";
 import { isSheetFile, parseSheetFile, stripHeader } from "@/lib/parseSheet";
 import { fullName, isReadOnlyRole, roleLabels, useAppStore, type Role, type UserRecord } from "@/store/appStore";
 import { branchLabel } from "@/lib/branchLabels";
@@ -86,6 +86,12 @@ export function UsersPanel() {
     branch: u.branch,
     role: u.role,
   });
+
+  // Once Google or Microsoft is set up, staff sign in there, so a password would not get them in.
+  const [singleSignOn, setSingleSignOn] = useState(false);
+  useEffect(() => {
+    getAuthOptions().then((o) => setSingleSignOn(o.microsoft || o.google)).catch(() => undefined);
+  }, []);
 
   async function resetPassword(u: UserRecord) {
     try {
@@ -321,7 +327,7 @@ export function UsersPanel() {
                   {readOnly ? null : (
                     <td>
                       <span className="flex gap-1">
-                        {isAdmin ? (
+                        {isAdmin && !singleSignOn ? (
                           <button type="button" className="ds-rowact" aria-label={`איפוס סיסמה ל${u.lastName} ${u.firstName}`} onClick={() => void resetPassword(u)}>
                             איפוס סיסמה
                           </button>

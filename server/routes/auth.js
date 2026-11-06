@@ -1,9 +1,9 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import { AppUser, Profile } from "../models.js";
-import { ah, badRequest, unauthorized, HttpError } from "../errors.js";
+import { ah, badRequest, forbidden, unauthorized, HttpError } from "../errors.js";
 import {
-  clearSession, hashPassword, issueSession, normalizeEmail, normalizePhone, passwordPolicyError, publicProfile, verifyPassword,
+  clearSession, hashPassword, isDevToolsOwner, issueSession, normalizeEmail, normalizePhone, passwordPolicyError, publicProfile, verifyPassword,
 } from "../auth.js";
 import { logAction } from "../lib/audit.js";
 import { claimHeldCards } from "../lib/claimHeldCards.js";
@@ -18,13 +18,19 @@ const INVALID = "פרטי הכניסה שגויים";
 const ATTEMPT_COOKIE = "rsf_oauth";
 const ATTEMPT_PATH = "/api/auth";
 const PROVIDERS = { microsoft, google };
+const USE_PROVIDER = "הכניסה למערכת מתבצעת דרך Google או Microsoft";
+const singleSignOnOnly = () => microsoft.configured() || google.configured();
 
 const fullNameOf = (u) => `${u.first_name ?? ""} ${u.last_name ?? ""}`.replace(/\s+/g, " ").trim();
 
 /** What the login screen may offer. */
 router.get("/options", (_req, res) => res.json({ microsoft: microsoft.configured(), google: google.configured() }));
 
-/** Password sign-in with email, or with the mobile number for accounts that have no email yet. */
+/**
+ * Password sign-in. Once Google or Microsoft is set up they are the way in, and a password works
+ * only for the primary admin (by email). Until then it stays open, also by mobile number, so
+ * nobody is locked out before the providers exist.
+ */
 router.post("/login", ah(async (req, res) => {
   const identifier = String(req.body?.identifier ?? "").trim();
   const password = String(req.body?.password ?? "");
@@ -47,6 +53,7 @@ router.post("/login", ah(async (req, res) => {
     await profile.save();
     throw unauthorized(INVALID);
   }
+  if (singleSignOnOnly() && !(isDevToolsOwner(profile) && identifier.includes("@"))) throw forbidden(USE_PROVIDER);
   profile.failed_logins = 0;
   profile.locked_until = null;
   profile.last_login_at = new Date();

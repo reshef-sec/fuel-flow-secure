@@ -175,13 +175,37 @@ describe("sign in with Google", () => {
 describe("password login", () => {
   it("works with email and with phone; an account with no password cannot use it", async () => {
     const u = await loginAs("admin", { email: "Maya@Example.com" });
+    delete process.env.MICROSOFT_CLIENT_ID;
     for (const identifier of ["maya@example.com", "MAYA@example.com", u.phone]) {
       assert.equal((await anon().post("/api/auth/login").send({ identifier, password: u.password })).status, 200, identifier);
     }
+    process.env.MICROSOFT_CLIENT_ID = CLIENT;
     await staff();
     await signInWithMicrosoft({ email: "dana@outlook.com", oid: "o1" });
+    delete process.env.MICROSOFT_CLIENT_ID;
     assert.equal((await anon().post("/api/auth/login").send({ identifier: "dana@outlook.com", password: "" })).status, 400);
     assert.equal((await anon().post("/api/auth/login").send({ identifier: "dana@outlook.com", password: "Passw0rd!" })).status, 401);
+  });
+});
+
+describe("once a provider is set up", () => {
+  it("only the primary admin may use a password, by email", async () => {
+    const owner = await loginAs("admin", { email: "owner@example.com" });
+    const other = await loginAs("supervisor");
+    process.env.DEV_TOOLS_OWNER_EMAIL = "owner@example.com";
+    const login = (identifier, password) => anon().post("/api/auth/login").send({ identifier, password });
+    assert.equal((await login("owner@example.com", owner.password)).status, 200);
+    assert.equal((await login(owner.phone, owner.password)).status, 403, "not by mobile number");
+    const refused = await login(other.email, other.password);
+    assert.equal(refused.status, 403);
+    assert.match(refused.body.error, /Google או Microsoft/);
+    assert.equal((await login(other.phone, other.password)).status, 403);
+
+    // Before any provider exists, nobody is locked out.
+    delete process.env.MICROSOFT_CLIENT_ID;
+    assert.equal((await login(other.email, other.password)).status, 200);
+    assert.equal((await login(other.phone, other.password)).status, 200);
+    delete process.env.DEV_TOOLS_OWNER_EMAIL;
   });
 });
 

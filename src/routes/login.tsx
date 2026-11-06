@@ -57,6 +57,7 @@ function LoginPage() {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [identifier, setIdentifier] = useState("");
   const [providers, setProviders] = useState({ microsoft: false, google: false });
+  const [adminForm, setAdminForm] = useState(false);
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +93,9 @@ function LoginPage() {
     }
   }
 
+  // With Google or Microsoft set up they are the way in; the password form is for the primary admin.
+  const singleSignOn = (providers.microsoft || providers.google) && !needsSetup;
+  const showPasswordForm = !singleSignOn || adminForm;
   const iconCls = "pointer-events-none absolute right-3.5 top-1/2 size-[18px] -translate-y-1/2 text-slate-400";
 
   return (
@@ -106,11 +110,11 @@ function LoginPage() {
             {needsSetup ? "הגדרת מנהל ראשי" : "כניסה למערכת"}
           </h1>
           <p className="m-0 text-[14.5px] text-slate-600">
-            {needsSetup ? "המערכת טרם הוגדרה. צרו את חשבון המנהל הראשי כדי להתחיל." : "התחברו עם החשבון שלכם, או עם אימייל וסיסמה."}
+            {needsSetup ? "המערכת טרם הוגדרה. צרו את חשבון המנהל הראשי כדי להתחיל." : singleSignOn ? "התחברו עם חשבון Google או Microsoft של המייל שלכם." : "הזינו אימייל וסיסמה כדי להמשיך."}
           </p>
         </div>
 
-        {(providers.microsoft || providers.google) && !needsSetup ? (
+        {singleSignOn ? (
           <>
             {providers.google ? (
               <a href="/api/auth/google/start" className={providerBtn}>
@@ -124,11 +128,11 @@ function LoginPage() {
                 התחבר באמצעות Microsoft
               </a>
             ) : null}
-            <div className="flex items-center gap-3 text-xs text-slate-500" aria-hidden>
-              <span className="h-px flex-1 bg-table-line" />
-              או
-              <span className="h-px flex-1 bg-table-line" />
-            </div>
+            {adminForm ? null : (
+              <button type="button" onClick={() => setAdminForm(true)} className="cursor-pointer border-0 bg-transparent p-1 text-[13px] font-semibold text-slate-500 hover:text-navy-700">
+                כניסת מנהלת המערכת עם סיסמה
+              </button>
+            )}
           </>
         ) : null}
 
@@ -153,8 +157,10 @@ function LoginPage() {
           </>
         ) : null}
 
+        {showPasswordForm ? (
+          <>
         <label className="flex flex-col gap-[7px] text-[13.5px] font-semibold text-ink-soft">
-          {needsSetup ? "אימייל" : "אימייל או מספר נייד"}
+          {needsSetup || singleSignOn ? "אימייל" : "אימייל או מספר נייד"}
           <span className="relative block">
             <Mail className={iconCls} aria-hidden />
             <input
@@ -164,7 +170,7 @@ function LoginPage() {
               autoComplete="username"
               dir="ltr"
               placeholder="name@company.com"
-              aria-label={needsSetup ? "אימייל" : "אימייל או מספר נייד"}
+              aria-label={needsSetup || singleSignOn ? "אימייל" : "אימייל או מספר נייד"}
               aria-invalid={error ? true : undefined}
               className={authInputClass}
             />
@@ -197,16 +203,21 @@ function LoginPage() {
           </span>
         </label>
 
+          </>
+        ) : null}
+
         {error ? (
           <AuthAlert tone="error" icon={<AlertCircle className="size-[18px]" aria-hidden />}>
             {error}
           </AuthAlert>
         ) : null}
 
+        {showPasswordForm ? (
         <button type="submit" disabled={busy} aria-busy={busy || undefined} className="auth-btn mt-1 inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[13px] border-0 text-[15.5px] font-bold disabled:cursor-wait disabled:opacity-70 focus-visible:shadow-focus-mint focus-visible:outline-none">
           {busy ? "מתחבר…" : needsSetup ? "צור מנהל והתחבר" : "כניסה למערכת"}
           {busy ? null : <ArrowLeft className="size-[18px]" aria-hidden />}
         </button>
+        ) : null}
 
       </AuthCard>
     </AuthLayout>
