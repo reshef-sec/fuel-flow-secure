@@ -1,182 +1,177 @@
-import { describe, it, before, after, beforeEach } from "node:test";
+/** The employee link: SMS code, device session, finger signature, wallet with revealed codes. */
+import { describe, it, before, after, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { startTestServer, stopTestServer, resetDb, loginAs, rpc, anon } from "./helpers.js";
-import { SignatureArchive, Voucher, VoucherCode, WorkerLink } from "../models.js";
-import { addMonths } from "../rpc/workerLinks.js";
+import { LEARNING, REAL, SignatureArchive, Voucher, VoucherCode, WorkerLink } from "../models.js";
+import { transport } from "../lib/sms.js";
 
-before(startTestServer);
-after(stopTestServer);
-beforeEach(resetDb);
+const ID = "abcDEF123456";
+const SIG = "data:image/png;base64,AAAA";
+let sent;
+const realSend = transport.send;
 
-const SIG = "data:image/png;base64,iVBORw0KGgo=";
+before(async () => {
+  await startTestServer();
+  transport.send = async (to, text) => { sent.push({ to, text }); };
+});
+after(async () => { transport.send = realSend; await stopTestServer(); });
+beforeEach(async () => {
+  sent = [];
+  await resetDb();
+  await LEARNING.WorkerLink.deleteMany({});
+  Object.assign(process.env, { TWILIO_ACCOUNT_SID: "a", TWILIO_AUTH_TOKEN: "b", TWILIO_FROM: "c" });
+});
+afterEach(() => { for (const k of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM"]) delete process.env[k]; });
 
-async function seedLink({ id = "123456", supervisorId = null, signed = false, createdAt } = {}) {
+/** Issues a real link through the API; returns the code that went out by SMS. */
+async function issue(agent, id = ID, phone = "0521234567") {
+  if (!(await REAL.RegularClient.exists({ client_id: "77" }))) await RegularClientSeed();
   await Voucher.create([
-    { serial: "S1", real_code: "fallback-1", amount: 100, fuel_type: "בנזין", status: "הוקצה לעובד", link_id: id },
-    { serial: "S2", real_code: "fallback-2", amount: 100, fuel_type: "סולר", status: "הוקצה לעובד", link_id: id },
-    { serial: "S3", real_code: "blocked", amount: 100, fuel_type: "בנזין", status: "חסום", link_id: id },
+    { serial: "S1", amount: 100, fuel_type: "בנזין", branch: "מאגר ראשי", status: "טרם שומש" },
+    { serial: "S2", amount: 100, fuel_type: "סולר", branch: "מאגר ראשי", status: "טרם שומש" },
   ]);
-  await VoucherCode.create({ serial: "S1", real_code: "REAL-1" });
-  await WorkerLink.create({
-    id, total: 300, serials: ["S1", "S2", "S3"], created_on: "2026-01-01", employee_name: "יוסי כהן",
-    branch: "חיפה", supervisor_id: supervisorId,
-    ...(signed ? { worker_id: "123456789", phone: "0521234567", signed_at: "2026-01-01" } : {}),
+  await VoucherCode.create([{ serial: "S1", real_code: "REAL-1" }, { serial: "S2", real_code: "REAL-2" }]);
+  const details = { route: "regular", client_id: "77", site_id: "1" };
+  const r = await rpc(agent, "issue_voucher_to_worker", {
+    p_items: [{ amount: 100, fuel_type: "בנזין", details }, { amount: 100, fuel_type: "סולר", details }],
+    p_branch: "מאגר ראשי", p_supervisor: null, p_link: { id, employee_name: "יוסי כהן", phone },
   });
-  if (createdAt) await WorkerLink.collection.updateOne({ id }, { $set: { created_at: createdAt } });
+  assert.equal(r.status, 200, r.error);
+  return { result: r.data, code: /קוד אימות: (\d{4})/.exec(sent.at(-1)?.text ?? "")?.[1] };
 }
+const RegularClientSeed = () => REAL.RegularClient.create({ client_id: "77", site_id: "1", client_name: "לקוח", site_name: "אתר", is_active: true });
+const verify = (code, id = ID) => rpc(anon(), "verify_worker_otp", { p_id: id, p_code: code });
+const wrongCode = (code) => (code === "0000" ? "1111" : "0000");
 
-describe("worker_link_status", () => {
-  it("reveals only status, total and name — never codes", async () => {
-    await seedLink();
-    const a = anon();
-    assert.deepEqual((await rpc(a, "worker_link_status", { p_id: "123456" })).data,
-      { exists: true, state: "ok", total: 300, signed: false, employee_name: "יוסי כהן" });
-    assert.deepEqual((await rpc(a, "worker_link_status", { p_id: "999999" })).data, { exists: false });
-    assert.deepEqual((await rpc(a, "worker_link_status", { p_id: "abc" })).data, { exists: false });
-    assert.deepEqual((await rpc(a, "worker_link_status", { p_id: { $ne: null } })).data, { exists: false });
+describe("issuing a voucher", () => {
+  it("sends one SMS with the link and a 4-digit code, and stores only a hash", async () => {
+    const { agent } = await loginAs("admin");
+    const { result, code } = await issue(agent);
+    assert.equal(result.sms_sent, true);
+    assert.equal(result.otp, undefined);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].to, "+972521234567");
+    assert.match(sent[0].text, /\/v\/abcDEF123456/);
+    assert.match(code, /^\d{4}$/);
+    const link = await REAL.WorkerLink.findOne({ id: ID }).lean();
+    assert.equal(link.phone, "0521234567");
+    assert.notEqual(link.otp_hash, code);
   });
 
-  it("reports expired links after 3 months", async () => {
-    await seedLink({ createdAt: addMonths(new Date(), -4) });
-    assert.deepEqual((await rpc(anon(), "worker_link_status", { p_id: "123456" })).data, { exists: true, state: "expired" });
-    assert.deepEqual((await rpc(anon(), "open_worker_wallet", { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567" })).data,
-      { ok: false, state: "expired" });
-    const s = await rpc(anon(), "sign_worker_link", { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567", p_full_name: "יוסי כהן", p_signature: SIG });
-    assert.deepEqual(s.data, { ok: false });
+  it("needs a phone, and hands the code to the issuer when SMS can't deliver", async () => {
+    const { agent } = await loginAs("admin");
+    const bad = await rpc(agent, "issue_voucher_to_worker", { p_items: [{ amount: 100, fuel_type: "בנזין", details: {} }], p_branch: "מאגר ראשי", p_link: { id: ID, employee_name: "יוסי" } });
+    assert.equal(bad.error, "מספר נייד לא תקין");
+
+    delete process.env.TWILIO_ACCOUNT_SID;
+    const { result } = await issue(agent, "noSmsLink1");
+    assert.equal(result.sms_sent, false);
+    assert.match(result.otp, /^\d{4}$/);
+    assert.equal(sent.length, 0);
+    assert.equal((await verify(result.otp, "noSmsLink1")).data.ok, true);
   });
 
-  it("addMonths clamps to month end like Postgres", () => {
-    assert.equal(addMonths(new Date("2026-01-31T10:00:00Z"), 3).toISOString(), "2026-04-30T10:00:00.000Z");
-    assert.equal(addMonths(new Date("2026-11-15T00:00:00Z"), 3).toISOString(), "2027-02-15T00:00:00.000Z");
+  it("never sends a real SMS from the learning environment", async () => {
+    const o = await loginAs("admin");
+    process.env.DEV_TOOLS_OWNER_EMAIL = o.email;
+    await REAL.Profile.updateOne({ id: o.profile.id }, { $set: { learning_mode: true } });
+    await LEARNING.RegularClient.create({ client_id: "77", site_id: "1", client_name: "ל", site_name: "א", is_active: true });
+    await LEARNING.Voucher.create({ serial: "D1", amount: 100, fuel_type: "בנזין", branch: "מאגר ראשי", status: "טרם שומש" });
+    const r = await rpc(o.agent, "issue_voucher_to_worker", {
+      p_items: [{ amount: 100, fuel_type: "בנזין", details: { route: "regular", client_id: "77", site_id: "1" } }],
+      p_branch: "מאגר ראשי", p_supervisor: null, p_link: { id: "demoLink01", employee_name: "דמו", phone: "0521234567" },
+    });
+    assert.equal(r.status, 200, r.error);
+    assert.equal(sent.length, 0);
+    assert.match(r.data.otp, /^\d{4}$/);
+    await LEARNING.Voucher.deleteMany({});
+    await LEARNING.RegularClient.deleteMany({});
+    delete process.env.DEV_TOOLS_OWNER_EMAIL;
   });
 });
 
-describe("sign_worker_link + open_worker_wallet", () => {
-  it("signs once, archives the signature, then opens only for the matching id + phone", async () => {
-    await seedLink();
-    const a = anon();
-    // Invalid payloads are rejected without side effects.
-    for (const bad of [
-      { p_worker_id: "12345678", p_phone: "0521234567", p_full_name: "יוסי", p_signature: SIG },
-      { p_worker_id: "123456789", p_phone: "521234567", p_full_name: "יוסי", p_signature: SIG },
-      { p_worker_id: "123456789", p_phone: "0521234567", p_full_name: " י ", p_signature: SIG },
-      { p_worker_id: "123456789", p_phone: "0521234567", p_full_name: "יוסי", p_signature: "data:image/jpeg;base64,x" },
-    ]) assert.deepEqual((await rpc(a, "sign_worker_link", { p_id: "123456", ...bad })).data, { ok: false });
-
-    // Unsigned link cannot be opened with empty credentials.
-    const empty = await rpc(a, "open_worker_wallet", { p_id: "123456", p_worker_id: null, p_phone: null });
-    assert.equal(empty.data.ok, false);
-    assert.equal(empty.data.codes, undefined);
-    await WorkerLink.updateOne({ id: "123456" }, { $set: { failed_attempts: 0 } });
-
-    const s = await rpc(a, "sign_worker_link", { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567", p_full_name: "  יוסי כהן ", p_signature: SIG });
-    assert.equal(s.data.ok, true);
-    // After signing the employee sees the cards, but every code is hidden until revealed.
-    assert.deepEqual(s.data.codes, [
-      { serial: "S1", real_code: null, amount: 100, fuel_type: "בנזין", revealed: false },
-      { serial: "S2", real_code: null, amount: 100, fuel_type: "סולר", revealed: false },
-    ]);
-    const link = await WorkerLink.findOne({ id: "123456" }).lean();
-    assert.equal(link.worker_id, "123456789");
-    assert.equal(link.phone, "0521234567");
-    assert.match(link.signed_at, /^\d{4}-\d{2}-\d{2}$/);
-    const v = await Voucher.findOne({ serial: "S1" }).lean();
-    assert.equal(v.employee_name, "יוסי כהן");
-    assert.equal(v.worker_id, "123456789");
-    assert.equal(v.employee_phone, "0521234567");
-    const arch = await SignatureArchive.find({ link_id: "123456" }).lean();
-    assert.equal(arch.length, 1);
-    assert.equal(arch[0].total_amount, 300);
-    assert.equal(arch[0].employee_id_number, "123456789");
-    assert.equal(arch[0].branch, "חיפה");
-    assert.deepEqual(arch[0].voucher_record_ids, ["S1", "S2", "S3"]);
-    assert.equal(arch[0].signature_image_url, SIG);
-
-    // Second signature is refused.
-    assert.deepEqual((await rpc(a, "sign_worker_link", { p_id: "123456", p_worker_id: "987654321", p_phone: "0521111111", p_full_name: "אחר", p_signature: SIG })).data, { ok: false });
-
-    const o = await rpc(anon(), "open_worker_wallet", { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567" });
-    assert.deepEqual(o.data, { ok: true, state: "ok", attempts_left: 3, codes: s.data.codes });
-    assert.equal((await rpc(anon(), "worker_link_status", { p_id: "123456" })).data.signed, true);
-
-    // Revealing one code keeps it visible on later visits; the other stays off the phone.
-    const who = { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567" };
-    const rev = await rpc(anon(), "reveal_worker_code", { ...who, p_serial: "S1" });
-    assert.deepEqual(rev.data, { ok: true, state: "ok", code: { serial: "S1", real_code: "REAL-1", amount: 100, fuel_type: "בנזין", revealed: true } });
-    const again = await rpc(anon(), "open_worker_wallet", who);
-    assert.deepEqual(again.data.codes, [
-      { serial: "S1", real_code: "REAL-1", amount: 100, fuel_type: "בנזין", revealed: true },
-      { serial: "S2", real_code: null, amount: 100, fuel_type: "סולר", revealed: false },
-    ]);
-    // Not this link's card (S3 is blocked, X1 unknown), or the wrong person: nothing is revealed.
-    assert.equal((await rpc(anon(), "reveal_worker_code", { ...who, p_serial: "X1" })).data.ok, false);
-    assert.equal((await rpc(anon(), "reveal_worker_code", { ...who, p_serial: "S3" })).data.ok, false);
-    const wrong = await rpc(anon(), "reveal_worker_code", { ...who, p_worker_id: "111111111", p_serial: "S2" });
-    assert.deepEqual([wrong.data.ok, wrong.data.state, wrong.data.code], [false, "mismatch", undefined]);
-    await WorkerLink.updateOne({ id: "123456" }, { $set: { failed_attempts: 0 } });
-    assert.deepEqual((await rpc(anon(), "open_worker_wallet", { p_id: "000000", p_worker_id: "123456789", p_phone: "0521234567" })).data,
-      { ok: false, state: "invalid" });
+describe("opening the link", () => {
+  it("shows only status, total and name before the code", async () => {
+    const { agent } = await loginAs("admin");
+    await issue(agent);
+    const s = (await rpc(anon(), "worker_link_status", { p_id: ID })).data;
+    assert.deepEqual(s, { exists: true, state: "ok", total: 200, signed: false, employee_name: "יוסי כהן", reachable: true });
+    assert.equal((await rpc(anon(), "open_worker_wallet", { p_id: ID, p_session: "forged" })).data.ok, false);
+    assert.equal((await rpc(anon(), "sign_worker_link", { p_id: ID, p_session: "forged", p_signature: SIG })).data.ok, false);
   });
 
-  it("locks after 3 wrong id/phone attempts; staff owner or admin can unlock", async () => {
-    const owner = await loginAs("supervisor", { branch: "חיפה" });
-    await seedLink({ signed: true, supervisorId: owner.profile.id });
-    const a = anon();
-    let r = await rpc(a, "open_worker_wallet", { p_id: "123456", p_worker_id: "111111111", p_phone: "0521234567" });
-    assert.deepEqual(r.data, { ok: false, state: "mismatch", attempts_left: 2 });
-    r = await rpc(a, "open_worker_wallet", { p_id: "123456", p_worker_id: "123456789", p_phone: "0529999999" });
-    assert.deepEqual(r.data, { ok: false, state: "mismatch", attempts_left: 1 });
-    r = await rpc(a, "open_worker_wallet", { p_id: "123456", p_worker_id: "000000000", p_phone: "0500000000" });
-    assert.deepEqual(r.data, { ok: false, state: "locked", attempts_left: 0 });
-    const locked = await WorkerLink.findOne({ id: "123456" }).lean();
-    assert.equal(locked.locked, true);
-    assert.ok(locked.locked_at instanceof Date);
+  it("the code works once, and 5 wrong tries end it until a new one is sent", async () => {
+    const { agent } = await loginAs("admin");
+    const { code } = await issue(agent);
+    assert.equal((await verify(wrongCode(code))).data.attempts_left, 4);
+    assert.equal((await verify(code)).data.ok, true, "a wrong try does not burn the code");
+    assert.equal((await verify(code)).data.state, "new_code_needed", "one use only");
 
-    // Even the correct credentials are refused now.
-    r = await rpc(a, "open_worker_wallet", { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567" });
-    assert.deepEqual(r.data, { ok: false, state: "locked" });
-    assert.deepEqual((await rpc(a, "worker_link_status", { p_id: "123456" })).data, { exists: true, state: "locked" });
+    await WorkerLink.updateOne({ id: ID }, { $set: { otp_sent_at: new Date(0) } });
+    assert.equal((await rpc(anon(), "request_worker_otp", { p_id: ID })).data.ok, true);
+    const fresh = /קוד אימות: (\d{4})/.exec(sent.at(-1).text)[1];
+    assert.equal(sent.length, 2);
+    assert.equal(sent.at(-1).to, "+972521234567", "only to the phone on the link");
+    assert.equal((await rpc(anon(), "request_worker_otp", { p_id: ID })).data.state, "wait", "one request a minute");
+    for (let i = 0; i < 5; i += 1) await verify(wrongCode(fresh));
+    assert.equal((await verify(fresh)).data.state, "new_code_needed");
+  });
 
-    // Anonymous / other staff cannot unlock.
-    r = await rpc(anon(), "unlock_worker_link", { p_id: "123456" });
-    assert.equal(r.status, 401);
-    assert.equal(r.error, "נדרשת התחברות");
-    const other = await loginAs("branch", { branch: "חיפה" });
-    r = await rpc(other.agent, "unlock_worker_link", { p_id: "123456" });
-    assert.equal(r.status, 403);
-    assert.equal(r.error, "רק מי שהפיק את השובר או אדמין יכולים לשחרר את הלינק");
-    r = await rpc(other.agent, "unlock_voucher_link", { p_link_id: "123456" });
-    assert.equal(r.status, 403);
-    assert.equal((await rpc(owner.agent, "unlock_worker_link", { p_id: "nope" })).error, "הלינק לא נמצא");
+  it("signs with a finger, archives without any ID, and a second signature is refused", async () => {
+    const { agent } = await loginAs("admin");
+    const { code } = await issue(agent);
+    const { session } = (await verify(code)).data;
+    const s = await rpc(anon(), "sign_worker_link", { p_id: ID, p_session: session, p_signature: SIG });
+    assert.equal(s.data.ok, true);
+    assert.deepEqual(s.data.codes.map((c) => [c.serial, c.real_code, c.revealed]), [["S1", null, false], ["S2", null, false]]);
 
-    const linkBefore = await WorkerLink.findOne({ id: "123456" }).lean();
-    const cardsBefore = await Voucher.find({}, { _id: 0, serial: 1, status: 1, link_id: 1, employee_name: 1 }).sort({ serial: 1 }).lean();
-    const sigsBefore = await SignatureArchive.countDocuments();
+    const link = await REAL.WorkerLink.findOne({ id: ID }).lean();
+    assert.match(link.signed_at, /^\d{4}-\d{2}-\d{2}$/);
+    const v = await Voucher.findOne({ serial: "S1" }).lean();
+    assert.equal(v.employee_phone, "0521234567");
+    const [arch] = await SignatureArchive.find({ link_id: ID }).lean();
+    assert.equal(arch.employee_name, "יוסי כהן");
+    assert.equal(arch.employee_phone, "0521234567");
+    assert.equal(arch.total_amount, 200);
+    assert.equal(arch.employee_id_number, undefined);
+    assert.equal((await rpc(anon(), "sign_worker_link", { p_id: ID, p_session: session, p_signature: SIG })).data.ok, false);
+    assert.equal((await rpc(anon(), "worker_link_status", { p_id: ID })).data.signed, true);
+  });
 
-    r = await rpc(owner.agent, "unlock_worker_link", { p_id: "123456" });
-    assert.equal(r.status, 200);
-    assert.equal(r.data, null);
+  it("a revealed code stays revealed; the rest stay off the phone; a session fits one link", async () => {
+    const { agent } = await loginAs("admin");
+    const { code } = await issue(agent);
+    const { session } = (await verify(code)).data;
+    await rpc(anon(), "sign_worker_link", { p_id: ID, p_session: session, p_signature: SIG });
+    const who = { p_id: ID, p_session: session };
+    const rev = await rpc(anon(), "reveal_worker_code", { ...who, p_serial: "S1" });
+    assert.deepEqual(rev.data.code, { serial: "S1", real_code: "REAL-1", amount: 100, fuel_type: "בנזין", revealed: true });
+    const again = await rpc(anon(), "open_worker_wallet", who);
+    assert.deepEqual(again.data.codes.map((c) => c.real_code), ["REAL-1", null]);
+    assert.equal((await rpc(anon(), "reveal_worker_code", { ...who, p_serial: "NOT-MINE" })).data.ok, false);
+    assert.equal((await rpc(anon(), "open_worker_wallet", { p_id: "anotherLink1", p_session: session })).data.ok, false);
+    assert.equal((await rpc(anon(), "reveal_worker_code", { p_id: ID, p_session: "x", p_serial: "S2" })).data.ok, false);
+  });
 
-    // Unlocking a SIGNED link only resets the lock — signature, worker identity, cards and archive are untouched.
-    const linkAfter = await WorkerLink.findOne({ id: "123456" }).lean();
-    assert.equal(linkAfter.locked, false);
-    assert.equal(linkAfter.failed_attempts, 0);
-    for (const k of ["signed_at", "worker_id", "phone", "employee_name", "total", "supervisor_id"]) assert.deepEqual(linkAfter[k], linkBefore[k], k);
-    assert.deepEqual(linkAfter.serials, linkBefore.serials);
-    assert.deepEqual(await Voucher.find({}, { _id: 0, serial: 1, status: 1, link_id: 1, employee_name: 1 }).sort({ serial: 1 }).lean(), cardsBefore);
-    assert.equal(await SignatureArchive.countDocuments(), sigsBefore);
+  it("the codes in SMS and hash never reach staff reads", async () => {
+    const { agent } = await loginAs("admin");
+    await issue(agent);
+    const rows = (await agent.post("/api/db/worker_links").send({ op: "select" })).body.data;
+    assert.equal("otp_hash" in rows[0], false);
+  });
+});
 
-    // …and the worker can open the wallet again with the correct details.
-    r = await rpc(a, "open_worker_wallet", { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567" });
-    assert.equal(r.data.ok, true);
-
-    // unlock_voucher_link by an admin also clears per-card locks.
-    await WorkerLink.updateOne({ id: "123456" }, { $set: { locked: true, failed_attempts: 3 } });
-    await Voucher.updateMany({}, { $set: { is_locked: true, failed_attempts: 3 } });
+describe("resending", () => {
+  it("the issuer or an admin can send a new code, also to a corrected phone", async () => {
     const admin = await loginAs("admin");
-    r = await rpc(admin.agent, "unlock_voucher_link", { p_link_id: "123456" });
-    assert.equal(r.data, true);
-    assert.equal((await WorkerLink.findOne({ id: "123456" }).lean()).locked, false);
-    assert.equal(await Voucher.countDocuments({ is_locked: true }), 0);
+    await issue(admin.agent);
+    const other = await loginAs("supervisor", { branch: "חיפה" });
+    assert.equal((await rpc(other.agent, "resend_worker_sms", { p_id: ID })).status, 403);
+    const r = await rpc(admin.agent, "resend_worker_sms", { p_id: ID, p_phone: "0541111111" });
+    assert.equal(r.status, 200, r.error);
+    assert.equal(r.data.sms_sent, true);
+    assert.equal(sent.at(-1).to, "+972541111111");
+    assert.equal((await REAL.WorkerLink.findOne({ id: ID }).lean()).phone, "0541111111");
+    assert.equal((await rpc(admin.agent, "resend_worker_sms", { p_id: ID, p_phone: "123" })).status, 400);
   });
 });

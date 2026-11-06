@@ -37,7 +37,7 @@ describe("QA", () => {
     const attempts = Array.from({ length: 25 }, (_, i) => rpc(agent, "issue_voucher_to_worker", {
       p_items: [{ amount: 100, fuel_type: PETROL, details: { route: "regular", client_id: "77", site_id: "1" } }],
       p_branch: "מאגר ראשי", p_supervisor: null,
-      p_link: { id: String(10000 + i), employee_name: `עובד ${i}` },
+      p_link: { id: String(10000 + i), employee_name: `עובד ${i}`, phone: "0521234567" },
     }));
     const results = await Promise.all(attempts);
     const ok = results.filter((r) => r.status === 200);
@@ -48,9 +48,9 @@ describe("QA", () => {
     assert.equal(issued.length, 4);
     assert.equal(new Set(issued.map((v) => v.link_id)).size, 4, "each card belongs to exactly one link");
     // Denomination rules are enforced server-side.
-    const bad = await rpc(agent, "issue_voucher_to_worker", { p_items: [{ amount: 150, fuel_type: PETROL }], p_branch: "מאגר ראשי", p_link: { id: "99999", employee_name: "x" } });
+    const bad = await rpc(agent, "issue_voucher_to_worker", { p_items: [{ amount: 150, fuel_type: PETROL }], p_branch: "מאגר ראשי", p_link: { id: "99999", employee_name: "x", phone: "0521234567" } });
     assert.notEqual(bad.status, 200);
-    const badDiesel = await rpc(agent, "issue_voucher_to_worker", { p_items: [{ amount: 75, fuel_type: DIESEL }], p_branch: "מאגר ראשי", p_link: { id: "99998", employee_name: "x" } });
+    const badDiesel = await rpc(agent, "issue_voucher_to_worker", { p_items: [{ amount: 75, fuel_type: DIESEL }], p_branch: "מאגר ראשי", p_link: { id: "99998", employee_name: "x", phone: "0521234567" } });
     assert.notEqual(badDiesel.status, 200);
   });
 
@@ -79,7 +79,7 @@ describe("QA", () => {
     await Voucher.create({ serial: "V1", amount: 100, fuel_type: PETROL, branch: "מאגר ראשי", status: "טרם שומש" });
     const blocked = await rpc(agent, "issue_voucher_to_worker", {
       p_items: [{ amount: 100, fuel_type: PETROL, details: { route: "regular", client_id: "5", site_id: "2" } }],
-      p_branch: "מאגר ראשי", p_link: { id: "55555", employee_name: "x" },
+      p_branch: "מאגר ראשי", p_link: { id: "55555", employee_name: "x", phone: "0521234567" },
     });
     assert.notEqual(blocked.status, 200);
     assert.equal((await Voucher.findOne({ serial: "V1" })).status, "טרם שומש");

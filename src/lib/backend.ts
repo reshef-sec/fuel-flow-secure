@@ -35,52 +35,56 @@ export async function getWorkerLinkStatus({ data }: Args<{ id: string; demo?: bo
   if (!r?.exists) return { exists: false as const };
   return {
     exists: true as const,
-    state: r.state as "ok" | "locked" | "expired",
+    state: r.state as "ok" | "expired",
     total: Number(r.total ?? 0),
     signed: Boolean(r.signed),
     employeeName: String(r.employee_name ?? ""),
+    reachable: Boolean(r.reachable),
   };
 }
 
-export async function openWorkerWallet({ data }: Args<{ id: string; workerId: string; phone: string; demo?: boolean }>) {
-  const r = await rpc<Record<string, any>>("open_worker_wallet", {
-    p_id: data.id, p_worker_id: data.workerId, p_phone: data.phone, ...demoParam(data.demo),
-  });
+export async function verifyWorkerOtp({ data }: Args<{ id: string; code: string; demo?: boolean }>) {
+  const r = await rpc<Record<string, any>>("verify_worker_otp", { p_id: data.id, p_code: data.code, ...demoParam(data.demo) });
   return {
     ok: Boolean(r?.ok),
-    state: (r?.state ?? "invalid") as "ok" | "invalid" | "expired" | "locked" | "mismatch",
+    state: (r?.state ?? "wrong") as "wrong" | "new_code_needed" | "expired",
     attemptsLeft: Number(r?.attempts_left ?? 0),
-    codes: mapCodes(r?.codes),
+    session: String(r?.session ?? ""),
+    signed: Boolean(r?.signed),
   };
 }
 
-/** Reveals one code, permanently; the server re-checks the employee's identity. */
-export async function revealWorkerCode({ data }: Args<{ id: string; workerId: string; phone: string; serial: string; demo?: boolean }>) {
+export async function requestWorkerOtp({ data }: Args<{ id: string }>) {
+  const r = await rpc<Record<string, any>>("request_worker_otp", { p_id: data.id });
+  return { ok: Boolean(r?.ok), state: (r?.state ?? "unavailable") as "wait" | "unavailable" };
+}
+
+export async function openWorkerWallet({ data }: Args<{ id: string; session: string; demo?: boolean }>) {
+  const r = await rpc<Record<string, any>>("open_worker_wallet", { p_id: data.id, p_session: data.session, ...demoParam(data.demo) });
+  return { ok: Boolean(r?.ok), codes: mapCodes(r?.codes) };
+}
+
+/** Reveals one code, permanently; the server checks this device's session. */
+export async function revealWorkerCode({ data }: Args<{ id: string; session: string; serial: string; demo?: boolean }>) {
   const r = await rpc<Record<string, any>>("reveal_worker_code", {
-    p_id: data.id, p_worker_id: data.workerId, p_phone: data.phone, p_serial: data.serial, ...demoParam(data.demo),
+    p_id: data.id, p_session: data.session, p_serial: data.serial, ...demoParam(data.demo),
   });
-  return {
-    ok: Boolean(r?.ok),
-    state: (r?.state ?? "invalid") as "ok" | "invalid" | "expired" | "locked" | "mismatch",
-    code: r?.code ? mapCodes([r.code])[0] : null,
-  };
+  return { ok: Boolean(r?.ok), code: r?.code ? mapCodes([r.code])[0] : null };
 }
 
-export async function signWorkerLink({
-  data,
-}: Args<{ id: string; workerId: string; phone: string; fullName: string; signature: string; demo?: boolean }>) {
+export async function signWorkerLink({ data }: Args<{ id: string; session: string; signature: string; demo?: boolean }>) {
   const r = await rpc<Record<string, any>>("sign_worker_link", {
-    p_id: data.id, p_worker_id: data.workerId, p_phone: data.phone,
-    p_full_name: data.fullName, p_signature: data.signature, ...demoParam(data.demo),
+    p_id: data.id, p_session: data.session, p_signature: data.signature, ...demoParam(data.demo),
   });
   return { ok: Boolean(r?.ok), codes: mapCodes(r?.codes) };
 }
 
 // ---------- Staff ----------
 
-export async function unlockWorkerLink({ data }: Args<{ id: string }>) {
-  await rpc("unlock_worker_link", { p_id: data.id });
-  return { ok: true as const };
+/** Sends the employee a new code, optionally to a corrected phone. Returns the code if SMS could not. */
+export async function resendWorkerSms({ data }: Args<{ id: string; phone: string }>) {
+  const r = await rpc<{ sms_sent?: boolean; otp?: string }>("resend_worker_sms", { p_id: data.id, p_phone: data.phone });
+  return { smsSent: Boolean(r?.sms_sent), otp: r?.otp ?? null };
 }
 
 /** What the login screen may offer. */

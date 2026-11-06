@@ -8,7 +8,7 @@ export function parseIssuanceResponse(payload: unknown, requestedLinkId: string,
   const legacy = Array.isArray(payload);
   const rows = legacy ? payload : isRow(payload) ? payload.vouchers : undefined;
   const linkId = legacy ? requestedLinkId : isRow(payload) ? payload.link_id : undefined;
-  if (!Array.isArray(rows) || !rows.length || typeof linkId !== "string" || !/^\d{4,12}$/.test(linkId)) {
+  if (!Array.isArray(rows) || !rows.length || typeof linkId !== "string" || !/^[A-Za-z0-9_-]{4,40}$/.test(linkId)) {
     throw new Error("תשובת הנפקה לא תקינה — יש לבדוק את שמירת הלינק");
   }
   const serials = new Set<string>();
@@ -26,5 +26,7 @@ export function parseIssuanceResponse(payload: unknown, requestedLinkId: string,
   });
   const total = cards.reduce((sum, card) => sum + card.amount, 0);
   if (!legacy && isRow(payload) && Number(payload.total) !== total) throw new Error("סכום תשובת ההנפקה אינו תואם לשוברים");
-  return { linkId, total, cards };
+  const smsSent = isRow(payload) && payload.sms_sent === true;
+  const otp = isRow(payload) && typeof payload.otp === "string" ? payload.otp : null;
+  return { linkId, total, cards, smsSent, otp };
 }

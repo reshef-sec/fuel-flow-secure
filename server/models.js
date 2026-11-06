@@ -116,9 +116,9 @@ const voucherSchema = new Schema({
   status: str("טרם שומש"),
   updated_on: { type: String, default: () => new Date().toISOString().slice(0, 10) },
   requester: str(), approver: str(), client_id: str(), site_id: str(), site_name: str(),
-  reason: str(), worker_name: str(), worker_id: str(), delivered_at: str(), route: str(),
+  reason: str(), worker_name: str(), delivered_at: str(), route: str(),
   link_id: str(), client_code: str(), account_name: str(), standard: str(), license_plate: str(),
-  driver_name: str(), standard_name: str(), employee_name: str(), employee_id: str(),
+  driver_name: str(), standard_name: str(), employee_name: str(),
   employee_phone: str(), issue_reason: str(),
   issued_at: { type: Date, default: null }, expires_at: { type: Date, default: null },
   /** Set when the card expired unissued, 3 months after entering stock (lib/expireStock.js). */
@@ -184,10 +184,11 @@ const workerLinkSchema = new Schema({
   id: { type: String, required: true },
   total: { type: Number, default: 0 },
   serials: { type: [String], default: [] },
-  created_on: str(""), worker_id: str(), phone: str(), signed_at: str(),
+  created_on: str(""), phone: str(), signed_at: str(),
   employee_name: str(), branch: str(), supervisor_id: str(),
-  failed_attempts: { type: Number, default: 0 }, locked: { type: Boolean, default: false },
-  locked_at: { type: Date, default: null },
+  /** One-time SMS code, stored only as a hash (lib/workerOtp.js). */
+  otp_hash: str(), otp_expires_at: { type: Date, default: null },
+  otp_attempts: { type: Number, default: 0 }, otp_sent_at: { type: Date, default: null },
   /** Cards whose code the employee chose to reveal; every other code stays hidden in the wallet. */
   revealed_serials: { type: [String], default: [] },
 }, opts("worker_links"));
@@ -206,7 +207,7 @@ workerLinkSchema.post("save", function () { forgetLink(this.id); });
 
 const signatureSchema = new Schema({
   id: uuid, link_id: str(), branch: str(), supervisor_id: str(), employee_name: str(),
-  employee_id_number: str(), employee_phone: str(), total_amount: { type: Number, default: 0 },
+  employee_phone: str(), total_amount: { type: Number, default: 0 },
   voucher_record_ids: { type: [String], default: [] }, signature_image_url: str(),
 }, opts("signatures_archive"));
 signatureSchema.index({ id: 1 }, { unique: true });

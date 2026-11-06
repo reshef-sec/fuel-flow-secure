@@ -53,12 +53,15 @@ const POLICIES = {
   voucher_requests: { read: signedInRead, write: notViewer, del: adminOnly },
   vouchers: {
     read: ownScopeRead, write: ownScopeWrite, check: ownScopeCheck, del: adminOnly,
-    hidden: ["real_code", "paz_match_key"],
+    hidden: ["real_code", "paz_match_key", "worker_id", "employee_id"],
     // Server-owned columns a client may never set directly.
     immutable: ["real_code", "card_number", "paz_match_key", "redeemed_at"],
   },
-  worker_links: { read: ownScopeRead, write: ownScopeWrite, check: ownScopeCheck, del: adminOnly },
-  signatures_archive: { read: ownScopeRead, write: ownScopeWrite, check: ownScopeCheck, del: adminOnly },
+  worker_links: {
+    read: ownScopeRead, write: ownScopeWrite, check: ownScopeCheck, del: adminOnly,
+    hidden: ["worker_id", "otp_hash"], immutable: ["otp_hash", "otp_expires_at", "otp_attempts", "otp_sent_at"],
+  },
+  signatures_archive: { read: ownScopeRead, write: ownScopeWrite, check: ownScopeCheck, del: adminOnly, hidden: ["employee_id_number"] },
   activity_log: {
     read: adminOnly, write: NONE, del: NONE,
     // Users may only append entries in their own name.

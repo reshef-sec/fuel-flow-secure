@@ -7,11 +7,9 @@ import {
   Check,
   Copy,
   Link2,
-  MessageCircle,
   Plus,
   Search,
   Send,
-  SquareArrowOutUpRight,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -91,7 +89,7 @@ interface BlockStock {
   error: string | null;
 }
 
-interface IssuedResult { url: string; name: string; total: number; codes: number }
+interface IssuedResult { url: string; name: string; phone: string; total: number; codes: number; smsSent: boolean; otp: string | null }
 
 function SupervisorPage() {
   // Issuing is a write action; the read-only viewer has no access to this screen.
@@ -108,6 +106,7 @@ function SupervisorIssuePage() {
   const stock = useAppStore(s => s.vouchers);
 
   const [employeeName, setEmployeeName] = useState("");
+  const [phone, setPhone] = useState("");
   const [blocks, setBlocks] = useState<Block[]>(() => [newBlock()]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -151,7 +150,7 @@ function SupervisorIssuePage() {
     });
   }, [pool, blocks]);
   // Any field change clears stale validation from the previous attempt.
-  useEffect(() => { setError(null); }, [employeeName, blocks]);
+  useEffect(() => { setError(null); }, [employeeName, phone, blocks]);
 
   const patch = (key: number, p: Partial<Block>) =>
     setBlocks((bs) => bs.map((b) => (b.key === key ? { ...b, ...p } : b)));
@@ -162,6 +161,7 @@ function SupervisorIssuePage() {
     setError(null);
     if (!me) return setError("לא נמצא משתמש מחובר");
     if (employeeName.trim().length < 2) return setError("יש למלא שם עובד");
+    if (!/^05\d{8}$/.test(phone)) return setError("יש למלא מספר נייד תקין של העובד");
     const items: WorkerIssueItem[] = [];
     for (const [i, b] of blocks.entries()) {
       const n = Number(b.amount);
@@ -180,6 +180,7 @@ function SupervisorIssuePage() {
       const name = employeeName.trim();
       const created = await issueWorkerVoucher({
         employeeName: name,
+        phone,
         branch: me.branch || "הנהלה",
         ...(role === "supervisor" ? { supervisor: fullName(me) } : {}),
         requester: fullName(me),
@@ -190,9 +191,10 @@ function SupervisorIssuePage() {
         toast.error(created.error);
         return;
       }
-      setIssued({ url: publicVoucherUrl(created.id, undefined, learningActive), name, total: items.reduce((t, it) => t + it.amount, 0), codes: created.serials.length });
+      setIssued({ url: publicVoucherUrl(created.id, undefined, learningActive), name, phone, total: items.reduce((t, it) => t + it.amount, 0), codes: created.serials.length, smsSent: created.smsSent, otp: created.otp });
       setCopied(false);
       setEmployeeName("");
+      setPhone("");
       setBlocks([newBlock()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "הפקת הלינק נכשלה");
@@ -234,10 +236,9 @@ function SupervisorIssuePage() {
   });
   const anyBlockError = blockStock.some((s) => s.error);
   const total = totals["בנזין"] + totals["סולר"];
-  const ready = nameOk && missing.length === 0 && !anyBlockError && total > 0;
+  const ready = nameOk && /^05\d{8}$/.test(phone) && missing.length === 0 && !anyBlockError && total > 0;
   const usedText = (["בנזין", "סולר"] as const).filter((f) => totals[f] > 0).map((f) => `${f}: ${cardsText(used[f])}`).join(" · ");
   const myStock = { "בנזין": cardsOfFuel(pool, "בנזין").reduce((t, v) => t + v.amount, 0), "סולר": cardsOfFuel(pool, "סולר").reduce((t, v) => t + v.amount, 0) };
-  const waText = issued ? `שלום ${issued.name}, זה הלינק לשוברי הדלק שלך: ${issued.url}` : "";
 
   return (
     <InternalLayout title="הפקת שוברי דלק">
@@ -269,6 +270,19 @@ function SupervisorIssuePage() {
                 required
               />
               <span className="text-[12.5px] font-medium text-slate-600">השם יופיע מראש בלינק — העובד יאמת עם ת.ז וטלפון</span>
+            </label>
+            <label className={cn(labelClass, "max-w-[420px]")}>
+              נייד העובד
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                inputMode="numeric"
+                dir="ltr"
+                placeholder="05XXXXXXXX"
+                aria-label="נייד העובד"
+                className={fieldClass}
+              />
+              <span className="text-[12.5px] font-medium text-slate-600">לכאן יישלחו ב־SMS הלינק וקוד האימות</span>
             </label>
           </div>
 
@@ -361,35 +375,32 @@ function SupervisorIssuePage() {
       <Modal
         open={!!issued}
         onClose={() => setIssued(null)}
-        title="הלינק הופק"
+        title="השובר הופק"
         description={issued ? `הופקו ${issued.codes} קודים בסך ${fmt(issued.total)} ₪ עבור ${issued.name}` : undefined}
         footer={<button type="button" className="ds-btn ds-btn-light" onClick={() => setIssued(null)}>הנפקה נוספת</button>}
       >
         {issued ? (
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5 rounded-[14px] border-2 border-dashed border-blue-500 bg-[#f2f6fe] p-4 text-center">
-              <span className="text-[12.5px] font-bold text-slate-600">לינק אישי לעובד</span>
-              <span dir="ltr" className="ds-num break-all text-[17px] font-semibold text-shell-2">{issued.url}</span>
-            </div>
-            <div className="grid gap-2.5 min-[600px]:grid-cols-3">
-              <button type="button" className="ds-btn ds-btn-primary" onClick={() => void copyLink()}>
-                {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
-                {copied ? "הלינק הועתק" : "העתקת לינק"}
-              </button>
-              <a
-                className="ds-btn bg-[#177a42] text-white no-underline hover:bg-[#11633a] hover:text-white"
-                href={`https://wa.me/?text=${encodeURIComponent(waText)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <MessageCircle className="size-4" aria-hidden />
-                וואטסאפ
-              </a>
-              <a className="ds-btn ds-btn-light no-underline" href={issued.url} target="_blank" rel="noopener noreferrer">
-                <SquareArrowOutUpRight className="size-4" aria-hidden />
-                צפייה בעמוד העובד
-              </a>
-            </div>
+            {issued.smsSent ? (
+              <p className="m-0 rounded-[14px] bg-available-bg p-4 text-center text-[15px] font-bold text-available-fg">
+                נשלח SMS עם הלינק וקוד האימות אל <span dir="ltr" className="ds-num">{issued.phone}</span>
+              </p>
+            ) : (
+              <>
+                <p className="m-0 rounded-[14px] bg-pending-bg p-3 text-sm font-semibold text-amber-700">
+                  ה־SMS לא נשלח. יש להעביר לעובד את הלינק ואת קוד האימות.
+                </p>
+                <div className="flex flex-col gap-1.5 rounded-[14px] border-2 border-dashed border-blue-500 bg-[#f2f6fe] p-4 text-center">
+                  <span className="text-[12.5px] font-bold text-slate-600">קוד אימות</span>
+                  <span dir="ltr" className="ds-num text-2xl font-bold tracking-[.3em] text-shell-2">{issued.otp}</span>
+                  <span dir="ltr" className="ds-num break-all text-[14px] font-semibold text-shell-2">{issued.url}</span>
+                </div>
+                <button type="button" className="ds-btn ds-btn-primary" onClick={() => void copyLink()}>
+                  {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+                  {copied ? "הלינק הועתק" : "העתקת לינק"}
+                </button>
+              </>
+            )}
           </div>
         ) : null}
       </Modal>

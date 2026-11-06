@@ -74,7 +74,7 @@ test("central snapshot totals, summary wrapper, counts and stock", async () => {
 test("issuance rejects invalid denominations", async () => {
   await seed([{ serial: "B1" }, { serial: "B2", amount: 100, fuel_type: "סולר" }]);
   for (const item of [{ amount: 120, fuel_type: "בנזין" }, { amount: 75, fuel_type: "סולר" }, { amount: 0, fuel_type: "סולר" }, { amount: null, fuel_type: "בנזין" }]) {
-    const r = await rpc(admin, "issue_voucher_to_worker", { p_items: [{ ...item, details: REG }], p_branch: MAIN_POOL, p_supervisor: null, p_link: { id: "123456", employee_name: "Worker" } });
+    const r = await rpc(admin, "issue_voucher_to_worker", { p_items: [{ ...item, details: REG }], p_branch: MAIN_POOL, p_supervisor: null, p_link: { id: "123456", employee_name: "Worker", phone: "0521234567" } });
     assert.equal(r.status, 400, JSON.stringify(item));
     assert.equal(r.error, DENOMINATION);
   }
@@ -87,7 +87,7 @@ test("issuance shortage rolls back every item and creates no link", async () => 
   await seed([{ serial: "S1" }, { serial: "S2" }, { serial: "D1", amount: 100, fuel_type: "סולר" }]);
   const r = await rpc(admin, "issue_voucher_to_worker", {
     p_items: [{ amount: 200, fuel_type: "בנזין", details: REG }, { amount: 200, fuel_type: "סולר", details: REG }],
-    p_branch: MAIN_POOL, p_supervisor: null, p_link: { id: "777777", employee_name: "Worker" },
+    p_branch: MAIN_POOL, p_supervisor: null, p_link: { id: "777777", employee_name: "Worker", phone: "0521234567" },
   });
   assert.equal(r.status, 400);
   assert.equal(r.error, SHORTAGE);
@@ -102,7 +102,7 @@ test("issuance returns the safe JSONB envelope and persists the link atomically"
   ]);
   const r = await rpc(admin, "issue_voucher_to_worker", {
     p_items: [{ amount: 300, fuel_type: "בנזין", details: { ...REG, requester: "R" } }, { amount: 100, fuel_type: "סולר", details: REG }],
-    p_branch: MAIN_POOL, p_supervisor: null, p_link: { id: "123456", employee_name: "  Test Employee " },
+    p_branch: MAIN_POOL, p_supervisor: null, p_link: { id: "123456", employee_name: "  Test Employee ", phone: "0521234567" },
   });
   assert.equal(r.status, 200, r.error);
   assert.equal(r.data.link_id, "123456");
@@ -131,16 +131,16 @@ test("issuance returns the safe JSONB envelope and persists the link atomically"
   // Duplicate link id: the link insert fails and the voucher claims roll back.
   const dup = await rpc(admin, "issue_voucher_to_worker", {
     p_items: [{ amount: 100, fuel_type: "בנזין", details: REG }], p_branch: MAIN_POOL, p_supervisor: null,
-    p_link: { id: "123456", employee_name: "Other" },
+    p_link: { id: "123456", employee_name: "Other", phone: "0521234567" },
   });
   assert.equal(dup.status, 409);
   const s4 = await Voucher.findOne({ serial: "0004" }).lean();
   assert.equal(s4.status, STATUS.AVAILABLE);
   assert.equal(s4.link_id, null);
 
-  const bad = await rpc(admin, "issue_voucher_to_worker", { p_items: [{ amount: 100, fuel_type: "בנזין" }], p_branch: MAIN_POOL, p_link: { id: "12", employee_name: "X Y" } });
+  const bad = await rpc(admin, "issue_voucher_to_worker", { p_items: [{ amount: 100, fuel_type: "בנזין" }], p_branch: MAIN_POOL, p_link: { id: "12", employee_name: "X Y", phone: "0521234567" } });
   assert.equal(bad.error, "פרטי לינק לא תקינים");
-  const none = await rpc(admin, "issue_voucher_to_worker", { p_items: [], p_branch: MAIN_POOL, p_link: { id: "5555", employee_name: "X Y" } });
+  const none = await rpc(admin, "issue_voucher_to_worker", { p_items: [], p_branch: MAIN_POOL, p_link: { id: "5555", employee_name: "X Y", phone: "0521234567" } });
   assert.equal(none.error, "יש לבחור שוברים");
 });
 
@@ -149,7 +149,7 @@ test("issuance is blocked for inactive or missing clients", async () => {
   await RegularClient.updateOne({ client_id: "C1" }, { is_active: false });
   await B2BClient.create({ client_code: "B9", standard: "STD", is_active: false });
   const issue = (details, id) => rpc(admin, "issue_voucher_to_worker", {
-    p_items: [{ amount: 100, fuel_type: "בנזין", details }], p_branch: MAIN_POOL, p_supervisor: null, p_link: { id, employee_name: "Worker" },
+    p_items: [{ amount: 100, fuel_type: "בנזין", details }], p_branch: MAIN_POOL, p_supervisor: null, p_link: { id, employee_name: "Worker", phone: "0521234567" },
   });
   assert.equal((await issue(REG, "1001")).error, "הלקוח או האתר אינם פעילים");
   assert.equal((await issue({ route: "b2b", client_code: "B9", standard: "STD" }, "1002")).error, "רכב העבודה אינו פעיל");
@@ -176,7 +176,7 @@ test("branch isolation and role checks", async () => {
   const branch = (await loginAs("branch", { branch: "צפון" })).agent;
   const viewer = (await loginAs("viewer")).agent;
   const sup = (await loginAs("supervisor", { branch: "צפון", fullName: "Avi Cohen" })).agent;
-  const link = (id) => ({ id, employee_name: "Worker" });
+  const link = (id) => ({ id, employee_name: "Worker", phone: "0521234567" });
   const item = [{ amount: 100, fuel_type: "בנזין", details: REG }];
 
   const foreign = await rpc(branch, "issue_voucher_to_worker", { p_items: item, p_branch: "דרום", p_supervisor: null, p_link: link("2001") });
@@ -246,7 +246,7 @@ test("transfer allocates exact serials to a supervisor, who can then issue them"
   assert.equal((await rpc(admin, "transfer_voucher_stock", { p_items: [items[0]], p_branch: "דרום" })).error, SHORTAGE);
 
   const issued = await rpc(sup, "issue_voucher_to_worker", {
-    p_items: [{ amount: 100, fuel_type: "בנזין", details: REG }], p_branch: "צפון", p_supervisor: "Cohen Avi", p_link: { id: "3001", employee_name: "Worker" },
+    p_items: [{ amount: 100, fuel_type: "בנזין", details: REG }], p_branch: "צפון", p_supervisor: "Cohen Avi", p_link: { id: "3001", employee_name: "Worker", phone: "0521234567" },
   });
   assert.equal(issued.status, 200, issued.error);
   assert.deepEqual(issued.data.vouchers.map((v) => v.serial), ["T1"]);
@@ -254,7 +254,7 @@ test("transfer allocates exact serials to a supervisor, who can then issue them"
   // Supervisor transfer-with-link of own stock (legacy physical issuance path).
   const linked = await rpc(sup, "transfer_voucher_stock", {
     p_items: [{ amount: 100, fuel_type: "סולר", serials: ["T2"], details: REG }], p_branch: "צפון", p_supervisor: "Cohen Avi",
-    p_link: { id: "3002", employee_name: "Worker Two" },
+    p_link: { id: "3002", employee_name: "Worker Two", phone: "0521234567" },
   });
   assert.equal(linked.status, 200, linked.error);
   const t2 = await Voucher.findOne({ serial: "T2" }).lean();
@@ -270,7 +270,7 @@ test("20 concurrent issuances for the last 3 cards never double-allocate", { tim
   await seed([{ serial: "L1" }, { serial: "L2" }, { serial: "L3" }]);
   const results = await Promise.all(Array.from({ length: 20 }, (_, i) => rpc(admin, "issue_voucher_to_worker", {
     p_items: [{ amount: 100, fuel_type: "בנזין", details: REG }], p_branch: MAIN_POOL, p_supervisor: null,
-    p_link: { id: String(500000 + i), employee_name: "Worker" },
+    p_link: { id: String(500000 + i), employee_name: "Worker", phone: "0521234567" },
   })));
   const ok = results.filter((r) => r.status === 200);
   const failed = results.filter((r) => r.status !== 200);
@@ -291,11 +291,11 @@ test("concurrent transfers and issuances of the same cards allocate each card on
   await seed([{ serial: "Q1" }, { serial: "Q2" }]);
   const transfers = Array.from({ length: 10 }, (_, i) => rpc(admin, "transfer_voucher_stock", {
     p_items: [{ amount: 100, fuel_type: "בנזין", serials: ["Q1"], details: REG }], p_branch: MAIN_POOL, p_supervisor: null,
-    p_link: { id: String(600000 + i), employee_name: "Worker" },
+    p_link: { id: String(600000 + i), employee_name: "Worker", phone: "0521234567" },
   }));
   const issues = Array.from({ length: 10 }, (_, i) => rpc(admin, "issue_voucher_to_worker", {
     p_items: [{ amount: 100, fuel_type: "בנזין", details: REG }], p_branch: MAIN_POOL, p_supervisor: null,
-    p_link: { id: String(700000 + i), employee_name: "Worker" },
+    p_link: { id: String(700000 + i), employee_name: "Worker", phone: "0521234567" },
   }));
   const results = await Promise.all([...transfers, ...issues]);
   const ok = results.filter((r) => r.status === 200);

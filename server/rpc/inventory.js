@@ -13,6 +13,8 @@
 import { Voucher, VoucherCode, WorkerLink, AppUser, Profile, InventoryLock } from "../models.js";
 import { scopedLockId } from "../lib/learningContext.js";
 import { blockExpiredStock } from "../lib/expireStock.js";
+import { sendLinkCode } from "../lib/workerOtp.js";
+import { normalizePhone } from "../auth.js";
 import { withTransaction } from "../db.js";
 import { badRequest, forbidden } from "../errors.js";
 import { logAction } from "../lib/audit.js";
@@ -31,7 +33,7 @@ const ADMIN_REQUIRED = "Admin access required";
 const AVAILABLE_STATUSES = [STATUS.AVAILABLE, "available"];
 const EMPTY = { $in: [null, ""] };
 /** nullif(v.link_id,'') IS NULL AND nullif(v.worker_id,'') IS NULL AND nullif(v.worker_name,'') IS NULL */
-const UNASSIGNED = { link_id: EMPTY, worker_id: EMPTY, worker_name: EMPTY };
+const UNASSIGNED = { link_id: EMPTY, worker_name: EMPTY };
 
 const isAdmin = (u) => u?.role === "admin";
 const requireAdmin = (u) => { if (!isAdmin(u)) throw forbidden(ADMIN_REQUIRED); };
@@ -80,7 +82,7 @@ async function ensureLockDoc() {
 
 // ───────────────────────────── central inventory ─────────────────────────────
 
-const SNAPSHOT_BLANK_KEYS = ["supervisor", "supervisor_id", "link_id", "worker_id", "worker_name", "employee_id", "employee_name"];
+const SNAPSHOT_BLANK_KEYS = ["supervisor", "supervisor_id", "link_id", "worker_name", "employee_id", "employee_name"];
 const DIESEL_EXACT = new Set(["סולר", "דיזל", "diesel", "solar"]);
 
 async function centralSnapshot() {
@@ -150,11 +152,13 @@ function expiryPatch(card, set) {
 function validateLink(p_link) {
   const id = txt(p_link, "id");
   const name = sqlTrim(txt(p_link, "employee_name") ?? "");
-  if (id == null || !/^\d{4,12}$/.test(id) || name.length < 2) throw badRequest("פרטי לינק לא תקינים");
-  return { id, name };
+  const phone = normalizePhone(txt(p_link, "phone") ?? "");
+  if (id == null || !/^[A-Za-z0-9_-]{4,40}$/.test(id) || name.length < 2) throw badRequest("פרטי לינק לא תקינים");
+  if (!/^05\d{8}$/.test(phone)) throw badRequest("מספר נייד לא תקין");
+  return { id, name, phone };
 }
 
-async function issueVoucherToWorker(params, { user }) {
+async function issueVoucherToWorker(params, { user, req }) {
   const { p_items, p_branch = null, p_supervisor = null, p_link = null } = params;
   const role = roleFlags(user);
   if (!(role.admin || role.branch || role.sup)) throw forbidden("אין הרשאה");
@@ -246,10 +250,12 @@ async function issueVoucherToWorker(params, { user }) {
 
     await WorkerLink.create([{
       id: link.id, total: linkTotal, serials: allIds, created_on: day,
-      employee_name: link.name, branch: p_branch, supervisor_id: user.id,
+      employee_name: link.name, phone: link.phone, branch: p_branch, supervisor_id: user.id,
     }], { session });
     return { link_id: link.id, total: totalAmount, vouchers: result };
-  });
+  }).then(async (issued) => ({
+    ...issued, ...(await sendLinkCode({ id: link.id, phone: link.phone, employee_name: link.name }, req)),
+  }));
 }
 
 async function transferVoucherStock(params, { user }) {
@@ -309,7 +315,7 @@ async function transferVoucherStock(params, { user }) {
         const card = cards.get(id);
         if (!card) throw badRequest(SHORTAGE);
         if (!AVAILABLE_STATUSES.includes(card.status) || (card.fuel_type ?? "בנזין") !== it.fuel
-          || !blank(card.link_id) || !blank(card.worker_id) || !blank(card.worker_name)) throw badRequest(SHORTAGE);
+          || !blank(card.link_id) || !blank(card.worker_name)) throw badRequest(SHORTAGE);
         if (role.admin) {
           if ((card.branch != null && canonicalBranch(card.branch) !== CENTRAL_LABEL) || !blank(card.supervisor)) throw badRequest(SHORTAGE);
         } else {
@@ -362,7 +368,7 @@ async function transferVoucherStock(params, { user }) {
     if (link != null) {
       await WorkerLink.create([{
         id: link.id, total: linkTotal, serials: ids, created_on: day,
-        employee_name: link.name, branch: p_branch, supervisor_id: user.id,
+        employee_name: link.name, phone: link.phone, branch: p_branch, supervisor_id: user.id,
       }], { session });
     }
   });

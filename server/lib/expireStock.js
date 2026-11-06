@@ -17,7 +17,7 @@ export async function blockExpiredStock(now = new Date()) {
   const r = await Voucher.updateMany({
     status: { $in: [STATUS.AVAILABLE, "available"] },
     created_at: { $lte: addMonths(now, -STOCK_LIFETIME_MONTHS) },
-    link_id: unset, worker_id: unset, worker_name: unset,
+    link_id: unset, worker_name: unset,
   }, { $set: { status: STATUS.BLOCKED, blocked_at: now, updated_on: now.toISOString().slice(0, 10) } });
   if (r.modifiedCount) logAction(null, "חסימת שוברים שלא הונפקו תוך 3 חודשים", `${r.modifiedCount} שוברים`, { count: r.modifiedCount });
   return r.modifiedCount;

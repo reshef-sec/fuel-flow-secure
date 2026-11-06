@@ -62,7 +62,7 @@ function ProducedPage() {
       <PageHero
         eyebrow="הנפקות"
         title="שוברים שהופקו"
-        subtitle="לינקים שהופקו לעובדים — סטטוס חתימה, העתקה ושחרור נעילה."
+        subtitle="לינקים שהופקו לעובדים והאם נחתמו."
         actions={
           <>
             <button type="button" className="ds-btn ds-btn-glass" onClick={() => void exportExcel()} disabled={exporting || rows.length === 0}>

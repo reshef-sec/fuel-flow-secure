@@ -128,7 +128,6 @@ export interface WorkerLink {
   branch?: string;
   supervisorId?: string;
   /** Locked after 3 wrong ID/phone attempts. */
-  locked?: boolean;
 }
 
 
@@ -180,6 +179,8 @@ export interface WorkerIssueItem {
 
 export interface WorkerIssuePayload {
   employeeName: string;
+  /** Worker's mobile: the SMS with the link and one-time code goes here. */
+  phone: string;
   branch: string;
   supervisor?: string;
   requester?: string;
@@ -281,10 +282,9 @@ interface AppState {
 
   links: WorkerLink[];
   /** Saves ID + phone after the worker signs. */
-  signLink: (id: string, workerId: string, phone: string) => void;
 
   /** Issues a voucher handed to an end worker, storing the resolved vehicle/client data. */
-  issueWorkerVoucher: (payload: WorkerIssuePayload) => Promise<WorkerLink | { error: string }>;
+  issueWorkerVoucher: (payload: WorkerIssuePayload) => Promise<(WorkerLink & { smsSent: boolean; otp: string | null }) | { error: string }>;
 
   reasons: ReasonRecord[];
   addReason: (reason: ReasonRecord) => void;
@@ -569,16 +569,6 @@ export const useAppStore = create<AppState>()(
   },
 
   links: [],
-  signLink: (id, workerId, phone) =>
-    set((s) => {
-      const link = s.links.find((l) => l.id === id);
-      const serials = new Set(link?.serials ?? []);
-      return {
-        links: s.links.map((l) => (l.id === id ? { ...l, workerId, phone, signedAt: today() } : l)),
-        vouchers: s.vouchers.map((v) => (serials.has(v.serial) ? { ...v, workerId } : v)),
-      };
-    }),
-
   issueWorkerVoucher: async (p) => {
     for (const item of p.items) {
       const error = issuanceAmountError(item.fuelType, item.amount);
@@ -589,7 +579,7 @@ export const useAppStore = create<AppState>()(
     catch { return { error: "בדיקת המלאי נכשלה — לא הופק לינק. יש לנסות שוב" }; }
     set({ vouchers: stock });
     const st = get();
-    const linkId = String(Math.floor(10000000 + Math.random() * 89999999));
+    const linkId = crypto.randomUUID().replaceAll("-", "");
     const pool = issuancePool(stock, { role: st.role, branch: p.branch, supervisorName: p.supervisor });
     const byFuel = new Map<FuelType, VoucherRecord[]>(FUEL_TYPES.map(f => [f, cardsOfFuel(pool, f)]));
     for (const fuel of FUEL_TYPES) {
@@ -627,6 +617,7 @@ export const useAppStore = create<AppState>()(
           issuedAt,
           expiresAt,
           workerName: p.employeeName,
+          workerPhone: p.phone,
           route: it.route,
           linkId,
           client: it.clientName,
@@ -642,12 +633,14 @@ export const useAppStore = create<AppState>()(
       }
     }
     let bySerial = new Map<string, VoucherRecord>();
+    let delivery: { smsSent: boolean; otp: string | null } = { smsSent: false, otp: null };
     const link: WorkerLink = {
       id: linkId,
       total: out.reduce((t, v) => t + v.amount, 0),
       serials: out.map((v) => v.serial),
       createdAt: today(),
       employeeName: p.employeeName,
+      phone: p.phone,
       branch: p.branch,
       ...(st.authId ? { supervisorId: st.authId } : {}),
     };
@@ -657,8 +650,9 @@ export const useAppStore = create<AppState>()(
         details: { client: item.clientName, client_id: item.clientCode, client_code: item.clientCode,
           account_name: item.accountName, standard: item.standard, site_id: item.siteId,
           site_name: item.siteName, route: item.route, reason: item.reason, requester: p.requester },
-      })), p.branch, p.supervisor, { id: linkId, employee_name: p.employeeName });
+      })), p.branch, p.supervisor, { id: linkId, employee_name: p.employeeName, phone: p.phone });
       const issued = result.cards;
+      delivery = { smsSent: result.smsSent, otp: result.otp };
       link.id = result.linkId;
       // The database chose the physical cards; reflect its choice locally.
       const chosenSerials = new Set(issued.map(c => c.serial));
@@ -689,7 +683,7 @@ export const useAppStore = create<AppState>()(
     });
     logActivity(actorOf(get()), "הנפקת שובר לעובד", `קישור ${link.id} · ${link.total} ₪`);
     notifyCentralInventoryChanged();
-    return link;
+    return { ...link, ...delivery };
   },
 
   reasons: [],

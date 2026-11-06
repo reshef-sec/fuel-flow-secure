@@ -32,11 +32,11 @@ export const voucherToRow = (v: VoucherRecord) => ({
   supervisor: v.supervisor ?? null, client: v.client ?? null, status: v.status, updated_on: v.updatedAt,
   requester: v.requester ?? null, approver: v.approver ?? null, client_id: v.clientId ?? null,
   site_id: v.siteId ?? null, site_name: v.siteName ?? null, reason: v.reason ?? null,
-  worker_name: v.workerName ?? null, worker_id: v.workerId ?? null, delivered_at: v.deliveredAt ?? null,
+  worker_name: v.workerName ?? null, delivered_at: v.deliveredAt ?? null,
   route: v.route ?? null, link_id: v.linkId ?? null, client_code: v.clientCode ?? null,
   account_name: v.accountName ?? null, standard: v.standard ?? null, license_plate: v.licensePlate ?? null,
   driver_name: v.driverName ?? null, standard_name: v.standardName ?? null,
-  employee_name: v.workerName ?? null, employee_id: v.workerId ?? null, employee_phone: v.workerPhone ?? null,
+  employee_name: v.workerName ?? null, employee_phone: v.workerPhone ?? null,
   issue_reason: v.reason ?? null, issued_at: v.issuedAt ?? null, expires_at: v.expiresAt ?? null,
   supervisor_id: v.supervisorId ?? null,
 });
@@ -48,7 +48,7 @@ const rowToVoucher = (r: Row, codes: Map<string, string>): VoucherRecord => {
     updatedAt: r.updated_on, supervisor: s(r.supervisor), client: s(r.client), requester: s(r.requester),
     approver: s(r.approver), clientId: s(r.client_id), siteId: s(r.site_id), siteName: s(r.site_name),
     reason: s(r.issue_reason) ?? s(r.reason), workerName: s(r.employee_name) ?? s(r.worker_name),
-    workerId: s(r.employee_id) ?? s(r.worker_id), workerPhone: s(r.employee_phone),
+    workerPhone: s(r.employee_phone),
     issuedAt: s(r.issued_at), expiresAt: s(r.expires_at), supervisorId: s(r.supervisor_id),
     deliveredAt: s(r.delivered_at), route: s(r.route), linkId: s(r.link_id), clientCode: s(r.client_code),
     accountName: s(r.account_name), standard: s(r.standard), licensePlate: s(r.license_plate),
@@ -96,7 +96,7 @@ export const requestToRow = (r: VoucherRequest) => ({
 });
 export const linkToRow = (l: WorkerLink) => ({
   id: l.id, total: l.total, serials: l.serials, created_on: l.createdAt,
-  worker_id: l.workerId ?? null, phone: l.phone ?? null, signed_at: l.signedAt ?? null,
+  phone: l.phone ?? null, signed_at: l.signedAt ?? null,
   employee_name: l.employeeName ?? null, branch: l.branch ?? null, supervisor_id: l.supervisorId ?? null,
 });
 
@@ -165,9 +165,8 @@ export async function loadStock() {
     vouchers: vouchers.map((r) => rowToVoucher(r, codes)).reverse(),
     links: links.map((r) => ({
       id: String(r.id), total: Number(r.total), serials: (r.serials as string[]) ?? [], createdAt: String(r.created_on),
-      workerId: s(r.worker_id), phone: s(r.phone), signedAt: s(r.signed_at),
+      phone: s(r.phone), signedAt: s(r.signed_at),
       employeeName: s(r.employee_name), branch: s(r.branch), supervisorId: s(r.supervisor_id),
-      locked: Boolean(r.locked) || Number(r.failed_attempts ?? 0) >= 3,
     })).reverse() as WorkerLink[],
   };
 }

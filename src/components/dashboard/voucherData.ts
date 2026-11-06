@@ -38,7 +38,6 @@ export interface VoucherRecord {
   /** שם עובד */
   workerName?: string;
   /** ת.ז עובד */
-  workerId?: string;
   /** תאריך מסירה לעובד */
   deliveredAt?: string;
   /** טלפון עובד */
@@ -70,7 +69,7 @@ export interface VoucherRecord {
 
 /** True for vouchers handed to an end worker (billing-relevant). */
 /** True once the voucher was handed to an employee through a link. */
-export const isIssued = (v: VoucherRecord) => Boolean(v.linkId || v.workerName || v.workerId);
+export const isIssued = (v: VoucherRecord) => Boolean(v.linkId || v.workerName);
 
 /** Unused budget still available to hand out (not issued, redeemed or blocked). */
 // Same predicate as issuance and the allocations balances (src/lib/issuanceStock.ts), so every
@@ -79,7 +78,7 @@ export const isAvailable = (v: VoucherRecord) =>
   isUnissuedAvailable(v as unknown as StockCard) && Number(v.amount) > 0;
 
 export const isWorkerVoucher = (v: VoucherRecord) =>
-  Boolean(v.workerId || v.workerName) || v.status === "הוקצה לעובד";
+  Boolean(v.workerName) || v.status === "הוקצה לעובד";
 
 /** "מאגר ראשי" | "צפון" | "סניף צפון (מפקח דן)" */
 export function formatAssignment(v: { branch: string; supervisor?: string }) {

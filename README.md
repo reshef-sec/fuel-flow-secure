@@ -53,6 +53,7 @@ npm test                    # server integration tests + frontend unit tests
      - In Azure → App registrations, add the redirect URI `https://<your-site>/api/auth/microsoft/callback` (type Web).
      - `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` from that registration.
      - `MICROSOFT_TENANT_ID`: your organisation's tenant id, to trust that tenant's email addresses. Leave it empty to accept personal Outlook accounts; other organisations' accounts are then accepted only if the `xms_edov` optional claim is enabled on the app.
+   - SMS to employees (Twilio): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM`. Until they are set, the issuer sees the code on screen and passes it on.
    - Sign in with Google (the button appears once both are set): in Google Cloud → Credentials create an OAuth client (Web application) with the redirect URI `https://<your-site>/api/auth/google/callback`, then set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 4. In Atlas → Network Access, allow Render's outbound IPs (or 0.0.0.0/0 with a strong DB password).
 

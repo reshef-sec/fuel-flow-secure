@@ -9,7 +9,7 @@
  *   - five stock imports (~5 months) → central pool (מאגר ראשי);
  *   - one approved request per branch in the last 3 weeks → branch allocation → part handed on to
  *     supervisors (הקצאה למפקח);
- *   - 45 worker links issued over the last ~3 months (signed / waiting / locked), and older
+ *   - 45 worker links issued over the last ~3 months (signed / waiting), and older
  *     pre-link issuances; weekly Paz feedback imports mark used cards מומש סופית (redeemed_at =
  *     the import time, exactly like reconcile_redeemed_vouchers);
  *   - activity_log covers the last 3 weeks completely (every import, allocation, issuance, request).
@@ -21,11 +21,14 @@ import {
 import { MAIN_POOL, STATUS } from "./canonical.js";
 import { roleLabel } from "./audit.js";
 import { addMonths } from "./issuanceGuard.js";
+import { otpFields } from "./workerOtp.js";
 
 const SEED = 0x5eed2611;
 const DAY = 864e5;
 const LOG_WINDOW = 21; // days of fully-logged activity
 const DUMMY_HASH = "!learning-demo-profile-no-login";
+/** Demo links open with this code (no SMS is ever sent from the learning environment). */
+export const DEMO_OTP = "1234";
 
 // ───────────────────────────── PRNG ─────────────────────────────
 
@@ -147,21 +150,7 @@ export async function seedLearning({ owner } = {}) {
   const ref = await loadReference();
 
   // ── identities (unique, never colliding with the owner or any real person) ──
-  const usedIds = new Set();
   const usedPhones = new Set([String(owner?.phone ?? ""), ...ref.users.map((u) => u.phone), ...ref.profiles.map((p) => p.phone)]);
-  const nationalId = () => {
-    for (;;) {
-      const body = `${R.int(2, 3)}${R.digits(7)}`;
-      let sum = 0;
-      for (let i = 0; i < 8; i += 1) {
-        let x = Number(body[i]) * (i % 2 ? 2 : 1);
-        if (x > 9) x -= 9;
-        sum += x;
-      }
-      const id = body + ((10 - (sum % 10)) % 10);
-      if (!usedIds.has(id)) { usedIds.add(id); return id; }
-    }
-  };
   const phone = () => {
     for (;;) {
       const p = `05${R.pick(["0", "2", "3", "4", "8"])}${R.digits(7)}`;
@@ -288,7 +277,7 @@ export async function seedLearning({ owner } = {}) {
     let name;
     do name = `${R.pick(LAST)} ${R.chance(0.72) ? R.pick(FIRST_M) : R.pick(FIRST_F)}`; while (usedNames.has(name));
     usedNames.add(name);
-    workers.push({ name, nationalId: nationalId(), phone: phone(), branch: ACT[i % ACT.length] });
+    workers.push({ name, phone: phone(), branch: ACT[i % ACT.length] });
   }
   const workersOf = (b) => workers.filter((w) => w.branch === b);
 
@@ -375,8 +364,7 @@ export async function seedLearning({ owner } = {}) {
     branch: branchName, supervisor: issuer.role === "supervisor" ? issuer.name : null, supervisor_id: issuer.id,
     status: STATUS.ISSUED, ...routeFields(route, branchName, false), reason: null, issue_reason: null,
     worker_name: worker.name, employee_name: worker.name,
-    worker_id: signed ? worker.nationalId : null, employee_id: signed ? worker.nationalId : null,
-    employee_phone: signed ? worker.phone : null,
+    employee_phone: worker.phone,
     requester: (managerOf(branchName) ?? ownerActor).name, approver: ownerName,
     delivered_at: day(issuedAt), updated_on: day(issuedAt), issued_at: issuedAt, expires_at: addMonths(issuedAt, 3),
   });
@@ -401,7 +389,6 @@ export async function seedLearning({ owner } = {}) {
   // ── 2. worker links: last ~3 months ──
   const linkDays = [0, 1, 2, 3, ...Array.from({ length: 41 }, () => R.int(4, 86))].sort((a, b) => a - b);
   const waitingIdx = new Set([0, 1, 3, 4, 6, 8, 9, 11, 13]);
-  const lockedIdx = new Set([15, 22, 29, 35, 41]);
   const usedLinkIds = new Set(ref.linkIds.map(String)); // never reuse a real link number
   const links = [];
   const archives = [];
@@ -411,8 +398,8 @@ export async function seedLearning({ owner } = {}) {
     const worker = R.pick(workersOf(b));
     const issuer = issuerOf(b);
     const route = R.chance(0.5) ? "b2b" : "regular";
-    const status = waitingIdx.has(i) ? "ממתין לחתימה" : lockedIdx.has(i) ? "נעול" : "נחתם";
-    const signed = status !== "ממתין לחתימה";
+    const status = waitingIdx.has(i) ? "טרם נחתם" : "נחתם";
+    const signed = status === "נחתם";
     let id;
     do id = String(R.int(10000000, 99999999)); while (usedLinkIds.has(id));
     usedLinkIds.add(id);
@@ -429,14 +416,13 @@ export async function seedLearning({ owner } = {}) {
     const link = {
       id, total, serials: cards.map((v) => v.serial), created_on: day(createdAt), created_at: createdAt,
       employee_name: worker.name, branch: b, supervisor_id: issuer.id,
-      worker_id: signed ? worker.nationalId : null, phone: signed ? worker.phone : null,
-      signed_at: signedAt ? day(signedAt) : null, failed_attempts: 0, locked: false, locked_at: null,
+      phone: worker.phone, signed_at: signedAt ? day(signedAt) : null,
+      ...otpFields(id, DEMO_OTP),
     };
-    if (status === "נעול") Object.assign(link, { failed_attempts: 3, locked: true, locked_at: later(signedAt, 1, Math.max(1, dAgo - 2)) });
     if (signed) {
       archives.push({
         id: R.uuid(), link_id: id, branch: b, supervisor_id: issuer.id, employee_name: worker.name,
-        employee_id_number: worker.nationalId, employee_phone: worker.phone, total_amount: total,
+        employee_phone: worker.phone, total_amount: total,
         voucher_record_ids: link.serials, signature_image_url: signatureSvg(R), created_at: signedAt,
       });
     }
@@ -610,8 +596,8 @@ export async function seedLearning({ owner } = {}) {
 
   // Easy demo links: newest of each employee-page state.
   const demo = (status) => links.find((l) => l._status === status);
-  const demoLinks = ["נחתם", "ממתין לחתימה", "נעול"].map(demo).filter(Boolean).map((l) => ({
-    id: l.id, workerId: l._worker.nationalId, phone: l._worker.phone, status: l._status,
+  const demoLinks = ["נחתם", "טרם נחתם"].map(demo).filter(Boolean).map((l) => ({
+    id: l.id, otp: DEMO_OTP, phone: l._worker.phone, status: l._status,
     employeeName: l.employee_name, total: l.total, cards: l.serials.length,
   }));
 
@@ -624,7 +610,7 @@ export async function seedLearning({ owner } = {}) {
 }
 
 /** Bumped whenever the dataset's shape changes; an older learning copy is re-seeded on next activation. */
-export const SEED_VERSION = 5;
+export const SEED_VERSION = 6;
 
 /** Drops Mongo internals so a real document can be copied into its learning twin. */
 function stripDoc(doc) {

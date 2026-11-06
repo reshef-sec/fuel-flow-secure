@@ -20,13 +20,13 @@ export const stockHolder = (v: { supervisor?: string; branch: string }) => clean
 
 export interface StockCard {
   serial: string; amount: number | string; branch: string; status: string;
-  fuelType?: string; supervisor?: string; linkId?: string; workerId?: string; workerName?: string;
+  fuelType?: string; supervisor?: string; linkId?: string; workerName?: string;
 }
 
 export interface Issuer { role: "admin" | "branch" | "supervisor" | "viewer"; branch?: string; supervisorName?: string }
 
 export const isUnissuedAvailable = (v: StockCard) =>
-  (v.status === "טרם שומש" || v.status === "available") && !v.linkId && !v.workerId && !v.workerName;
+  (v.status === "טרם שומש" || v.status === "available") && !v.linkId && !v.workerName;
 
 /** Cards the issuer may hand out. Admin → central pool; branch → own unassigned branch stock; supervisor → own stock. */
 export function issuancePool<T extends StockCard>(stock: T[], who: Issuer): T[] {

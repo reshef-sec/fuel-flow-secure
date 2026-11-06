@@ -111,7 +111,7 @@ describe("learning demo seed", () => {
     const links = await L.WorkerLink.find().lean();
     const archives = new Map((await L.SignatureArchive.find().lean()).map((a) => [a.link_id, a]));
     const threeMonths = Date.now() - 92 * 864e5;
-    let signed = 0, waiting = 0, locked = 0;
+    let signed = 0, waiting = 0;
     for (const l of links) {
       assert.match(l.id, /^\d{4,12}$/);
       assert.ok(l.serials.length >= 1 && l.serials.length <= 4);
@@ -127,29 +127,23 @@ describe("learning demo seed", () => {
       assert.equal(l.total, total);
       assert.ok(new Date(l.created_at).getTime() > threeMonths, "link created within ~3 months (not expired)");
       assert.equal(l.created_on, new Date(l.created_at).toISOString().slice(0, 10), "created_at keeps the issuance time");
-      if (l.locked) {
-        locked += 1;
-        assert.equal(l.failed_attempts, 3);
-        assert.ok(l.locked_at);
-      } else if (l.signed_at) signed += 1;
+      assert.match(l.phone, /^05\d{8}$/);
+      if (l.signed_at) signed += 1;
       else waiting += 1;
       if (l.signed_at) {
         const a = archives.get(l.id);
         assert.ok(a, `archive for signed link ${l.id}`);
-        assert.equal(a.employee_id_number, l.worker_id);
         assert.equal(a.employee_phone, l.phone);
         assert.deepEqual(a.voucher_record_ids, l.serials);
         assert.equal(a.total_amount, l.total);
         assert.match(a.signature_image_url, /^data:image\/svg\+xml;base64,/);
       } else {
-        assert.equal(l.worker_id, null);
         assert.ok(!archives.has(l.id));
       }
     }
     assert.equal(archives.size, links.filter((l) => l.signed_at).length);
-    inRange(signed, 28, 34, "signed links");
+    inRange(signed, 32, 38, "signed links");
     inRange(waiting, 7, 11, "waiting links");
-    inRange(locked, 3, 6, "locked links");
 
     // Requests: exactly four pending, valid fuel split.
     const reqs = await L.VoucherRequest.find().lean();
@@ -172,7 +166,7 @@ describe("learning demo seed", () => {
     assert.ok(await L.ActivityLog.countDocuments({ action: "היזון חוזר מימושים מפז" }) >= 2);
 
     // Demo links cover the three employee-page states.
-    assert.deepEqual(summary.demoLinks.map((d) => d.status).sort(), ["ממתין לחתימה", "נחתם", "נעול"].sort());
+    assert.deepEqual(summary.demoLinks.map((d) => d.status).sort(), ["טרם נחתם", "נחתם"].sort());
   });
 
   it("is deterministic across resets", async () => {
@@ -206,19 +200,21 @@ describe("learning demo seed", () => {
     assert.equal(await REAL.Voucher.countDocuments(), realVouchers);
 
     const signedLink = summary.demoLinks.find((d) => d.status === "נחתם");
-    const waitingLink = summary.demoLinks.find((d) => d.status === "ממתין לחתימה");
-    const lockedLink = summary.demoLinks.find((d) => d.status === "נעול");
+    const waitingLink = summary.demoLinks.find((d) => d.status === "טרם נחתם");
     const a = anon();
 
     const st = await rpc(a, "worker_link_status", { p_id: signedLink.id, p_demo: true });
     assert.equal(st.data.state, "ok");
     assert.equal(st.data.signed, true);
     assert.equal(st.data.total, signedLink.total);
-    const wallet = await rpc(a, "open_worker_wallet", { p_id: signedLink.id, p_worker_id: signedLink.workerId, p_phone: signedLink.phone, p_demo: true });
+    const otp = await rpc(a, "verify_worker_otp", { p_id: signedLink.id, p_code: signedLink.otp, p_demo: true });
+    assert.equal(otp.data.ok, true);
+    assert.equal(otp.data.signed, true);
+    const wallet = await rpc(a, "open_worker_wallet", { p_id: signedLink.id, p_session: otp.data.session, p_demo: true });
     assert.equal(wallet.data.ok, true);
     assert.equal(wallet.data.codes.length, signedLink.cards);
     for (const c of wallet.data.codes) assert.equal(c.real_code, null);
-    const revealed = await rpc(a, "reveal_worker_code", { p_id: signedLink.id, p_worker_id: signedLink.workerId, p_phone: signedLink.phone, p_serial: wallet.data.codes[0].serial, p_demo: true });
+    const revealed = await rpc(a, "reveal_worker_code", { p_id: signedLink.id, p_session: otp.data.session, p_serial: wallet.data.codes[0].serial, p_demo: true });
     assert.match(revealed.data.code.real_code, /^\d{12}$/);
     // The same link is unknown to the real data.
     assert.equal((await rpc(a, "worker_link_status", { p_id: signedLink.id })).data.exists, false);
@@ -227,6 +223,5 @@ describe("learning demo seed", () => {
     assert.equal(w.data.state, "ok");
     assert.equal(w.data.signed, false);
     assert.equal(w.data.employee_name, waitingLink.employeeName);
-    assert.equal((await rpc(a, "worker_link_status", { p_id: lockedLink.id, p_demo: true })).data.state, "locked");
   });
 });

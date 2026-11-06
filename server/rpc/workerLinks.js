@@ -1,24 +1,37 @@
 /**
- * Public employee link (/voucher/:id) and staff unlock — ports of worker_link_status,
- * open_worker_wallet, sign_worker_link, unlock_worker_link, unlock_voucher_link and the
- * _link_codes / _link_expired helpers (database/legacy_live_functions.sql).
- *
- * Anonymous access is token-scoped: the link id alone reveals only status/total/name;
- * after signing, or to the matching worker id + phone, the wallet lists the cards but hides every
- * code until the employee reveals it (reveal_worker_code). A revealed code stays revealed; an
- * unrevealed code never leaves the server.
- * Three failed identity attempts lock the link until its issuer or an admin unlocks it.
+ * Public employee link (/v/:token): the token is unguessable, but it alone reveals only
+ * status, total and name. A 4-digit code sent by SMS opens the link once; that gives the device a
+ * session, which signing and the wallet require. The wallet lists the cards but hides every code
+ * until the employee reveals it; a revealed code stays revealed and an unrevealed one never leaves
+ * the server.
  */
+import jwt from "jsonwebtoken";
 import { Voucher, VoucherCode, WorkerLink, SignatureArchive } from "../models.js";
 import { withTransaction } from "../db.js";
 import { STATUS } from "../lib/canonical.js";
-import { forbidden, unauthorized, HttpError } from "../errors.js";
+import { badRequest, forbidden, unauthorized, HttpError } from "../errors.js";
+import { normalizePhone } from "../auth.js";
+import { inLearning } from "../lib/learningContext.js";
+import { OTP_MAX_ATTEMPTS, otpHash, sendLinkCode } from "../lib/workerOtp.js";
 import { cachedLink, forgetLink, rememberLink } from "../lib/linkStatusCache.js";
 
-const MAX_ATTEMPTS = 3;
+const RESEND_GAP_MS = 60 * 1000;
+const SESSION_DAYS = 120;
+const LINK_ID = /^[A-Za-z0-9_-]{4,40}$/;
 /** Only what each public read needs (lean, projected: these endpoints take the employee traffic). */
-const STATUS_FIELDS = { _id: 0, total: 1, worker_id: 1, employee_name: 1, created_at: 1, created_on: 1, failed_attempts: 1, locked: 1 };
-const WALLET_FIELDS = { _id: 0, id: 1, serials: 1, revealed_serials: 1, worker_id: 1, phone: 1, created_at: 1, created_on: 1, failed_attempts: 1, locked: 1 };
+const STATUS_FIELDS = { _id: 0, total: 1, signed_at: 1, phone: 1, employee_name: 1, created_at: 1, created_on: 1 };
+const WALLET_FIELDS = { _id: 0, id: 1, serials: 1, revealed_serials: 1, signed_at: 1, created_at: 1, created_on: 1, otp_hash: 1, otp_attempts: 1 };
+
+/** Proof that this device passed the code for this link. */
+const workerSession = (id) => jwt.sign({ sub: id, kind: "worker" }, process.env.JWT_SECRET, { expiresIn: `${SESSION_DAYS}d`, algorithm: "HS256" });
+function validSession(token, id) {
+  try {
+    const p = jwt.verify(String(token ?? ""), process.env.JWT_SECRET, { algorithms: ["HS256"] });
+    return p.kind === "worker" && p.sub === id;
+  } catch {
+    return false;
+  }
+}
 /** Text parameter coercion: never pass caller objects into a query (NoSQL injection). */
 const text = (v) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : null);
 
@@ -40,8 +53,6 @@ export function linkExpired(l, now = new Date()) {
   if (!base || Number.isNaN(base.getTime())) return false; // NULL comparison → not expired
   return addMonths(base, 3) < now;
 }
-
-const isLocked = (l) => Boolean(l.locked) || Number(l.failed_attempts ?? 0) >= MAX_ATTEMPTS;
 
 /** _link_codes: card codes for the link's serials, never blocked cards, ordered by serial. */
 export async function linkCodes(serials, session) {
@@ -75,106 +86,91 @@ async function walletCodes(link, session) {
     : { ...c, real_code: null, revealed: false }));
 }
 
-/**
- * Identity gate shared by the wallet and code reveal: null when the caller may proceed, otherwise
- * the failure to return. A wrong id/phone counts as a failed attempt (3 lock the link).
- */
-async function workerGate(l, workerId, phone, session) {
-  if (!l) return { ok: false, state: "invalid" };
-  if (linkExpired(l)) return { ok: false, state: "expired" };
-  if (isLocked(l)) return { ok: false, state: "locked" };
-  // Unlike SQL's IS DISTINCT FROM, NULL never matches NULL: an unsigned link cannot be
-  // opened with empty credentials (codes are only reachable by signing or by the signer).
-  const matches = l.worker_id != null && l.phone != null && l.worker_id === workerId && l.phone === phone;
-  if (!matches) {
-    const n = Number(l.failed_attempts ?? 0) + 1;
-    const set = { failed_attempts: n, locked: n >= MAX_ATTEMPTS };
-    if (n >= MAX_ATTEMPTS) set.locked_at = new Date();
-    await WorkerLink.updateOne({ id: l.id }, { $set: set }, { session });
-    return { ok: false, state: n >= MAX_ATTEMPTS ? "locked" : "mismatch", attempts_left: Math.max(0, MAX_ATTEMPTS - n) };
-  }
-  if (Number(l.failed_attempts ?? 0) > 0) await WorkerLink.updateOne({ id: l.id }, { $set: { failed_attempts: 0 } }, { session });
-  return null;
-}
-
 async function workerLinkStatus({ p_id }) {
   const id = text(p_id);
-  if (id == null || !/^\d{4,12}$/.test(id)) return { exists: false };
+  if (id == null || !LINK_ID.test(id)) return { exists: false };
   let l = cachedLink(id);
   if (!l) {
     const doc = await WorkerLink.findOne({ id }, STATUS_FIELDS).lean();
     if (!doc) return { exists: false }; // unknown ids are not cached: a new link must work at once
-    // The national id only decides "signed"; it is not kept in memory.
-    const { worker_id: workerId, ...rest } = doc;
-    l = { ...rest, signed: workerId != null };
+    // The phone only decides whether a code can be sent; it is not kept in memory.
+    const { phone, ...rest } = doc;
+    l = { ...rest, reachable: Boolean(phone) };
     rememberLink(id, l);
   }
   if (linkExpired(l)) return { exists: true, state: "expired" };
-  if (isLocked(l)) return { exists: true, state: "locked" };
-  return { exists: true, state: "ok", total: l.total, signed: l.signed, employee_name: l.employee_name ?? "" };
+  return { exists: true, state: "ok", total: l.total, signed: l.signed_at != null, employee_name: l.employee_name ?? "", reachable: l.reachable };
 }
 
-async function openWorkerWallet({ p_id, p_worker_id, p_phone }) {
+/** Checks the 4-digit code. Every attempt is counted before it is compared. */
+async function verifyWorkerOtp({ p_id, p_code }) {
   const id = text(p_id);
-  if (id == null) return { ok: false, state: "invalid" };
-  const workerId = text(p_worker_id);
-  const phone = text(p_phone);
-  // The usual visit (right person, nothing to update) is a plain read, without a transaction.
-  const seen = await WorkerLink.findOne({ id }, WALLET_FIELDS).lean();
-  if (seen && !linkExpired(seen) && !isLocked(seen) && !Number(seen.failed_attempts ?? 0)
-    && seen.worker_id != null && seen.phone != null && seen.worker_id === workerId && seen.phone === phone) {
-    return { ok: true, state: "ok", attempts_left: MAX_ATTEMPTS, codes: await walletCodes(seen) };
+  const code = text(p_code);
+  if (id == null || code == null || !/^\d{4}$/.test(code)) return { ok: false, state: "wrong" };
+  const l = await WorkerLink.findOneAndUpdate(
+    { id, otp_hash: { $ne: null }, otp_attempts: { $lt: OTP_MAX_ATTEMPTS }, otp_expires_at: { $gt: new Date() } },
+    { $inc: { otp_attempts: 1 } }, { new: true, projection: WALLET_FIELDS },
+  ).lean();
+  if (!l) return { ok: false, state: "new_code_needed" };
+  if (linkExpired(l)) return { ok: false, state: "expired" };
+  if (l.otp_hash !== otpHash(id, code)) {
+    const left = Math.max(0, OTP_MAX_ATTEMPTS - l.otp_attempts);
+    return { ok: false, state: left ? "wrong" : "new_code_needed", attempts_left: left };
   }
-  // Anything else may write (failed-attempt count, lock), so it goes through the full check.
-  const result = await withTransaction(async (session) => {
-    const l = await WorkerLink.findOne({ id }, WALLET_FIELDS).session(session).lean();
-    const denied = await workerGate(l, workerId, phone, session);
-    if (denied) return denied;
-    return { ok: true, state: "ok", attempts_left: MAX_ATTEMPTS, codes: await walletCodes(l, session) };
-  });
-  forgetLink(id);
-  return result;
+  // One use only. Demo links keep their published code.
+  if (!inLearning()) await WorkerLink.updateOne({ id }, { $set: { otp_hash: null } });
+  return { ok: true, session: workerSession(id), signed: l.signed_at != null };
+}
+
+/** Sends a fresh code to the phone on the link, for a new device or a lost message. */
+async function requestWorkerOtp({ p_id }, { req }) {
+  const id = text(p_id);
+  const l = id == null ? null : await WorkerLink.findOne({ id }, { _id: 0, id: 1, phone: 1, employee_name: 1, otp_sent_at: 1, created_at: 1, created_on: 1 }).lean();
+  if (!l || !l.phone || linkExpired(l)) return { ok: false, state: "unavailable" };
+  if (l.otp_sent_at && Date.now() - new Date(l.otp_sent_at).getTime() < RESEND_GAP_MS) return { ok: false, state: "wait" };
+  const r = await sendLinkCode(l, req);
+  return r.sms_sent ? { ok: true } : { ok: false, state: "unavailable" };
+}
+
+async function openWorkerWallet({ p_id, p_session }) {
+  const id = text(p_id);
+  if (id == null || !validSession(p_session, id)) return { ok: false, state: "invalid" };
+  const l = await WorkerLink.findOne({ id }, WALLET_FIELDS).lean();
+  if (!l) return { ok: false, state: "invalid" };
+  if (linkExpired(l)) return { ok: false, state: "expired" };
+  return { ok: true, state: "ok", codes: await walletCodes(l) };
 }
 
 /** Reveals one card of the link, permanently: the code is sent now and on every later visit. */
-async function revealWorkerCode({ p_id, p_worker_id, p_phone, p_serial }) {
+async function revealWorkerCode({ p_id, p_session, p_serial }) {
   const id = text(p_id);
   const serial = text(p_serial);
-  if (id == null || serial == null) return { ok: false, state: "invalid" };
-  const workerId = text(p_worker_id);
-  const phone = text(p_phone);
-  const result = await withTransaction(async (session) => {
-    const l = await WorkerLink.findOne({ id }, WALLET_FIELDS).session(session).lean();
-    const denied = await workerGate(l, workerId, phone, session);
-    if (denied) return denied;
-    if (!(l.serials ?? []).includes(serial)) return { ok: false, state: "invalid" };
-    const [card] = await linkCodes([serial], session);
-    if (!card) return { ok: false, state: "invalid" };
-    await WorkerLink.updateOne({ id }, { $addToSet: { revealed_serials: serial } }, { session });
-    return { ok: true, state: "ok", code: { ...card, revealed: true } };
-  });
-  forgetLink(id);
-  return result;
+  if (id == null || serial == null || !validSession(p_session, id)) return { ok: false, state: "invalid" };
+  const l = await WorkerLink.findOne({ id }, WALLET_FIELDS).lean();
+  if (!l) return { ok: false, state: "invalid" };
+  if (linkExpired(l)) return { ok: false, state: "expired" };
+  if (!(l.serials ?? []).includes(serial)) return { ok: false, state: "invalid" };
+  const [card] = await linkCodes([serial]);
+  if (!card) return { ok: false, state: "invalid" };
+  await WorkerLink.updateOne({ id }, { $addToSet: { revealed_serials: serial } });
+  return { ok: true, state: "ok", code: { ...card, revealed: true } };
 }
 
-async function signWorkerLink({ p_id, p_worker_id, p_phone, p_full_name, p_signature }) {
+/** The employee signs with a finger; name and phone come from the link the issuer created. */
+async function signWorkerLink({ p_id, p_session, p_signature }) {
   const id = text(p_id);
-  const workerId = text(p_worker_id);
-  const phone = text(p_phone);
-  const fullName = typeof p_full_name === "string" ? p_full_name.trim() : null;
   const signature = typeof p_signature === "string" ? p_signature : null;
-  if (id == null || workerId == null || !/^\d{9}$/.test(workerId) || phone == null || !/^0\d{8,9}$/.test(phone)
-    || fullName == null || fullName.length < 2
+  if (id == null || !validSession(p_session, id)
     || signature == null || !signature.startsWith("data:image/png;base64,") || signature.length > 800000) {
     return { ok: false };
   }
   const result = await withTransaction(async (session) => {
     const l = await WorkerLink.findOne({ id }).session(session).lean();
-    if (!l || l.worker_id != null || linkExpired(l) || isLocked(l)) return { ok: false };
+    if (!l || l.signed_at != null || linkExpired(l)) return { ok: false };
     const serials = (l.serials ?? []).filter((s) => typeof s === "string");
-    await WorkerLink.updateOne({ id }, { $set: { worker_id: workerId, phone, signed_at: new Date().toISOString().slice(0, 10) } }, { session });
+    await WorkerLink.updateOne({ id }, { $set: { signed_at: new Date().toISOString().slice(0, 10) } }, { session });
     await Voucher.updateMany({ serial: { $in: serials } }, {
-      $set: { worker_id: workerId, worker_name: fullName, employee_id: workerId, employee_phone: phone, employee_name: fullName },
+      $set: { worker_name: l.employee_name, employee_name: l.employee_name, employee_phone: l.phone },
     }, { session });
     const sums = await Voucher.aggregate([
       { $match: { serial: { $in: serials } } },
@@ -182,8 +178,8 @@ async function signWorkerLink({ p_id, p_worker_id, p_phone, p_full_name, p_signa
     ]).session(session);
     const total = sums[0]?.n ? sums[0].total : (l.total ?? 0);
     await SignatureArchive.create([{
-      link_id: id, branch: l.branch ?? null, supervisor_id: l.supervisor_id ?? null, employee_name: fullName,
-      employee_id_number: workerId, employee_phone: phone, total_amount: total,
+      link_id: id, branch: l.branch ?? null, supervisor_id: l.supervisor_id ?? null, employee_name: l.employee_name,
+      employee_phone: l.phone, total_amount: total,
       voucher_record_ids: l.serials ?? [], signature_image_url: signature,
     }], { session });
     return { ok: true, codes: await walletCodes({ ...l, serials }, session) };
@@ -193,47 +189,28 @@ async function signWorkerLink({ p_id, p_worker_id, p_phone, p_full_name, p_signa
   return result;
 }
 
-/** Admin, or the staff member who issued the link (worker_links.supervisor_id). */
-function assertCanUnlock(user, owner) {
-  if (user.role !== "admin" && (owner == null || String(owner) !== user.id)) {
-    throw forbidden("רק מי שהפיק את השובר או אדמין יכולים לשחרר את הלינק");
-  }
-}
-
-async function unlockWorkerLink({ p_id }, { user }) {
+/** Issuer or admin: send a new code, optionally correcting the phone (also for links from before SMS). */
+async function resendWorkerSms({ p_id, p_phone }, { user, req }) {
   if (!user) throw unauthorized("נדרשת התחברות");
   if (user.requires_password_change) throw forbidden("יש לעדכן סיסמה לפני הכניסה למערכת");
   const id = text(p_id);
-  const l = id == null ? null : await WorkerLink.findOne({ id }, { supervisor_id: 1 }).lean();
+  const l = id == null ? null : await WorkerLink.findOne({ id }, { _id: 0, id: 1, phone: 1, employee_name: 1, supervisor_id: 1 }).lean();
   if (!l) throw new HttpError(404, "הלינק לא נמצא", "not_found");
-  assertCanUnlock(user, l.supervisor_id);
-  await WorkerLink.updateOne({ id }, { $set: { failed_attempts: 0, locked: false, locked_at: null } });
-  return null;
-}
-
-async function unlockVoucherLink({ p_link_id }, { user }) {
-  const id = text(p_link_id);
-  const result = await withTransaction(async (session) => {
-    const l = id == null ? null : await WorkerLink.findOne({ id }, { supervisor_id: 1, serials: 1 }).session(session).lean();
-    if (!l) throw new HttpError(404, "הלינק לא נמצא", "not_found");
-    assertCanUnlock(user, l.supervisor_id);
-    await WorkerLink.updateOne({ id }, { $set: { failed_attempts: 0, locked: false, locked_at: null } }, { session });
-    await Voucher.updateMany({ serial: { $in: (l.serials ?? []).filter((s) => typeof s === "string") } },
-      { $set: { failed_attempts: 0, is_locked: false } }, { session });
-    return true;
-  });
-  forgetLink(id);
-  return result;
+  if (user.role !== "admin" && (l.supervisor_id == null || String(l.supervisor_id) !== user.id)) {
+    throw forbidden("רק מי שהפיק את השובר או אדמין יכולים לשלוח שוב");
+  }
+  const phone = p_phone == null ? l.phone : normalizePhone(p_phone);
+  if (!/^05\d{8}$/.test(phone ?? "")) throw badRequest("מספר נייד לא תקין");
+  if (phone !== l.phone) await WorkerLink.updateOne({ id }, { $set: { phone } });
+  return sendLinkCode({ ...l, phone }, req);
 }
 
 export default {
   worker_link_status: { auth: "public", handler: workerLinkStatus },
+  verify_worker_otp: { auth: "public", handler: verifyWorkerOtp },
+  request_worker_otp: { auth: "public", handler: requestWorkerOtp },
   open_worker_wallet: { auth: "public", handler: openWorkerWallet },
   reveal_worker_code: { auth: "public", handler: revealWorkerCode },
   sign_worker_link: { auth: "public", handler: signWorkerLink },
-  // Public at the dispatcher only so the SQL's own 'נדרשת התחברות' message is preserved;
-  // the handler enforces sign-in + password change itself.
-  unlock_worker_link: { auth: "public", handler: unlockWorkerLink },
-  unlock_voucher_link: { auth: "staff", handler: unlockVoucherLink },
+  resend_worker_sms: { auth: "staff", handler: resendWorkerSms },
 };
-

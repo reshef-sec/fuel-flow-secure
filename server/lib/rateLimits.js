@@ -6,7 +6,7 @@
 import rateLimit from "express-rate-limit";
 import { clientAddress } from "./requestContext.js";
 
-const PUBLIC_RPC = new Set(["worker_link_status", "open_worker_wallet", "reveal_worker_code", "sign_worker_link"]);
+const PUBLIC_RPC = new Set(["worker_link_status", "verify_worker_otp", "request_worker_otp", "open_worker_wallet", "reveal_worker_code", "sign_worker_link"]);
 
 /** Employee links and shared training videos: reachable without an account. */
 export function isPublicRequest(req) {

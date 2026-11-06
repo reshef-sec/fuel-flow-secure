@@ -5,7 +5,7 @@
  *
  *   Cards:    טרם שומש → "זמין" (green) · הוקצה לעובד (orange) · מומש סופית (red) · חסום (grey)
  *             legacy "מומש בפועל" → shown as מומש סופית
- *   Links:    ממתין לחתימה (blue) · נחתם (green) · נעול (red); "פג תוקף" displays as ממתין לחתימה
+ *   Links:    נחתם (green) · טרם נחתם (blue)
  *   Vehicles: פעיל (green) · לא פעיל (red)
  *   Requests: ממתין לאישור (amber) · אושר (green) · נדחה (red)
  */
@@ -25,10 +25,8 @@ const MAP: Record<string, StatusDisplay> = {
   "מומש בפועל": { label: "מומש סופית", tone: "redeemed" },
   "חסום": { label: "חסום", tone: "muted" },
   // Produced links
-  "ממתין לחתימה": { label: "ממתין לחתימה", tone: "waiting" },
-  "פג תוקף": { label: "ממתין לחתימה", tone: "waiting" },
+  "טרם נחתם": { label: "טרם נחתם", tone: "waiting" },
   "נחתם": { label: "נחתם", tone: "available" },
-  "נעול": { label: "נעול", tone: "redeemed" },
   // Vehicles
   "פעיל": { label: "פעיל", tone: "available" },
   "לא פעיל": { label: "לא פעיל", tone: "redeemed" },
@@ -48,7 +46,7 @@ export function statusDisplay(status: string | null | undefined): StatusDisplay 
 export const CARD_STATUS_FILTERS = ["טרם שומש", "הוקצה לעובד", "מומש סופית", "חסום"] as const;
 
 /** Produced-link statuses offered in filters/legends. */
-export const LINK_STATUS_FILTERS = ["ממתין לחתימה", "נחתם", "נעול"] as const;
+export const LINK_STATUS_FILTERS = ["נחתם", "טרם נחתם"] as const;
 
 /** Hex colours per tone (bg / dot / fg) — for non-CSS consumers such as Excel exports. */
 export const STATUS_TONE_HEX: Record<StatusTone, { bg: string; dot: string; fg: string }> = {

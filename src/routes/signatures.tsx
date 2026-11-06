@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { createPortal } from "react-dom";
-import { Printer, X } from "lucide-react";
+import { FileSpreadsheet, Printer, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Logo } from "@/design-system/delek-1ea111";
 import { InternalLayout } from "@/components/layout/InternalLayout";
@@ -12,6 +13,7 @@ import { SearchField } from "@/components/settings/shared";
 import { api } from "@/lib/apiClient";
 import { useAppStore } from "@/store/appStore";
 import { formatIsraelDate } from "@/lib/israelDate";
+import { downloadReport } from "@/lib/excel";
 
 export const Route = createFileRoute("/signatures")({
   head: () => ({
@@ -31,7 +33,6 @@ interface SignatureRecord {
   id: string;
   created_at: string;
   full_name: string;
-  national_id: string;
   phone: string;
   total_amount: number;
   serials: string[];
@@ -61,6 +62,7 @@ function SignaturesPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<SignatureRecord | null>(null);
+  const [bulk, setBulk] = useState(false);
 
   useEffect(() => {
     // The database only returns rows the viewer may see (own branch / own records).
@@ -75,7 +77,7 @@ function SignaturesPage() {
           setRows(
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ((data ?? []) as Record<string, any>[]).map((r) => ({
-              id: r.id, created_at: r.created_at, full_name: r.employee_name, national_id: r.employee_id_number,
+              id: r.id, created_at: r.created_at, full_name: r.employee_name,
               phone: r.employee_phone, total_amount: Number(r.total_amount), serials: r.voucher_record_ids ?? [],
               signature: r.signature_image_url ?? "",
             })),
@@ -90,12 +92,27 @@ function SignaturesPage() {
     return rows.filter(
       (r) =>
         r.full_name.includes(q) ||
-        r.national_id.includes(q) ||
         r.phone.includes(q) ||
         r.serials.some((s) => s.includes(q)),
     );
   }, [rows, query]);
   const paged = usePaged(filtered);
+
+  const exportExcel = () =>
+    downloadReport<SignatureRecord>({
+      fileName: "ארכיון-חתימות",
+      title: "ארכיון חתימות",
+      subtitle: query.trim() ? `חיפוש: ${query.trim()}` : "כל החתימות",
+      generatedBy: "רשף ביטחון",
+      columns: [
+        { header: "תאריך", key: "date", type: "text", get: (r) => fmt(r.created_at) },
+        { header: "שם מלא", key: "name", type: "text", get: (r) => r.full_name },
+        { header: "טלפון", key: "phone", type: "text", get: (r) => r.phone },
+        { header: "סכום השוברים", key: "total", type: "text", get: (r) => r.total_amount.toLocaleString("he-IL") },
+        { header: "מספרי כרטיסים", key: "cards", type: "text", get: (r) => r.serials.join(", ") },
+      ],
+      rows: filtered,
+    }).catch(() => toast.error("הייצוא נכשל"));
   const emptyText = loading
     ? "טוען…"
     : error
@@ -121,10 +138,20 @@ function SignaturesPage() {
                 <span className="ds-num">{filtered.length.toLocaleString("he-IL")}</span> חתימות · מהחדש לישן
               </span>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" className="ds-btn ds-btn-light" disabled={!filtered.length} onClick={() => void exportExcel()}>
+                <FileSpreadsheet className="size-4" aria-hidden />
+                ייצוא לאקסל
+              </button>
+              <button type="button" className="ds-btn ds-btn-light" disabled={!filtered.length} onClick={() => setBulk(true)}>
+                <Printer className="size-4" aria-hidden />
+                ייצוא PDF
+              </button>
+            </div>
             <SearchField
               value={query}
               onChange={setQuery}
-              placeholder="חיפוש לפי שם, ת.ז, טלפון או מספר כרטיס"
+              placeholder="חיפוש לפי שם, טלפון או מספר כרטיס"
               label="חיפוש בארכיון"
               className="min-[900px]:w-80"
             />
@@ -135,7 +162,6 @@ function SignaturesPage() {
               <tr>
                 <th scope="col">תאריך</th>
                 <th scope="col">שם מלא</th>
-                <th scope="col">ת.ז</th>
                 <th scope="col">טלפון</th>
                 <th scope="col">סכום השוברים</th>
                 <th scope="col">מספרי כרטיסים</th>
@@ -144,7 +170,7 @@ function SignaturesPage() {
             </thead>
             <tbody>
               {paged.slice.length === 0 ? (
-                <EmptyRow colSpan={7}>
+                <EmptyRow colSpan={6}>
                   {error ? <span className="font-semibold text-danger">{emptyText}</span> : emptyText}
                 </EmptyRow>
               ) : (
@@ -152,7 +178,6 @@ function SignaturesPage() {
                   <tr key={r.id}>
                     <td><span className="ds-num">{fmt(r.created_at)}</span></td>
                     <td className="font-semibold text-navy-900">{r.full_name}</td>
-                    <td><span className="ds-num">{r.national_id}</span></td>
                     <td><span className="ds-num" dir="ltr">{r.phone}</span></td>
                     <td><span className="ds-num font-bold">{r.total_amount.toLocaleString("he-IL")} ₪</span></td>
                     <td><SerialList serials={r.serials} /></td>
@@ -179,7 +204,6 @@ function SignaturesPage() {
                   </div>
                   <span className="ds-num font-bold text-navy-900">{r.total_amount.toLocaleString("he-IL")} ₪</span>
                 </div>
-                <KV label="ת.ז"><span className="ds-num">{r.national_id}</span></KV>
                 <KV label="טלפון"><span className="ds-num" dir="ltr">{r.phone}</span></KV>
                 <KV label="כרטיסים">{r.serials.length} כרטיסים</KV>
                 <button type="button" className="ds-btn ds-btn-light" onClick={() => setOpen(r)}>
@@ -195,45 +219,22 @@ function SignaturesPage() {
       </div>
 
       {open ? <RecordDialog record={open} onClose={() => setOpen(null)} /> : null}
+      {bulk ? <BulkPrint records={filtered} onDone={() => setBulk(false)} /> : null}
     </InternalLayout>
   );
 }
 
-function RecordDialog({ record, onClose }: { record: SignatureRecord; onClose: () => void }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
+/** The signed form: on screen, printed alone, or as one page of the bulk export. */
+function SignatureForm({ record }: { record: SignatureRecord }) {
   const fields: [string, React.ReactNode][] = [
     ["תאריך ושעה", <span className="ds-num">{fmt(record.created_at)}</span>],
     ["שם מלא", record.full_name],
-    ["ת.ז", <span className="ds-num">{record.national_id}</span>],
     ["טלפון", <span className="ds-num" dir="ltr">{record.phone}</span>],
     ["סכום השוברים", <span className="ds-num">{record.total_amount.toLocaleString("he-IL")} ₪</span>],
     ["מספר שוברים", <span className="ds-num">{record.serials.length}</span>],
   ];
-  // On the page body, outside the app shell: printing shows this form alone (see styles.css).
-  return createPortal(
-    <div className="signature-print fixed inset-0 z-[70] flex items-end justify-center overflow-y-auto print:static print:block min-[900px]:items-center min-[900px]:p-6">
-      <button type="button" aria-label="סגירת הטופס" onClick={onClose} className="fixed inset-0 cursor-pointer bg-navy-900/55 print:hidden" />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="sigdlg-title"
-        className="relative w-full max-w-2xl overflow-hidden rounded-t-dialog bg-surface shadow-dialog min-[900px]:rounded-dialog print:max-w-none print:rounded-none print:shadow-none"
-      >
-        <div className="flex items-center justify-between gap-2 border-b border-table-line px-5 py-3 print:hidden">
-          <button type="button" className="ds-btn ds-btn-primary" onClick={() => window.print()}>
-            <Printer className="size-4" aria-hidden />
-            הדפסה / PDF
-          </button>
-          <button type="button" className="ds-iconbtn" onClick={onClose} aria-label="סגירה">
-            <X className="size-5" />
-          </button>
-        </div>
-        <div className="max-h-[78vh] space-y-6 overflow-y-auto p-6 min-[900px]:p-8 print:max-h-none print:overflow-visible">
+  return (
+    <div className="space-y-6">
           <div className="flex items-center justify-between gap-3 border-b-2 border-navy-900 pb-4">
             <h2 id="sigdlg-title" className="m-0 text-xl font-extrabold text-navy-900 min-[900px]:text-2xl">טופס תיעוד חתימת עובד</h2>
             <Logo className="h-16 min-[900px]:h-20 print:h-28" />
@@ -268,6 +269,58 @@ function RecordDialog({ record, onClose }: { record: SignatureRecord; onClose: (
           <p className="text-xs text-slate-600">
             העובד/ת אישר/ה בחתימתו/ה את קבלת שוברי הדלק המפורטים לעיל.
           </p>
+    </div>
+  );
+}
+
+/** Every form in the current view as one document: one printed page per signature. */
+function BulkPrint({ records, onDone }: { records: SignatureRecord[]; onDone: () => void }) {
+  useEffect(() => {
+    const done = () => onDone();
+    window.addEventListener("afterprint", done);
+    const t = window.setTimeout(() => window.print(), 300);
+    return () => { window.clearTimeout(t); window.removeEventListener("afterprint", done); };
+  }, [onDone]);
+  return createPortal(
+    <div className="signature-print hidden print:block">
+      {records.map((r) => (
+        <div key={r.id} className="break-after-page p-8">
+          <SignatureForm record={r} />
+        </div>
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
+function RecordDialog({ record, onClose }: { record: SignatureRecord; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  // On the page body, outside the app shell: printing shows this form alone (see styles.css).
+  return createPortal(
+    <div className="signature-print fixed inset-0 z-[70] flex items-end justify-center overflow-y-auto print:static print:block min-[900px]:items-center min-[900px]:p-6">
+      <button type="button" aria-label="סגירת הטופס" onClick={onClose} className="fixed inset-0 cursor-pointer bg-navy-900/55 print:hidden" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sigdlg-title"
+        className="relative w-full max-w-2xl overflow-hidden rounded-t-dialog bg-surface shadow-dialog min-[900px]:rounded-dialog print:max-w-none print:rounded-none print:shadow-none"
+      >
+        <div className="flex items-center justify-between gap-2 border-b border-table-line px-5 py-3 print:hidden">
+          <button type="button" className="ds-btn ds-btn-primary" onClick={() => window.print()}>
+            <Printer className="size-4" aria-hidden />
+            הדפסה / PDF
+          </button>
+          <button type="button" className="ds-iconbtn" onClick={onClose} aria-label="סגירה">
+            <X className="size-5" />
+          </button>
+        </div>
+        <div className="max-h-[78vh] space-y-6 overflow-y-auto p-6 min-[900px]:p-8 print:max-h-none print:overflow-visible">
+          <SignatureForm record={record} />
         </div>
       </div>
     </div>,

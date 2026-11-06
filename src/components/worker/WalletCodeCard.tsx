@@ -6,7 +6,7 @@ import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
  * WalletCodeCard — one fuel code in the employee's digital wallet (design: Worker.dc.html).
  * Dashed "coupon" card: fuel chip + amount, the fuel rule line, the code in large mono, and a copy button.
  * `onCopy` performs the copy (and its own toasts); the button shows "הועתק" for 2s when it resolves true.
- * `code` null = not revealed yet: a blurred placeholder (the real code is not on the phone at all) and a
+ * `code` null = not revealed yet: a masked placeholder (the real code is not on the phone at all) and a
  * reveal button; `onReveal` asks the server, which keeps that code revealed from then on.
  */
 export function WalletCodeCard({
@@ -51,8 +51,8 @@ export function WalletCodeCard({
             {code}
           </span>
         ) : (
-          <span aria-hidden dir="ltr" className="ds-num select-none text-right text-[21px] font-semibold tracking-[.06em] text-navy-900 blur-[7px]">
-            000000000000
+          <span aria-hidden dir="ltr" className="ds-num select-none text-right text-[21px] font-semibold tracking-[.06em] text-slate-400">
+            ••••••••••
           </span>
         )}
       </div>

@@ -1,11 +1,11 @@
 import { fuelLabel, fuelOf, type FuelType } from "@/components/fuel/fuel";
-import { publicVoucherUrl } from "@/lib/publicUrl";
 import { formatIsraelDate } from "@/lib/israelDate";
 import { useMemo, useState } from "react";
-import { Copy, LockOpen, Search, SquareArrowOutUpRight } from "lucide-react";
+import { MessageSquare, Search } from "lucide-react";
 import { logActivity } from "@/lib/activityLog";
 import { currentActor, type WorkerLink } from "@/store/appStore";
-import { unlockWorkerLink } from "@/lib/backend";
+import { resendWorkerSms } from "@/lib/backend";
+import { Modal } from "@/components/ui/Modal";
 import { Pager, usePaged } from "@/components/ui/Pager";
 import { DataTable, EmptyRow, KV, MobileCardList, TableCard } from "@/components/ui/DataTable";
 import { FilterChips } from "@/components/ui/FilterChips";
@@ -17,15 +17,10 @@ import { toast } from "sonner";
 import { useAppStore, useCurrentUser } from "@/store/appStore";
 import { useLearningActive } from "@/components/learning/LearningMode";
 
-/** Employee link; learning-environment links carry ?demo=1 so the public page reads the demo data. */
-const linkUrl = (id: string, demo: boolean) =>
-  publicVoucherUrl(id, undefined, demo);
-
 export type LinkStatus = (typeof LINK_STATUS_FILTERS)[number];
 
-/** Display status of a worker link: נעול / נחתם / ממתין לחתימה (an expired unsigned link stays ממתין לחתימה). */
-export const linkStatusOf = (l: Pick<WorkerLink, "locked" | "signedAt">): LinkStatus =>
-  l.locked ? "נעול" : l.signedAt ? "נחתם" : "ממתין לחתימה";
+/** Display status of a worker link: signed or not. */
+export const linkStatusOf = (l: Pick<WorkerLink, "signedAt">): LinkStatus => (l.signedAt ? "נחתם" : "טרם נחתם");
 
 export interface ProducedRow {
   link: WorkerLink;
@@ -92,31 +87,55 @@ export function ProducedLinks({ limit, variant = "table" }: { limit?: number; va
   const filtered = useMemo(() => (filter === "all" ? bySearch : bySearch.filter((r) => r.status === filter)), [bySearch, filter]);
 
   const paged = usePaged(filtered);
-  const unlockFn = unlockWorkerLink;
-  const [busy, setBusy] = useState<string | null>(null);
-  const canUnlock = (l: { supervisorId?: string }) => role === "admin" || (!!authId && l.supervisorId === authId);
-  async function unlock(id: string) {
-    setBusy(id);
+  const [resend, setResend] = useState<WorkerLink | null>(null);
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [manualCode, setManualCode] = useState<string | null>(null);
+  const canResend = (l: { supervisorId?: string }) => role === "admin" || (!!authId && l.supervisorId === authId);
+  const openResend = (l: WorkerLink) => { setResend(l); setPhone(l.phone ?? ""); setManualCode(null); };
+
+  async function sendAgain() {
+    if (!resend) return;
+    if (!/^05\d{8}$/.test(phone)) return void toast.error("מספר נייד לא תקין");
+    setBusy(true);
     try {
-      await unlockFn({ data: { id } });
-      useAppStore.setState((s) => ({ links: s.links.map((l) => (l.id === id ? { ...l, locked: false } : l)) }));
-      logActivity(currentActor(), "שחרור לינק נעול", `קישור ${id}`);
-      toast.success("מונה הניסיונות אופס והלינק פתוח");
+      const r = await resendWorkerSms({ data: { id: resend.id, phone } });
+      useAppStore.setState((s) => ({ links: s.links.map((l) => (l.id === resend.id ? { ...l, phone } : l)) }));
+      logActivity(currentActor(), "שליחת קוד אימות חוזרת", resend.employeeName ?? "");
+      if (r.smsSent) {
+        toast.success("ה־SMS נשלח");
+        setResend(null);
+      } else setManualCode(r.otp);
     } catch (e) {
-      toast.error((e as Error).message || "שחרור הלינק נכשל");
+      toast.error((e as Error).message || "השליחה נכשלה");
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }
 
-  async function copy(id: string) {
-    try {
-      await navigator.clipboard.writeText(linkUrl(id, demo));
-      toast.success("הלינק הועתק — ניתן לשלוח שוב לעובד");
-    } catch {
-      toast.error("ההעתקה נכשלה");
-    }
-  }
+  const resendDialog = (
+    <Modal open={!!resend} onClose={() => setResend(null)} title="שליחת SMS חוזרת" size="sm">
+      <div className="flex flex-col gap-3.5">
+        <label className="flex flex-col gap-1.5 text-[13.5px] font-bold">
+          נייד העובד
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            inputMode="numeric"
+            dir="ltr"
+            aria-label="נייד העובד"
+            className="ds-num h-11 rounded-control border border-line-strong bg-surface px-3 text-[15px] text-navy-900 outline-none focus:shadow-focus-mint"
+          />
+        </label>
+        {manualCode ? (
+          <p className="m-0 rounded-xl bg-pending-bg p-3 text-sm font-semibold text-amber-700">
+            ה־SMS לא נשלח. קוד האימות לעובד: <span dir="ltr" className="ds-num font-bold">{manualCode}</span>
+          </p>
+        ) : null}
+        <button type="button" className="ds-btn ds-btn-primary" disabled={busy} onClick={() => void sendAgain()}>שליחה</button>
+      </div>
+    </Modal>
+  );
 
   if (variant === "compact") {
     if (rows.length === 0) return <p className="m-0 border-t border-table-line py-6 text-center text-sm text-slate-600">עדיין לא הופקו שוברים</p>;
@@ -132,9 +151,6 @@ export function ProducedLinks({ limit, variant = "table" }: { limit?: number; va
             <span className="ds-num min-w-[70px] font-bold">{r.link.total.toLocaleString("he-IL")} ₪</span>
             <StatusBadge status={r.status} size="sm" />
             <span className="ds-num text-xs text-slate-600">{formatIsraelDate(r.link.createdAt)}</span>
-            <button type="button" className="ds-rowact" aria-label={`העתקת הלינק של ${r.link.employeeName ?? "העובד"}`} onClick={() => void copy(r.link.id)}>
-              <Copy className="inline size-4" aria-hidden /> העתקה
-            </button>
           </div>
         ))}
       </div>
@@ -148,36 +164,11 @@ export function ProducedLinks({ limit, variant = "table" }: { limit?: number; va
   const emptyText = rows.length === 0 ? "עדיין לא הופקו שוברים" : "לא נמצאו קישורים התואמים לסינון.";
 
   const actions = (r: ProducedRow, mobile = false) => {
-    const l = r.link;
-    // Always offered (signed links too): workers often return to their codes later, and a
-    // signed link can still lock after wrong ID/phone attempts. Permission = canUnlock (issuer or admin).
-    const showUnlock = true;
-    const who = l.employeeName ?? "העובד";
+    if (r.link.signedAt || !canResend(r.link)) return null;
     return (
-      <>
-        <button type="button" className={mobile ? "ds-btn ds-btn-light" : "ds-rowact"} aria-label={`העתקת הלינק של ${who}`} onClick={() => void copy(l.id)}>
-          <Copy className="inline size-4" aria-hidden /> העתקה
-        </button>
-        <a className={cn(mobile ? "ds-btn ds-btn-light" : "ds-rowact", "no-underline")} aria-label={`פתיחת הלינק של ${who}`} href={linkUrl(l.id, demo)} target="_blank" rel="noopener noreferrer">
-          <SquareArrowOutUpRight className="inline size-4" aria-hidden /> פתיחה
-        </a>
-        {showUnlock ? (
-          <button
-            type="button"
-            aria-label={`שחרור נעילה ואיפוס ניסיונות — ${who}`}
-            title={canUnlock(l) ? "שחרור נעילה / איפוס ניסיונות שגויים" : "רק מי שהפיק את השובר או אדמין"}
-            disabled={busy === l.id || !canUnlock(l)}
-            onClick={() => void unlock(l.id)}
-            className={cn(
-              mobile ? "ds-btn ds-btn-light col-span-2" : "ds-rowact",
-              "disabled:cursor-not-allowed disabled:opacity-40",
-              r.status === "נעול" && "text-red-700",
-            )}
-          >
-            <LockOpen className="inline size-4" aria-hidden /> שחרור נעילה
-          </button>
-        ) : null}
-      </>
+      <button type="button" className={mobile ? "ds-btn ds-btn-light col-span-2" : "ds-rowact"} aria-label={`שליחת SMS חוזרת ל${r.link.employeeName ?? "העובד"}`} onClick={() => openResend(r.link)}>
+        <MessageSquare className="inline size-4" aria-hidden /> שליחת SMS
+      </button>
     );
   };
 

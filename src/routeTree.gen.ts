@@ -22,6 +22,7 @@ import { Route as SupervisorRouteImport } from './routes/supervisor'
 import { Route as VouchersRouteImport } from './routes/vouchers'
 import { Route as WorkerRouteImport } from './routes/worker'
 import { Route as TrainingTokenRouteImport } from './routes/training.$token'
+import { Route as VTokenRouteImport } from './routes/v.$token'
 import { Route as VoucherIdRouteImport } from './routes/voucher.$id'
 import { Route as WorkerTokenRouteImport } from './routes/worker.$token'
 import { Route as Char91__componentChar93PreviewSplatRouteImport } from './routes/[__component].preview.$'
@@ -92,6 +93,11 @@ const TrainingTokenRoute = TrainingTokenRouteImport.update({
   path: '/training/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VTokenRoute = VTokenRouteImport.update({
+  id: '/v/$token',
+  path: '/v/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VoucherIdRoute = VoucherIdRouteImport.update({
   id: '/voucher/$id',
   path: '/voucher/$id',
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRouteWithChildren
   '/training/$token': typeof TrainingTokenRoute
+  '/v/$token': typeof VTokenRoute
   '/voucher/$id': typeof VoucherIdRoute
   '/worker/$token': typeof WorkerTokenRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRouteWithChildren
   '/training/$token': typeof TrainingTokenRoute
+  '/v/$token': typeof VTokenRoute
   '/voucher/$id': typeof VoucherIdRoute
   '/worker/$token': typeof WorkerTokenRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/vouchers': typeof VouchersRoute
   '/worker': typeof WorkerRouteWithChildren
   '/training/$token': typeof TrainingTokenRoute
+  '/v/$token': typeof VTokenRoute
   '/voucher/$id': typeof VoucherIdRoute
   '/worker/$token': typeof WorkerTokenRoute
   '/__component/preview/$': typeof Char91__componentChar93PreviewSplatRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/vouchers'
     | '/worker'
     | '/training/$token'
+    | '/v/$token'
     | '/voucher/$id'
     | '/worker/$token'
     | '/__component/preview/$'
@@ -208,6 +218,7 @@ export interface FileRouteTypes {
     | '/vouchers'
     | '/worker'
     | '/training/$token'
+    | '/v/$token'
     | '/voucher/$id'
     | '/worker/$token'
     | '/__component/preview/$'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/vouchers'
     | '/worker'
     | '/training/$token'
+    | '/v/$token'
     | '/voucher/$id'
     | '/worker/$token'
     | '/__component/preview/$'
@@ -247,6 +259,7 @@ export interface RootRouteChildren {
   VouchersRoute: typeof VouchersRoute
   WorkerRoute: typeof WorkerRouteWithChildren
   TrainingTokenRoute: typeof TrainingTokenRoute
+  VTokenRoute: typeof VTokenRoute
   VoucherIdRoute: typeof VoucherIdRoute
   Char91__componentChar93PreviewSplatRoute: typeof Char91__componentChar93PreviewSplatRoute
   Char91__mockupChar93PreviewSplatRoute: typeof Char91__mockupChar93PreviewSplatRoute
@@ -345,6 +358,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrainingTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v/$token': {
+      id: '/v/$token'
+      path: '/v/$token'
+      fullPath: '/v/$token'
+      preLoaderRoute: typeof VTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/voucher/$id': {
       id: '/voucher/$id'
       path: '/voucher/$id'
@@ -401,6 +421,7 @@ const rootRouteChildren: RootRouteChildren = {
   VouchersRoute: VouchersRoute,
   WorkerRoute: WorkerRouteWithChildren,
   TrainingTokenRoute: TrainingTokenRoute,
+  VTokenRoute: VTokenRoute,
   VoucherIdRoute: VoucherIdRoute,
   Char91__componentChar93PreviewSplatRoute:
     Char91__componentChar93PreviewSplatRoute,

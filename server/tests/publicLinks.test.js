@@ -14,7 +14,6 @@ beforeEach(async () => {
   await LEARNING.WorkerLink.deleteMany({});
 });
 
-const SIG = "data:image/png;base64,AAAA";
 const makeLink = async (id = "555111") => {
   await REAL.Voucher.create({ serial: "C1", amount: 100, fuel_type: "בנזין", status: "הוקצה לעובד", link_id: id });
   await REAL.VoucherCode.create({ serial: "C1", real_code: "SECRET-1" });
@@ -32,19 +31,11 @@ describe("public link status cache", () => {
     assert.equal((await status("555111")).total, 100, "second read came from the cache");
   });
 
-  it("drops the entry on any write, so a signature or lock shows immediately", async () => {
+  it("drops the entry on any write, so a signature shows immediately", async () => {
     await makeLink();
     assert.equal((await status("555111")).signed, false);
-    const who = { p_id: "555111", p_worker_id: "123456789", p_phone: "0521234567" };
-    const s = await rpc(anon(), "sign_worker_link", { ...who, p_full_name: "עובד", p_signature: SIG });
-    assert.equal(s.data.ok, true);
+    await REAL.WorkerLink.updateOne({ id: "555111" }, { $set: { signed_at: "2026-01-01" } });
     assert.equal((await status("555111")).signed, true);
-
-    for (let i = 0; i < 3; i += 1) await rpc(anon(), "open_worker_wallet", { ...who, p_phone: "0500000000" });
-    assert.equal((await status("555111")).state, "locked");
-    const { agent } = await loginAs("admin");
-    assert.equal((await rpc(agent, "unlock_worker_link", { p_id: "555111" })).status, 200);
-    assert.equal((await status("555111")).state, "ok");
   });
 
   it("keeps real and demo links apart, and holds no codes or identity", async () => {
@@ -56,15 +47,10 @@ describe("public link status cache", () => {
     assert.equal(JSON.stringify(await status("555111")).includes("SECRET-1"), false);
   });
 
-  it("the wallet still needs the right person after the status was cached", async () => {
+  it("the wallet still needs a device session after the status was cached", async () => {
     await makeLink();
-    const who = { p_id: "555111", p_worker_id: "123456789", p_phone: "0521234567" };
-    await rpc(anon(), "sign_worker_link", { ...who, p_full_name: "עובד", p_signature: SIG });
     await status("555111");
-    assert.equal((await rpc(anon(), "open_worker_wallet", { ...who, p_worker_id: "111111111" })).data.ok, false);
-    const fine = await rpc(anon(), "open_worker_wallet", who);
-    assert.equal(fine.data.ok, true);
-    assert.equal((await REAL.WorkerLink.findOne({ id: "555111" }).lean()).failed_attempts, 0, "a correct visit clears failed attempts");
+    assert.equal((await rpc(anon(), "open_worker_wallet", { p_id: "555111", p_session: "forged" })).data.ok, false);
   });
 });
 
