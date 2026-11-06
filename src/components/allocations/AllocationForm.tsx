@@ -4,7 +4,7 @@ import { Send } from "lucide-react";
 import { FUEL_TYPES, fuelLabel, type FuelType } from "@/components/fuel/fuel";
 import { issuanceAmountError, issuanceAmountRules, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { pickExact } from "@/lib/inventorySelection";
-import { groupStock } from "@/store/appStore";
+import { groupStock, useAppStore } from "@/store/appStore";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 
 /** Shared input look of the redesign (44px, 11px radius, mint focus ring). */
@@ -200,6 +200,7 @@ export function AllocationFormFields({
 
 /** Pool card ("מאגר מרכזי" / "היתרה שלי"): per-fuel total + card breakdown. */
 export function PoolSummary({ title, totals, pools }: { title: string; totals: Record<FuelType, number> | null; pools: Record<FuelType, { amount: number }[]> }) {
+  const stockLoaded = useAppStore((s) => s.stockLoaded);
   return (
     <section aria-label={title} className="ds-card flex flex-col gap-3.5 p-[22px]">
       <h2 className="m-0 text-base font-extrabold text-navy-900">{title}</h2>
@@ -214,7 +215,7 @@ export function PoolSummary({ title, totals, pools }: { title: string; totals: R
             {fuelLabel(f)}
           </span>
           <span className="ds-num text-[26px] font-semibold text-navy-900">{totals ? `${fmt(totals[f])} ₪` : "—"}</span>
-          <span className="ds-num text-xs text-slate-600">{pools[f].length ? cardsText(pools[f]) : "אין כרטיסים"}</span>
+          <span className="ds-num text-xs text-slate-600">{pools[f].length ? cardsText(pools[f]) : stockLoaded ? "אין כרטיסים" : "טוען…"}</span>
         </div>
       ))}
     </section>
