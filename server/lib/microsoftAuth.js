@@ -10,33 +10,18 @@
  *   - a token with the xms_edov optional claim (the domain owner verified it).
  * Each user is also pinned to their Microsoft identity on first sign-in.
  */
-import { createHash, randomBytes } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { pkceChallenge } from "./oauth.js";
 
 const CONSUMERS_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";
 const AUTHORITY = "https://login.microsoftonline.com";
 const SCOPE = "openid profile email";
-const CALLBACK = "/api/auth/microsoft/callback";
 
 const clientId = () => process.env.MICROSOFT_CLIENT_ID ?? "";
 const clientSecret = () => process.env.MICROSOFT_CLIENT_SECRET ?? "";
 const tenant = () => process.env.MICROSOFT_TENANT_ID || "common";
 
-export const microsoftConfigured = () => Boolean(clientId() && clientSecret());
-
-/** The callback address registered in Azure; RENDER_EXTERNAL_URL is set by Render. */
-export function redirectUri(req) {
-  if (process.env.MICROSOFT_REDIRECT_URI) return process.env.MICROSOFT_REDIRECT_URI;
-  const base = process.env.RENDER_EXTERNAL_URL || `${req.protocol}://${req.get("host")}`;
-  return base.replace(/\/$/, "") + CALLBACK;
-}
-
-const b64 = (n) => randomBytes(n).toString("base64url");
-
-/** One-time values for a sign-in attempt, kept in a signed cookie until Microsoft redirects back. */
-export const newAttempt = () => ({ state: b64(24), nonce: b64(24), verifier: b64(48) });
-
-export function authorizeUrl(attempt, redirect) {
+function authorizeUrl(attempt, redirect) {
   const q = new URLSearchParams({
     client_id: clientId(),
     response_type: "code",
@@ -45,7 +30,7 @@ export function authorizeUrl(attempt, redirect) {
     scope: SCOPE,
     state: attempt.state,
     nonce: attempt.nonce,
-    code_challenge: createHash("sha256").update(attempt.verifier).digest("base64url"),
+    code_challenge: pkceChallenge(attempt.verifier),
     code_challenge_method: "S256",
     prompt: "select_account",
   });
@@ -70,7 +55,7 @@ export const transport = {
 };
 
 /** Signature, audience, expiry, issuer and nonce. Throws when any of them is wrong. */
-export async function verifyIdToken(idToken, nonce) {
+async function verifyIdToken(idToken, nonce) {
   const { payload } = await jwtVerify(idToken, transport.keys, { audience: clientId(), algorithms: ["RS256"] });
   if (!payload.tid || payload.iss !== `${AUTHORITY}/${payload.tid}/v2.0`) throw new Error("issuer mismatch");
   if (payload.nonce !== nonce) throw new Error("nonce mismatch");
@@ -78,7 +63,7 @@ export async function verifyIdToken(idToken, nonce) {
 }
 
 /** The verified identity in a token, or null when its email can't be trusted. */
-export function identityFrom(claims) {
+function identityFrom(claims) {
   const email = String(claims.email ?? "").trim().toLowerCase();
   if (!email.includes("@")) return null;
   const configured = tenant();
@@ -88,3 +73,14 @@ export function identityFrom(claims) {
   if (!trusted) return null;
   return { email, subject: `${claims.tid}:${claims.oid ?? claims.sub}` };
 }
+
+export const microsoft = {
+  name: "microsoft",
+  /** Profile field that pins an account to this provider's identity. */
+  subjectField: "microsoft_sub",
+  configured: () => Boolean(clientId() && clientSecret()),
+  authorizeUrl,
+  exchangeCode: (args) => transport.exchangeCode(args),
+  verifyIdToken,
+  identityFrom,
+};

@@ -33,8 +33,9 @@ const profileSchema = new Schema({
   role,
   /** Empty for accounts that only sign in with Microsoft. */
   password_hash: str(""),
-  /** The Microsoft identity (tenant:object id) this account is pinned to at first sign-in. */
+  /** The provider identity this account is pinned to at first sign-in with that provider. */
   microsoft_sub: str(),
+  google_sub: str(),
   requires_password_change: { type: Boolean, default: true },
   token_version: { type: Number, default: 0 },
   failed_logins: { type: Number, default: 0 },

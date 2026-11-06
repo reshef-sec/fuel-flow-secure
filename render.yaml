@@ -24,5 +24,9 @@ services:
         sync: false # Azure app registration → Application (client) ID
       - key: MICROSOFT_CLIENT_SECRET
         sync: false # Azure app registration → Certificates & secrets
+      - key: GOOGLE_CLIENT_ID
+        sync: false # Google Cloud → Credentials → OAuth client ID
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false # from the same OAuth client
       - key: MICROSOFT_TENANT_ID
         sync: false # your organisation's tenant id; leave empty to also allow personal Outlook accounts

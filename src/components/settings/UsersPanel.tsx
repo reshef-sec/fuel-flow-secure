@@ -197,7 +197,7 @@ export function UsersPanel() {
       toast.success("פרטי המשתמש עודכנו");
     } else {
       addUser({ ...payload, requiresPasswordChange: false });
-      toast.success("המשתמש נוסף בהצלחה — הכניסה דרך Microsoft עם האימייל שהוזן");
+      toast.success("המשתמש נוסף בהצלחה — הכניסה עם חשבון Google או Microsoft של האימייל שהוזן");
     }
     syncFn({ data: accountData(payload) }).catch((err) =>
       toast.error(err instanceof Error ? `חשבון הכניסה לא עודכן: ${err.message}` : "חשבון הכניסה לא עודכן"),
@@ -295,7 +295,7 @@ export function UsersPanel() {
         <DataTable minWidth={1100} caption="משתמשי המערכת">
           <thead>
             <tr>
-              <th scope="col">דוא״ל / Microsoft Account</th>
+              <th scope="col">דוא״ל לכניסה</th>
               <th scope="col">שם</th>
               <th scope="col">הרשאה</th>
               <th scope="col">רשאי להקים דרישה</th>
@@ -390,7 +390,7 @@ export function UsersPanel() {
             </Select>
           </FormField>
 
-          <FormField label="אימייל (Microsoft / Outlook)">
+          <FormField label="אימייל (Microsoft / Google)">
             <Input
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -398,7 +398,7 @@ export function UsersPanel() {
               inputMode="email"
               dir="ltr"
               placeholder="name@company.com"
-              aria-label="אימייל (Microsoft / Outlook)"
+              aria-label="אימייל (Microsoft / Google)"
             />
           </FormField>
 

@@ -7,6 +7,7 @@ import { startTestServer, stopTestServer, resetDb, loginAs, anon } from "./helpe
 import { AppUser, Profile, Voucher } from "../models.js";
 import { isDevToolsOwner } from "../auth.js";
 import { transport } from "../lib/microsoftAuth.js";
+import { transport as googleTransport } from "../lib/googleAuth.js";
 import { leaveStaleLearning, migrateUserIdentity } from "../lib/migrateUsers.js";
 
 const CONSUMERS = "9188040d-6c67-4c5b-b112-36a304b66dad";
@@ -98,7 +99,7 @@ describe("sign in with Microsoft", () => {
 
   it("rejects a wrong state, nonce, audience, issuer or signature", async () => {
     await staff();
-    const bad = { location: "/login?error=microsoft_failed" };
+    const bad = { location: "/login?error=signin_failed" };
     const claims = { email: "dana@outlook.com", oid: "o1" };
     const other = (await generateKeyPair("RS256")).privateKey;
     for (const opts of [{ state: "forged" }, { nonce: "forged" }, { aud: "another-app" }, { iss: "https://evil.example/v2.0" }, { signWith: other }]) {
@@ -108,7 +109,7 @@ describe("sign in with Microsoft", () => {
   });
 
   it("is refused without a started attempt, and stays off until configured", async () => {
-    assert.equal((await anon().get("/api/auth/microsoft/callback").query({ code: "c", state: "s" })).headers.location, "/login?error=microsoft_failed");
+    assert.equal((await anon().get("/api/auth/microsoft/callback").query({ code: "c", state: "s" })).headers.location, "/login?error=signin_failed");
     assert.equal((await anon().get("/api/auth/options")).body.microsoft, true);
     delete process.env.MICROSOFT_CLIENT_ID;
     assert.equal((await anon().get("/api/auth/options")).body.microsoft, false);
@@ -120,6 +121,54 @@ describe("sign in with Microsoft", () => {
     await signInWithMicrosoft({ email: "dana@outlook.com", oid: "o1" });
     const p = await Profile.findOne({ email: "dana@outlook.com" }).lean();
     assert.equal((await Voucher.findOne({ serial: "H1" }).lean()).supervisor_id, p.id);
+  });
+});
+
+describe("sign in with Google", () => {
+  const GCLIENT = "google-client-for-tests";
+  const realGoogle = { keys: googleTransport.keys, exchangeCode: googleTransport.exchangeCode };
+  beforeEach(async () => {
+    Object.assign(process.env, { GOOGLE_CLIENT_ID: GCLIENT, GOOGLE_CLIENT_SECRET: "s" });
+    const pair = await generateKeyPair("RS256");
+    key = pair.privateKey;
+    const jwk = { ...(await exportJWK(pair.publicKey)), kid: "k1", alg: "RS256", use: "sig" };
+    googleTransport.keys = createLocalJWKSet({ keys: [jwk] });
+  });
+  afterEach(() => {
+    delete process.env.GOOGLE_CLIENT_ID;
+    delete process.env.GOOGLE_CLIENT_SECRET;
+    Object.assign(googleTransport, realGoogle);
+  });
+  const signIn = async (claims, { provider = "google", state } = {}) => {
+    const agent = anon();
+    const start = await agent.get(`/api/auth/${provider}/start`);
+    const url = new URL(start.headers.location);
+    const nonce = url.searchParams.get("nonce");
+    googleTransport.exchangeCode = async () => ({
+      id_token: await new SignJWT({ nonce, ...claims }).setProtectedHeader({ alg: "RS256", kid: "k1" })
+        .setIssuer("https://accounts.google.com").setAudience(GCLIENT).setSubject(claims.sub ?? "g-1").setIssuedAt().setExpirationTime("5m").sign(key),
+    });
+    return { agent, res: await agent.get("/api/auth/google/callback").query({ code: "c", state: state ?? url.searchParams.get("state") }) };
+  };
+
+  it("signs in a listed, verified address and offers the button", async () => {
+    const u = await staff({ email: "dana@gmail.com" });
+    assert.equal((await anon().get("/api/auth/options")).body.google, true);
+    const { agent, res } = await signIn({ email: "Dana@Gmail.com", email_verified: true });
+    assert.equal(res.headers.location, "/");
+    assert.equal((await agent.get("/api/auth/me")).body.profile.id, u.id);
+  });
+  it("refuses an unverified or unlisted address, and a different Google account", async () => {
+    await staff({ email: "dana@gmail.com" });
+    assert.equal((await signIn({ email: "dana@gmail.com", email_verified: false })).res.headers.location, "/login?error=not_authorized");
+    assert.equal((await signIn({ email: "x@gmail.com", email_verified: true })).res.headers.location, "/login?error=not_authorized");
+    assert.equal((await signIn({ email: "dana@gmail.com", email_verified: true, sub: "g-1" })).res.headers.location, "/");
+    assert.equal((await signIn({ email: "dana@gmail.com", email_verified: true, sub: "g-2" })).res.headers.location, "/login?error=not_authorized");
+  });
+  it("an attempt started with one provider cannot finish with another", async () => {
+    await staff({ email: "dana@gmail.com" });
+    const r = await signIn({ email: "dana@gmail.com", email_verified: true }, { provider: "microsoft" });
+    assert.equal(r.res.headers.location, "/login?error=signin_failed");
   });
 });
 

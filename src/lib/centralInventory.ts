@@ -1,9 +1,10 @@
-import { MAIN_POOL, isAvailable, mainBranch, type VoucherRecord } from "@/components/dashboard/voucherData";
+import { isAvailable, type VoucherRecord } from "@/components/dashboard/voucherData";
+import { isCentralBranch } from "./issuanceStock";
 import type { FuelType } from "@/components/fuel/fuel";
 import { STOCK_SHORTAGE } from "./issuanceInventory";
 
 export const centralPoolOf = <T extends VoucherRecord>(list: T[], fuel?: FuelType) =>
-  list.filter(v => mainBranch(v.branch) === MAIN_POOL && !v.supervisor && isAvailable(v)
+  list.filter(v => isCentralBranch(v.branch) && !v.supervisor && isAvailable(v)
     && v.status === "טרם שומש" && (!fuel || (v.fuelType ?? "בנזין") === fuel));
 
 export function centralFuelLimitError(split: Record<FuelType, number>, list: VoucherRecord[]): string | null {

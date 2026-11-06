@@ -1,23 +1,27 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { cardsOfSize, emptySizeCounts, pickBySize, readSizeCounts } from "./allocationSizes";
+import { emptySizeCounts, pickBySize, readSizeCounts, sizesFor, stockFromSummary } from "./allocationSizes";
 
 const card = (serial: string, amount: number) => ({ serial, amount });
 const pools = {
   "בנזין": [card("p1", 50), card("p2", 50), card("p3", 100), card("p4", 500)],
   "סולר": [card("d1", 100), card("d2", 500), card("d3", 500)],
 };
+const stock = stockFromSummary([
+  { amount: 50, fuel_type: "בנזין", count: 2 }, { amount: 100, fuel_type: "בנזין", count: 1 }, { amount: 500, fuel_type: "בנזין", count: 1 },
+  { amount: 100, fuel_type: "סולר", count: 1 }, { amount: 500, fuel_type: "סולר", count: 2 },
+]);
 
 describe("allocation by voucher size", () => {
-  it("offers petrol 50/100/500 and diesel 100/500 only", () => {
-    const c = emptySizeCounts();
-    assert.deepEqual(Object.keys(c["בנזין"]).map(Number), [50, 100, 500]);
-    assert.deepEqual(Object.keys(c["סולר"]).map(Number), [100, 500]);
+  it("offers petrol 50/100/500 and diesel 100/500, plus any other value really in stock", () => {
+    assert.deepEqual(sizesFor("בנזין", stockFromSummary([])), [50, 100, 500]);
+    assert.deepEqual(sizesFor("סולר", stockFromSummary([])), [100, 500]);
+    assert.deepEqual(sizesFor("סולר", stockFromSummary([{ amount: 50, fuel_type: "סולר", count: 3 }])), [50, 100, 500]);
   });
   it("mixes sizes and fuels in one allocation and sends exactly those cards", () => {
     const c = emptySizeCounts();
     c["בנזין"][50] = "2"; c["בנזין"][500] = "1"; c["סולר"][500] = "2";
-    const r = readSizeCounts(c, pools);
+    const r = readSizeCounts(c, stock);
     assert.notEqual(typeof r, "string");
     if (typeof r === "string") return;
     assert.deepEqual(r.split, { "בנזין": 600, "סולר": 1000 });
@@ -27,14 +31,13 @@ describe("allocation by voucher size", () => {
   it("refuses more cards of a size than exist, without substituting another size", () => {
     const c = emptySizeCounts();
     c["בנזין"][100] = "2"; // only one 100 card, even though two 50s + 500 could cover the value
-    assert.match(String(readSizeCounts(c, pools)), /100 ₪/);
+    assert.match(String(readSizeCounts(c, stock)), /100 ₪/);
     assert.equal(pickBySize(pools["בנזין"], { 100: 2 }), null);
   });
   it("rejects an empty form and invalid counts", () => {
-    assert.equal(typeof readSizeCounts(emptySizeCounts(), pools), "string");
+    assert.equal(typeof readSizeCounts(emptySizeCounts(), stock), "string");
     const c = emptySizeCounts();
     c["סולר"][100] = "1.5";
-    assert.equal(typeof readSizeCounts(c, pools), "string");
+    assert.equal(typeof readSizeCounts(c, stock), "string");
   });
-  it("counts cards of a size", () => assert.equal(cardsOfSize(pools["בנזין"], 50), 2));
 });

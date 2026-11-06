@@ -73,6 +73,7 @@ export function InternalLayout({ title, children }: { title: string; children: R
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const role = useAppStore((s) => s.role);
   const setRole = useAppStore((s) => s.setRole);
+  const stockLoaded = useAppStore((s) => s.stockLoaded);
   const { profile } = useAuthContext();
   const canSimulate = useIsSuperAdmin();
   const setLearningActive = useAppStore((s) => s.setLearningActive);
@@ -216,6 +217,11 @@ export function InternalLayout({ title, children }: { title: string; children: R
           {bell(true)}
         </header>
         <LearningBanner />
+        {stockLoaded ? null : (
+          <div role="status" className="relative h-[3px] overflow-hidden bg-table-line" aria-label="טוען נתונים">
+            <span className="absolute inset-y-0 w-1/3 animate-pulse bg-primary" />
+          </div>
+        )}
         </div>
 
         {/* ── Mobile drawer ── */}

@@ -308,7 +308,7 @@ async function transferVoucherStock(params, { user }) {
         if (!AVAILABLE_STATUSES.includes(card.status) || (card.fuel_type ?? "בנזין") !== it.fuel
           || !blank(card.link_id) || !blank(card.worker_id) || !blank(card.worker_name)) throw badRequest(SHORTAGE);
         if (role.admin) {
-          if ((card.branch != null && card.branch !== MAIN_POOL) || !blank(card.supervisor)) throw badRequest(SHORTAGE);
+          if ((card.branch != null && canonicalBranch(card.branch) !== CENTRAL_LABEL) || !blank(card.supervisor)) throw badRequest(SHORTAGE);
         } else {
           if (canonicalBranch(card.branch) !== canonicalBranch(callerBranch)) throw forbidden("אין הרשאה למלאי זה");
           if (role.branch && !blank(card.supervisor)) throw badRequest("המלאי כבר הוקצה למפקח");

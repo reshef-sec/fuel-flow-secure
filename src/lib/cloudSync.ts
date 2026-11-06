@@ -100,43 +100,31 @@ export const linkToRow = (l: WorkerLink) => ({
   employee_name: l.employeeName ?? null, branch: l.branch ?? null, supervisor_id: l.supervisorId ?? null,
 });
 
-/** Reads every table in pages (the API returns at most 1,000 rows per call). */
+const PAGE = 5000;
+
+/** Reads a whole table in pages (the API returns at most 5,000 rows per call). */
 async function all(table: string, order?: string): Promise<Row[]> {
   const out: Row[] = [];
-  for (let from = 0; ; from += 1000) {
-    let q = db.from(table).select("*").range(from, from + 999);
+  for (let from = 0; ; from += PAGE) {
+    let q = db.from(table).select("*").range(from, from + PAGE - 1);
     if (order) q = q.order(order, { ascending: true });
     const { data, error } = await q;
     if (error) throw error;
     out.push(...(data as Row[]));
-    if (!data || data.length < 1000) break;
+    if (!data || data.length < PAGE) break;
   }
   return out;
 }
 
-export async function loadAll() {
-  const [branches, reasons, b2b, clients, vouchers, users, requests, links, settings] = await Promise.all([
-    all("branches", "created_at"), all("issue_reasons", "created_at"), all("b2b_clients", "created_at"),
-    all("regular_clients", "created_at"), all("vouchers", "created_at"), all("app_users", "created_at"),
-    all("voucher_requests", "created_at"), all("worker_links", "created_at"), all("app_settings"),
+/** What every screen needs before it can open: small tables only. */
+export async function loadEssentials() {
+  const [branches, reasons, users, requests, settings] = await Promise.all([
+    all("branches", "created_at"), all("issue_reasons", "created_at"), all("app_users", "created_at"),
+    all("voucher_requests", "created_at"), all("app_settings"),
   ]);
-  // Real codes are admin-only; other roles get an access error and see none.
-  // Redemption codes are never loaded into the staff app; only the employee page reads them server-side.
-  const codes = new Map<string, string>();
   return {
     branchList: branches.map((r) => ({ id: String(r.id), name: String(r.name), manager: String(r.manager), city: String(r.city) })) as BranchRecord[],
     reasons: reasons.map((r) => ({ id: String(r.id), name: String(r.name), category: r.category === "B2B" ? "B2B" : "Regular" })) as ReasonRecord[],
-    b2bClients: b2b.map((r) => ({
-      clientCode: String(r.client_code), accountName: String(r.account_name), clientName: String(r.client_name),
-      branch: String(r.branch), standard: String(r.standard), balance: s(r.balance), loadType: s(r.load_type),
-      budgetSection: s(r.budget_section), accountKey: s(r.account_key), itemFamily: s(r.item_family),
-      accountStatus: s(r.account_status), accountType: s(r.account_type), isActive: r.is_active === true,
-    })) as B2BClientRecord[],
-    nonB2bClients: clients.map((r) => ({
-      clientId: String(r.client_id), clientName: String(r.client_name), siteId: String(r.site_id),
-      siteName: String(r.site_name), standard: s(r.standard), isActive: r.is_active === true,
-    })) as ClientRecord[],
-    vouchers: vouchers.map((r) => rowToVoucher(r, codes)).reverse(),
     users: users.map((r) => ({
       id: String(r.id), email: String(r.email ?? ""), lastName: String(r.last_name), firstName: String(r.first_name),
       role: r.role as UserRecord["role"], title: String(r.title), phone: String(r.phone), branch: String(r.branch),
@@ -151,13 +139,36 @@ export async function loadAll() {
         ? { benzineAmount: Number(r.benzine_amount ?? 0), dieselAmount: Number(r.diesel_amount ?? 0) }
         : {}),
     })).reverse() as VoucherRequest[],
+    balance: Number(settings.find((r) => r.key === "main")?.balance ?? 0),
+  };
+}
+
+/** The large tables. They load after the app has opened, so no screen waits for them. */
+export async function loadStock() {
+  const [b2b, clients, vouchers, links] = await Promise.all([
+    all("b2b_clients", "created_at"), all("regular_clients", "created_at"),
+    all("vouchers", "created_at"), all("worker_links", "created_at"),
+  ]);
+  // Redemption codes are never loaded into the staff app; only the employee page reads them server-side.
+  const codes = new Map<string, string>();
+  return {
+    b2bClients: b2b.map((r) => ({
+      clientCode: String(r.client_code), accountName: String(r.account_name), clientName: String(r.client_name),
+      branch: String(r.branch), standard: String(r.standard), balance: s(r.balance), loadType: s(r.load_type),
+      budgetSection: s(r.budget_section), accountKey: s(r.account_key), itemFamily: s(r.item_family),
+      accountStatus: s(r.account_status), accountType: s(r.account_type), isActive: r.is_active === true,
+    })) as B2BClientRecord[],
+    nonB2bClients: clients.map((r) => ({
+      clientId: String(r.client_id), clientName: String(r.client_name), siteId: String(r.site_id),
+      siteName: String(r.site_name), standard: s(r.standard), isActive: r.is_active === true,
+    })) as ClientRecord[],
+    vouchers: vouchers.map((r) => rowToVoucher(r, codes)).reverse(),
     links: links.map((r) => ({
       id: String(r.id), total: Number(r.total), serials: (r.serials as string[]) ?? [], createdAt: String(r.created_on),
       workerId: s(r.worker_id), phone: s(r.phone), signedAt: s(r.signed_at),
       employeeName: s(r.employee_name), branch: s(r.branch), supervisorId: s(r.supervisor_id),
       locked: Boolean(r.locked) || Number(r.failed_attempts ?? 0) >= 3,
     })).reverse() as WorkerLink[],
-    balance: Number(settings.find((r) => r.key === "main")?.balance ?? 0),
   };
 }
 

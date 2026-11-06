@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, emitAuthChange, onAuthChange } from "@/lib/apiClient";
 import { cleanUserName } from "./userDisplay";
 
@@ -50,6 +50,7 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const signedIn = useRef(false);
 
   const loadProfile = useCallback(async () => {
     const { body } = await apiFetch<{ profile: Profile | null }>("/api/auth/me");
@@ -57,13 +58,15 @@ export function useAuth() {
     if (next) next.full_name = cleanUserName(next.full_name);
     setSession(next ? { user: { id: next.id } } : null);
     setProfile(next);
+    signedIn.current = Boolean(next);
     setLoading(false);
   }, []);
 
   useEffect(() => {
     void loadProfile();
     return onAuthChange(() => {
-      setLoading(true);
+      // A re-check while signed in stays silent: the screen is not blanked for it.
+      if (!signedIn.current) setLoading(true);
       void loadProfile();
     });
   }, [loadProfile]);

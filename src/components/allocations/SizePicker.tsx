@@ -1,6 +1,5 @@
 import { FUEL_TYPES, fuelLabel, type FuelType } from "@/components/fuel/fuel";
-import { cardsOfSize, type SizeCounts } from "@/lib/allocationSizes";
-import { FACE_VALUES } from "@/lib/issuanceInventory";
+import { sizesFor, type SizeCounts, type SizeStock } from "@/lib/allocationSizes";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 import { fieldClass, fieldBadClass } from "./AllocationForm";
 
@@ -11,23 +10,24 @@ export function SizePicker({
   idPrefix,
   counts,
   onCounts,
-  pools,
+  stock,
 }: {
   idPrefix: string;
   counts: SizeCounts;
   onCounts: (c: SizeCounts) => void;
-  pools: Record<FuelType, { amount: number }[]>;
+  stock: SizeStock;
 }) {
   return (
     <div className="grid gap-4 min-[600px]:grid-cols-2">
       {FUEL_TYPES.map((f) => {
-        const subtotal = FACE_VALUES[f].reduce((t, size) => t + (Number(counts[f][size]) || 0) * size, 0);
+        const sizes = sizesFor(f, stock);
+        const subtotal = sizes.reduce((t, size) => t + (Number(counts[f][size]) || 0) * size, 0);
         return (
           <fieldset key={f} className="m-0 flex min-w-0 flex-col gap-2.5 rounded-[14px] border border-line bg-[#fbfcfe] p-3.5">
             <legend className="px-1 text-[13.5px] font-bold text-navy-900">{fuelLabel(f)}</legend>
-            {FACE_VALUES[f].map((size) => {
+            {sizes.map((size) => {
               const id = `${idPrefix}-${f === "בנזין" ? "petrol" : "diesel"}-${size}`;
-              const have = cardsOfSize(pools[f], size);
+              const have = stock[f][size] ?? 0;
               const over = (Number(counts[f][size]) || 0) > have;
               return (
                 <div key={size} className="grid grid-cols-[64px_minmax(0,1fr)] items-center gap-x-2.5 gap-y-0.5">

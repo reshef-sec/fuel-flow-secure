@@ -1,7 +1,7 @@
 /**
  * Login accounts, managed from Settings → Users. Actions: bootstrap | sync | reset | delete |
  * change_password. Users are identified by their stable `id`; email is how they sign in.
- * A new user needs no password: their first Microsoft sign-in creates the login account.
+ * A new user needs no password: their first Microsoft or Google sign-in creates the login account.
  */
 import { Router } from "express";
 import { randomBytes } from "node:crypto";
@@ -76,8 +76,8 @@ router.post("/", ah(async (req, res) => {
         await assertFree("phone", d.phone, d.id);
         const roleChanged = existing.role !== d.role || existing.branch !== d.branch;
         existing.set({ phone: d.phone, email: d.email, full_name: d.fullName || existing.full_name, branch: d.branch, role: d.role });
-        // A new address may belong to a different Microsoft account.
-        if (existing.isModified("email")) existing.microsoft_sub = null;
+        // A new address may belong to a different Microsoft or Google account.
+        if (existing.isModified("email")) existing.set({ microsoft_sub: null, google_sub: null });
         if (roleChanged) existing.token_version = (existing.token_version ?? 0) + 1;
         await existing.save();
       }

@@ -13,7 +13,7 @@ export const Route = createFileRoute("/login")({
       { title: "כניסה למערכת | רשף ביטחון" },
       { name: "description", content: "כניסה מאובטחת למערכת ניהול שוברי הדלק של רשף ביטחון." },
       { property: "og:title", content: "כניסה למערכת | רשף ביטחון" },
-      { property: "og:description", content: "כניסה מאובטחת עם חשבון Microsoft או אימייל וסיסמה." },
+      { property: "og:description", content: "כניסה מאובטחת עם חשבון Google או Microsoft, או עם אימייל וסיסמה." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -21,10 +21,10 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-/** Why Microsoft sent the user back here (/login?error=…). */
-const MICROSOFT_ERRORS: Record<string, string> = {
+/** Why a provider sent the user back here (/login?error=…). */
+const SIGNIN_ERRORS: Record<string, string> = {
   not_authorized: "כתובת המייל אינה מורשית במערכת",
-  microsoft_failed: "הכניסה דרך Microsoft נכשלה. נסו שוב",
+  signin_failed: "הכניסה לא הושלמה. נסו שוב",
 };
 
 function MicrosoftLogo() {
@@ -38,12 +38,25 @@ function MicrosoftLogo() {
   );
 }
 
+function GoogleLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-[18px]" aria-hidden>
+      <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z" />
+      <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.2v3.1A12 12 0 0 0 12 24z" />
+      <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.2a12 12 0 0 0 0 10.8z" />
+      <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.2 6.6l4.1 3.1c.9-2.9 3.6-4.9 6.7-4.9z" />
+    </svg>
+  );
+}
+
+const providerBtn = "inline-flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-[13px] border border-line-strong bg-white text-[15px] font-bold text-navy-900 no-underline transition hover:bg-slate-50 focus-visible:shadow-focus-mint focus-visible:outline-none";
+
 function LoginPage() {
   const status = getSetupStatus;
   const bootstrap = bootstrapAdmin;
   const [needsSetup, setNeedsSetup] = useState(false);
   const [identifier, setIdentifier] = useState("");
-  const [microsoft, setMicrosoft] = useState(false);
+  const [providers, setProviders] = useState({ microsoft: false, google: false });
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +65,9 @@ function LoginPage() {
 
   useEffect(() => {
     status().then((r) => setNeedsSetup(r.needsSetup)).catch(() => undefined);
-    getAuthOptions().then((r) => setMicrosoft(r.microsoft)).catch(() => undefined);
+    getAuthOptions().then(setProviders).catch(() => undefined);
     const reason = new URLSearchParams(window.location.search).get("error");
-    if (reason && MICROSOFT_ERRORS[reason]) setError(MICROSOFT_ERRORS[reason]);
+    if (reason && SIGNIN_ERRORS[reason]) setError(SIGNIN_ERRORS[reason]);
   }, [status]);
 
   async function onSubmit(e: FormEvent) {
@@ -93,19 +106,24 @@ function LoginPage() {
             {needsSetup ? "הגדרת מנהל ראשי" : "כניסה למערכת"}
           </h1>
           <p className="m-0 text-[14.5px] text-slate-600">
-            {needsSetup ? "המערכת טרם הוגדרה. צרו את חשבון המנהל הראשי כדי להתחיל." : "התחברו עם חשבון Microsoft, או עם אימייל וסיסמה."}
+            {needsSetup ? "המערכת טרם הוגדרה. צרו את חשבון המנהל הראשי כדי להתחיל." : "התחברו עם החשבון שלכם, או עם אימייל וסיסמה."}
           </p>
         </div>
 
-        {microsoft && !needsSetup ? (
+        {(providers.microsoft || providers.google) && !needsSetup ? (
           <>
-            <a
-              href="/api/auth/microsoft/start"
-              className="inline-flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-[13px] border border-line-strong bg-white text-[15px] font-bold text-navy-900 no-underline transition hover:bg-slate-50 focus-visible:shadow-focus-mint focus-visible:outline-none"
-            >
-              <MicrosoftLogo />
-              התחבר באמצעות Microsoft
-            </a>
+            {providers.google ? (
+              <a href="/api/auth/google/start" className={providerBtn}>
+                <GoogleLogo />
+                התחבר באמצעות Google
+              </a>
+            ) : null}
+            {providers.microsoft ? (
+              <a href="/api/auth/microsoft/start" className={providerBtn}>
+                <MicrosoftLogo />
+                התחבר באמצעות Microsoft
+              </a>
+            ) : null}
             <div className="flex items-center gap-3 text-xs text-slate-500" aria-hidden>
               <span className="h-px flex-1 bg-table-line" />
               או

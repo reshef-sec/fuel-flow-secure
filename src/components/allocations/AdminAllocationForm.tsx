@@ -1,29 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { emptySplit, readSplit, type FuelType } from "@/components/fuel/fuel";
+import { emptySplit, type FuelType } from "@/components/fuel/fuel";
 import type { ResultSummary } from "@/components/ui/ResultDialog";
 import { loadIssuanceStock } from "@/lib/cloudSync";
 import { centralPoolOf } from "@/lib/centralInventory";
 import type { CentralInventorySummary } from "@/lib/centralInventorySummary";
 import { STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { branchLabel } from "@/lib/branchLabels";
-import { pickExact } from "@/lib/inventorySelection";
-import { emptySizeCounts, pickBySize, readSizeCounts } from "@/lib/allocationSizes";
-import { fullName, poolShortage, useAppStore, useCurrentUser } from "@/store/appStore";
+import { emptySizeCounts, pickBySize, readSizeCounts, stockFromSummary } from "@/lib/allocationSizes";
+import { fullName, useAppStore, useCurrentUser } from "@/store/appStore";
 import { AllocationFormFields, cardsText } from "./AllocationForm";
 import { SizePicker } from "./SizePicker";
 import { adminRecipients, recipientRoleText, recipientTarget } from "./allocationRecipients";
 
 const FUELS = ["בנזין", "סולר"] as const;
+const NO_AMOUNTS = emptySplit();
 const fmt = (n: number) => n.toLocaleString("he-IL");
 const fuelWord = (f: FuelType) => (f === "בנזין" ? "בנזין 95" : "סולר");
 
 /**
  * Admin allocation from the central pool to a branch manager / "רשאי להקים דרישה" user.
- * Submit logic is the previous AllocationDialog's, unchanged: fresh summary check → reload stock →
- * poolShortage → `allocate(branch, supervisor, amount, { approver, fuelType })` per fuel, sequentially,
- * refreshing after each successful fuel.
+ * The admin chooses how many cards of each size to send. Submit: fresh summary check → reload stock →
+ * the chosen cards must still exist → `allocate(branch, supervisor, amount, { approver, fuelType, sizes })`
+ * per fuel, sequentially, refreshing after each successful fuel.
  */
 export function AdminAllocationForm({
   active,
@@ -59,15 +59,12 @@ export function AdminAllocationForm({
   const pools = useMemo(() => ({ "בנזין": centralPoolOf(stock, "בנזין"), "סולר": centralPoolOf(stock, "סולר") }), [stock]);
 
   const [target, setTarget] = useState("");
-  const [split, setSplit] = useState(emptySplit);
-  const [bySize, setBySize] = useState(false);
   const [sizeCounts, setSizeCounts] = useState(emptySizeCounts);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const sizeSelection = readSizeCounts(sizeCounts, pools);
-  const sizeTotal = typeof sizeSelection === "string" ? 0 : sizeSelection.split["בנזין"] + sizeSelection.split["סולר"];
-  const currentSplit = bySize ? (typeof sizeSelection === "string" ? sizeSelection : sizeSelection.split) : readSplit(split);
-  const stockError = typeof currentSplit === "string" || bySize ? null : poolShortage(currentSplit, stock);
+  const sizeStock = useMemo(() => stockFromSummary(summary?.denominations), [summary]);
+  const selection = readSizeCounts(sizeCounts, sizeStock);
+  const sizeTotal = typeof selection === "string" ? 0 : selection.split["בנזין"] + selection.split["סולר"];
 
   useEffect(() => {
     if (!active) return;
@@ -75,21 +72,19 @@ export function AdminAllocationForm({
       ? recipients.find((u) => u.branch === presetTarget && u.role === "branch") ?? recipients.find((u) => u.branch === presetTarget)
       : undefined;
     setTarget(preset?.id ?? "");
-    setSplit(emptySplit());
     setSizeCounts(emptySizeCounts());
     setError(null);
     setLoading(false);
   }, [active, presetTarget, recipients]);
-  useEffect(() => { setError(null); }, [target, split, sizeCounts, bySize]);
+  useEffect(() => { setError(null); }, [target, sizeCounts]);
 
   const picked = recipients.find((u) => u.id === target);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = currentSplit;
     if (!picked) return setError("יש לבחור מקבל הקצאה");
-    if (typeof parsed === "string") return setError(parsed);
-    const sizes = bySize && typeof sizeSelection !== "string" ? sizeSelection.sizes : null;
+    if (typeof selection === "string") return setError(selection);
+    const { sizes, split: parsed } = selection;
     const { branch, supervisor } = recipientTarget(picked);
     setError(null);
     setLoading(true);
@@ -104,21 +99,19 @@ export function AdminAllocationForm({
       const latest = await loadIssuanceStock();
       useAppStore.setState({ vouchers: latest });
       // Fresh stock may have changed since the form opened: re-check the chosen sizes against it.
-      const shortage = sizes
-        ? (FUELS.some((f) => parsed[f] > 0 && !pickBySize(centralPoolOf(latest, f), sizes[f])) ? STOCK_SHORTAGE : null)
-        : poolShortage(parsed, latest);
-      if (shortage) { setError(shortage); toast.error(shortage); return; }
+      if (FUELS.some((f) => parsed[f] > 0 && !pickBySize(centralPoolOf(latest, f), sizes[f]))) {
+        setError(STOCK_SHORTAGE); toast.error(STOCK_SHORTAGE); return;
+      }
       const approver = me ? fullName(me) : "אדמין מרכזי";
       for (const f of FUELS)
         if (parsed[f]) {
           // Preview of the cards the store will pick (same selection over the same pool).
           const pool = centralPoolOf(useAppStore.getState().vouchers, f);
-          const preview = sizes ? pickBySize(pool, sizes[f]) : pickExact(pool, parsed[f]);
-          const err = await allocate(branch, supervisor, parsed[f], { approver, fuelType: f, ...(sizes ? { sizes: sizes[f] } : {}) });
+          const preview = pickBySize(pool, sizes[f]);
+          const err = await allocate(branch, supervisor, parsed[f], { approver, fuelType: f, sizes: sizes[f] });
           if (err) {
             if (done.length) {
               // Partial success: clear the fuel that was already allocated so a retry can't double it.
-              setSplit((s) => ({ ...s, "בנזין": "" }));
               setSizeCounts((c) => ({ ...c, "בנזין": emptySizeCounts()["בנזין"] }));
               onDone({ tone: "warning", title: "ההקצאה בוצעה חלקית", line: `הוקצו ${done.join(" ו-")} ל${fullName(picked)}. ${fuelWord(f)} לא הוקצה: ${err}`, detail: cards.join(" · ") || undefined });
             }
@@ -130,7 +123,6 @@ export function AdminAllocationForm({
           await onAllocated?.().catch(() => {});
         }
       setTarget("");
-      setSplit(emptySplit());
       setSizeCounts(emptySizeCounts());
       onDone({
         tone: "success",
@@ -151,12 +143,7 @@ export function AdminAllocationForm({
     <form onSubmit={submit} noValidate>
       <AllocationFormFields
         idPrefix={idPrefix}
-        sizeMode={{
-          on: bySize,
-          onToggle: setBySize,
-          total: sizeTotal,
-          picker: <SizePicker idPrefix={idPrefix} counts={sizeCounts} onCounts={setSizeCounts} pools={pools} />,
-        }}
+        sizePicker={{ total: sizeTotal, picker: <SizePicker idPrefix={idPrefix} counts={sizeCounts} onCounts={setSizeCounts} stock={sizeStock} /> }}
         recipientLabel="מקבל ההקצאה"
         recipientPlaceholder="בחירת מנהל סניף או מורשה דרישה…"
         recipients={recipients.map((u) => ({
@@ -168,16 +155,15 @@ export function AdminAllocationForm({
         onRecipient={setTarget}
         recipientHint={recipientHint}
         emptyRecipientsNote="אין משתמשים מתאימים. יש להגדיר מנהל סניף או משתמש ״רשאי להקים דרישה״ בהגדרות → ניהול משתמשים."
-        values={split}
-        onValues={setSplit}
+        values={NO_AMOUNTS}
+        onValues={() => undefined}
         available={available}
         pools={pools}
         availPrefix="זמין במאגר"
         overLabel="חורג מהזמין במאגר"
         error={error ?? (summary ? null : inventoryError)}
-        fallbackError={stockError}
         loading={loading}
-        submitDisabled={!summary || !stockReady || !!stockError || typeof currentSplit === "string" || !picked}
+        submitDisabled={!summary || !stockReady || typeof selection === "string" || !picked}
         onCancel={onCancel}
       />
     </form>

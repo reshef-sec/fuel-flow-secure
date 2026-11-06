@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { loadIssuanceStock } from "@/lib/cloudSync";
 import { useAppStore } from "@/store/appStore";
 
-/** Refresh while inventory is visible, including after returning to the tab. */
+const REFRESH_MS = 60 * 1000;
+
+/**
+ * Keeps the card list fresh while a stock screen is open. The first copy comes from the app's own
+ * start-up load, so opening a screen downloads nothing; every action re-reads stock before it runs.
+ */
 export function useLiveInventory(active = true) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -10,19 +15,23 @@ export function useLiveInventory(active = true) {
     if (!active) return;
     let cancelled = false;
     let pending = false;
+    let last = Date.now();
     const refresh = async () => {
-      if (pending) return;
+      if (pending || document.hidden || Date.now() - last < REFRESH_MS) return;
       pending = true;
+      last = Date.now();
       try {
         const vouchers = await loadIssuanceStock();
-        if (!cancelled) { useAppStore.setState({ vouchers }); setReady(true); }
-      } catch { if (!cancelled) setReady(false); }
+        if (!cancelled) useAppStore.setState({ vouchers });
+      } catch { /* the next refresh retries */ }
       finally { pending = false; }
     };
-    void refresh();
-    const interval = window.setInterval(() => { void refresh(); }, 15 * 1000);
+    const markReady = () => { if (useAppStore.getState().stockLoaded) setReady(true); };
+    markReady();
+    const unsubscribe = useAppStore.subscribe(markReady);
+    const interval = window.setInterval(() => { void refresh(); }, REFRESH_MS);
     window.addEventListener("focus", refresh);
-    return () => { cancelled = true; window.clearInterval(interval); window.removeEventListener("focus", refresh); };
+    return () => { cancelled = true; unsubscribe(); window.clearInterval(interval); window.removeEventListener("focus", refresh); };
   }, [active]);
   return ready;
 }

@@ -5,7 +5,6 @@ import { FUEL_TYPES, fuelLabel, type FuelType } from "@/components/fuel/fuel";
 import { issuanceAmountError, issuanceAmountRules, STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { pickExact } from "@/lib/inventorySelection";
 import { groupStock } from "@/store/appStore";
-import { FilterChips } from "@/components/ui/FilterChips";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
 
 /** Shared input look of the redesign (44px, 11px radius, mint focus ring). */
@@ -80,7 +79,7 @@ export function AllocationFormFields({
   submitDisabled,
   onCancel,
   idPrefix,
-  sizeMode,
+  sizePicker,
 }: {
   recipientLabel: string;
   recipientPlaceholder: string;
@@ -102,8 +101,8 @@ export function AllocationFormFields({
   submitDisabled: boolean;
   onCancel?: () => void;
   idPrefix: string;
-  /** Admin only: choose the card sizes instead of an open amount. `picker` replaces the amount fields. */
-  sizeMode?: { on: boolean; onToggle: (on: boolean) => void; picker: ReactNode; total: number };
+  /** Admin allocation: the card-size picker replaces the amount fields. */
+  sizePicker?: { picker: ReactNode; total: number };
 }) {
   const groups: { group: string; items: RecipientOption[] }[] = [];
   for (const r of recipients) {
@@ -115,7 +114,7 @@ export function AllocationFormFields({
   const checks = Object.fromEntries(
     FUEL_TYPES.map((f) => [f, checkFuelAmount(f, values[f], available?.[f] ?? 0, pools[f], overLabel)]),
   ) as Record<FuelType, FuelAmountCheck>;
-  const total = sizeMode?.on ? sizeMode.total : FUEL_TYPES.reduce((t, f) => t + (checks[f].pick ? checks[f].amount : 0), 0);
+  const total = sizePicker ? sizePicker.total : FUEL_TYPES.reduce((t, f) => t + (checks[f].pick ? checks[f].amount : 0), 0);
 
   return (
     <div className="flex flex-col gap-[18px]">
@@ -144,16 +143,7 @@ export function AllocationFormFields({
         {recipientHint ? <span className="text-[12.5px] font-medium text-slate-600">{recipientHint}</span> : null}
       </label>
 
-      {sizeMode ? (
-        <FilterChips
-          label="אופן בחירת השוברים"
-          value={sizeMode.on ? "sizes" : "auto"}
-          onChange={(v) => sizeMode.onToggle(v === "sizes")}
-          items={[{ value: "auto", label: "לפי סכום" }, { value: "sizes", label: "לפי גודל שובר" }]}
-        />
-      ) : null}
-
-      {sizeMode?.on ? sizeMode.picker : (
+      {sizePicker ? sizePicker.picker : (
       <div className="grid gap-4 min-[600px]:grid-cols-2">
         {FUEL_TYPES.map((f) => {
           const c = checks[f];

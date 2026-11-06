@@ -4,7 +4,7 @@ import { FUEL_TYPES, fuelOf, type FuelType } from "@/components/fuel/fuel";
 import { create } from "zustand";
 import { toast } from "sonner";
 import {
-  b2bToRow, clientToRow, db, loadAll, loadIssuanceStock, requestToRow, run, userPatch, userToRow,
+  b2bToRow, clientToRow, db, loadEssentials, loadStock, loadIssuanceStock, requestToRow, run, userPatch, userToRow,
 } from "@/lib/cloudSync";
 
 import { logActivity } from "@/lib/activityLog";
@@ -219,6 +219,8 @@ export function siteStandard(clients: ClientRecord[], clientId?: string, siteId?
 
 interface AppState {
   loaded: boolean;
+  /** Cards, links and vehicle pools have arrived (they load after the app opens). */
+  stockLoaded: boolean;
   /** Signed-in login account id */
   authId: string | null;
   setIdentity: (authId: string | null) => void;
@@ -300,6 +302,7 @@ export function storedRole(): Role | null {
 export const useAppStore = create<AppState>()(
   (set, get) => ({
   loaded: false,
+  stockLoaded: false,
   authId: null,
   setIdentity: (authId) => set({ authId }),
   learningActive: false,
@@ -311,11 +314,12 @@ export const useAppStore = create<AppState>()(
         window.localStorage.removeItem("reshef.store.v2");
         window.localStorage.removeItem(ROLE_KEY);
       }
-      const data = await loadAll();
-      // Vouchers never expire; only the employee link does (checked server-side).
-      set({ ...data, loaded: true });
+      set({ stockLoaded: false });
+      // The app opens as soon as the essentials arrive; the large tables follow in the background.
+      set({ ...(await loadEssentials()), loaded: true });
+      set({ ...(await loadStock()), stockLoaded: true });
     } catch (e) {
-      set({ loaded: true });
+      set({ loaded: true, stockLoaded: true });
       toast.error(`טעינת הנתונים מהענן נכשלה: ${(e as Error).message}`);
     }
   },
@@ -520,7 +524,7 @@ export const useAppStore = create<AppState>()(
   importClients: async (rows) => {
     const prepared = preparePrivateVehicles(rows);
     const result = await syncPrivateVehicles(prepared.rows.map(clientToRow));
-    const fresh = await loadAll();
+    const fresh = await loadStock();
     set({ nonB2bClients: fresh.nonB2bClients });
     return { ...result, duplicates: (result.duplicates ?? 0) + prepared.duplicates, blanks: (result.blanks ?? 0) + prepared.blanks };
   },
@@ -551,7 +555,7 @@ export const useAppStore = create<AppState>()(
   importB2b: async (rows) => {
     const prepared = prepareWorkVehicles(rows);
     const result = await syncWorkVehicles(prepared.rows.map(b2bToRow));
-    const fresh = await loadAll();
+    const fresh = await loadStock();
     set({ b2bClients: fresh.b2bClients });
     const blanks = (result.blanks ?? 0) + prepared.blanks;
     const invalid = (result.invalid ?? 0) + prepared.invalid;

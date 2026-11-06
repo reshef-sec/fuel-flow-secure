@@ -85,8 +85,8 @@ export async function unlockWorkerLink({ data }: Args<{ id: string }>) {
 
 /** What the login screen may offer. */
 export async function getAuthOptions() {
-  const { body } = await apiFetch<{ microsoft?: boolean }>("/api/auth/options");
-  return { microsoft: body?.microsoft === true };
+  const { body } = await apiFetch<{ microsoft?: boolean; google?: boolean }>("/api/auth/options");
+  return { microsoft: body?.microsoft === true, google: body?.google === true };
 }
 
 export async function getSetupStatus() {
