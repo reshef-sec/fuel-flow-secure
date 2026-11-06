@@ -23,7 +23,7 @@ const opts = (collection) => ({
 export const ROLES = ["admin", "branch", "supervisor", "viewer"];
 const role = { type: String, enum: ROLES, default: "supervisor" };
 
-/** Login accounts (replaces Supabase auth.users + profiles + user_roles). */
+/** Login accounts: profile, roles and password hash. */
 const profileSchema = new Schema({
   id: uuid,
   email: { type: String, lowercase: true, trim: true, default: null },

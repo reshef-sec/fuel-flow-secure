@@ -21,7 +21,6 @@ server/
   rpc/devtools.js     demo data / reset — only מאיה קורן (DEV_TOOLS_OWNER_*)
   tests/              integration tests on an in-memory MongoDB replica set
 src/                  React app; src/lib/apiClient.ts is the bridge to the API
-scripts/migrate-from-supabase.mjs   one-time data copy from the old Supabase project
 ```
 
 Roles: `admin` (אדמין), `branch` (מנהל סניף / אזור), `supervisor` (מפקח), `viewer` (צופה, read-only).
@@ -57,12 +56,3 @@ npm test                    # server integration tests + frontend unit tests
    - Sign in with Google (the button appears once both are set): in Google Cloud → Credentials create an OAuth client (Web application) with the redirect URI `https://<your-site>/api/auth/google/callback`, then set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 4. In Atlas → Network Access, allow Render's outbound IPs (or 0.0.0.0/0 with a strong DB password).
 
-## Moving the existing data
-
-```bash
-node --env-file=.env scripts/migrate-from-supabase.mjs           # dry run
-node --env-file=.env scripts/migrate-from-supabase.mjs --write   # copy
-```
-
-Passwords cannot be exported from Supabase Auth: after migration every user signs in with
-their phone + ת.ז and is forced to choose a new password.

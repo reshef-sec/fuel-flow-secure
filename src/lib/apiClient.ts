@@ -1,8 +1,7 @@
 /**
  * Same-origin client for the Express + MongoDB backend (server/app.js).
  *
- * Keeps the call shape of the former supabase-js client so existing call sites only
- * change their import: api.from(table).select().eq()…, api.rpc(name, params).
+ * Call shape: api.from(table).select().eq()…, api.rpc(name, params).
  * Every query is a thenable resolving to { data, error } and never throws.
  * The session lives in an httpOnly cookie — the browser never sees a token.
  */

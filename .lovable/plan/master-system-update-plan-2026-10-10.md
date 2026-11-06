@@ -1,6 +1,6 @@
 # Master system update — plan
 
-This update is large, so it is delivered in 4 stages. Each stage ends working and checked before the next starts. Some stages need a short SQL script that you run in your Supabase SQL Editor (provided at that stage).
+This update is large, so it is delivered in 4 stages. Each stage ends working and checked before the next starts.
 
 ## Stage 1 — Names and dashboard (no database changes)
 - Rename everywhere: "ללא חיוב לקוח" / "דוח ללא חיוב לקוח" -> "רכב פרטי"; "בחיוב לקוח" / "דו"ח B2B" / "מאגר B2B" -> "רכב עבודה" (reports tabs, settings tabs, production radio buttons).
@@ -32,5 +32,4 @@ This update is large, so it is delivered in 4 stages. Each stage ends working an
 - The signatures archive exists from the previous update; only the access rules above are added to it.
 
 ## Technical notes
-- External Supabase project; schema changes are delivered as SQL scripts for the user to run, and code tolerates missing new columns until then.
 - Expiry is enforced when vouchers load and when the worker link opens (no scheduled job needed).

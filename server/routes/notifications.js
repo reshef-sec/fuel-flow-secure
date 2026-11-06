@@ -1,5 +1,5 @@
 /**
- * Replaces Supabase Realtime channels with lightweight polling:
+ * Notifications by lightweight polling:
  * GET /api/notifications?since=<ISO>
  *   admin      → voucher_requests created after `since`
  *   supervisor → vouchers newly assigned to me after `since` (sum of amounts)

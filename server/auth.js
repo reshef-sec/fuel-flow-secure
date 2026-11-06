@@ -1,5 +1,5 @@
 /**
- * JWT + bcrypt session handling (replaces Supabase Auth).
+ * JWT + bcrypt session handling.
  * The token lives in an httpOnly, SameSite=Strict cookie; it is never readable by page scripts.
  */
 import jwt from "jsonwebtoken";
