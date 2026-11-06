@@ -247,7 +247,8 @@ interface AppState {
   requests: VoucherRequest[];
   addRequest: (req: Omit<VoucherRequest, "id" | "createdAt" | "status">) => void;
   /** Approves a request (full or custom amount) and allocates to the requester branch. */
-  approveRequest: (id: string, amount: number, approver: string, sizes?: FuelSizes) => Promise<boolean>;
+  /** "short" = stock cannot supply it and nothing was allocated, so the admin can choose other cards. */
+  approveRequest: (id: string, amount: number, approver: string, sizes?: FuelSizes) => Promise<"ok" | "short" | "failed">;
   rejectRequest: (id: string, approver: string) => void;
   assignToSupervisor: (branch: string, supervisor: string, amount: number, fuelType?: FuelType) => Promise<string | null>;
   /** Marks vouchers redeemed by serial numbers from the Paz feedback file. */
@@ -420,7 +421,7 @@ export const useAppStore = create<AppState>()(
   },
   approveRequest: async (id, amount, approver, chosen) => {
     const req = get().requests.find((r) => r.id === id);
-    if (!req) return false;
+    if (!req) return "failed";
     // The admin's sizes, or exactly what was asked for.
     const sizes = chosen ?? req.sizes;
     if (sizes) {
@@ -428,15 +429,12 @@ export const useAppStore = create<AppState>()(
       const latest = await loadIssuanceStock();
       set({ vouchers: latest });
       for (const f of fuels) {
-        if (!pickBySize(centralPoolOf(latest, f), sizes[f])) {
-          toast.error(`${STOCK_SHORTAGE}. אפשר לאשר גדלים אחרים ב"אשר סכום אחר"`);
-          return false;
-        }
+        if (!pickBySize(centralPoolOf(latest, f), sizes[f])) return "short";
       }
       for (const fuelType of fuels) {
         const fuelAmount = Object.entries(sizes[fuelType]).reduce((t, [size, n]) => t + Number(size) * n, 0);
         const error = await get().allocate(req.branch, undefined, fuelAmount, { requester: req.requester, approver, fuelType, sizes: sizes[fuelType] });
-        if (error) { toast.error(error); return false; }
+        if (error) { toast.error(error); return "failed"; }
       }
     } else {
     const asked = (req.benzineAmount ?? 0) + (req.dieselAmount ?? 0);
@@ -447,15 +445,15 @@ export const useAppStore = create<AppState>()(
       if (amount > asked) diesel = Math.floor((req.dieselAmount ?? 0) / 100) * 100;
       const benzine = Math.max(0, amount - diesel);
       const fail = poolShortage({ "בנזין": benzine, "סולר": diesel }, get().vouchers);
-      if (fail) { toast.error(fail); return false; }
+      if (fail) return "short";
       for (const [fuelType, fuelAmount] of [["בנזין", benzine], ["סולר", diesel]] as const) {
         if (!fuelAmount) continue;
         const error = await get().allocate(req.branch, undefined, fuelAmount, { requester: req.requester, approver, fuelType });
-        if (error) { toast.error(error); return false; }
+        if (error) { toast.error(error); return "failed"; }
       }
     } else {
       const err = await get().allocate(req.branch, undefined, amount, { requester: req.requester, approver });
-      if (err) { toast.error(err); return false; }
+      if (err) { toast.error(err); return "failed"; }
     }
     }
     set((s) => ({
@@ -465,7 +463,7 @@ export const useAppStore = create<AppState>()(
     }));
     run(db.from("voucher_requests").update({ status: "אושר", approved_amount: amount, approver }).eq("id", id));
     logActivity(actorOf(get()), "אישור דרישה", `${req.requester} · ${amount} ₪`);
-    return true;
+    return "ok";
   },
   rejectRequest: (id, approver) => {
     set((s) => ({

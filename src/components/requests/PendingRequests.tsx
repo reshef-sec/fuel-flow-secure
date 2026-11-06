@@ -13,7 +13,7 @@ import { branchLabel } from "@/lib/branchLabels";
 import { formatIsraelDate } from "@/lib/israelDate";
 import { FUEL_TYPES, fuelLabel, type FuelType } from "@/components/fuel/fuel";
 import { SizePicker } from "@/components/allocations/SizePicker";
-import { countsFromSizes, emptySizeCounts, readSizeCounts, sizesText, stockFromSummary, type FuelSizes } from "@/lib/allocationSizes";
+import { alternativeApproval, countsFromSizes, emptySizeCounts, fitsStock, fuelSizesAmount, readSizeCounts, sizesText, stockFromSummary, type FuelSizes } from "@/lib/allocationSizes";
 
 const sizesLine = (sizes: FuelSizes) =>
   FUEL_TYPES.filter((f) => sizesText(sizes[f])).map((f: FuelType) => `${sizesText(sizes[f])} ${fuelLabel(f)}`).join(" ו־");
@@ -40,7 +40,7 @@ const rejectBtn = "ds-btn min-h-10 rounded-[10px] px-[13px] text-[13px] border-[
 /** Admin-only queue of voucher requests awaiting approval. */
 export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {}) {
   const requests = useAppStore((s) => s.requests);
-  const { summary } = useCentralInventorySummary();
+  const { summary, refresh } = useCentralInventorySummary();
   const approveRequest = useAppStore((s) => s.approveRequest);
   const rejectRequest = useAppStore((s) => s.rejectRequest);
   const me = useCurrentUser();
@@ -53,6 +53,7 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
 
   const [customId, setCustomId] = useState<string | null>(null);
   const [customCounts, setCustomCounts] = useState(emptySizeCounts);
+  const [customNote, setCustomNote] = useState<string | null>(null);
   const [result, setResult] = useState<ResultSummary | null>(null);
   const closeCustom = useCallback(() => setCustomId(null), []);
   const closeResult = useCallback(() => setResult(null), []);
@@ -69,12 +70,15 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
       toast.error("הסכום חייב להיות בכפולות של 50 ₪");
       return;
     }
+    const req = requests.find((r) => r.id === id);
     if (!summary || amount > summary.total_available_amount) {
+      if (summary && req) return offerAlternative(req);
       toast.error("הסכום גבוה מהיתרה הזמינה לחלוקה");
       return;
     }
-    const req = requests.find((r) => r.id === id);
-    if (!(await approveRequest(id, amount, approver, sizes))) return;
+    const outcome = await approveRequest(id, amount, approver, sizes);
+    if (outcome === "short" && req) return offerAlternative(req);
+    if (outcome !== "ok") return;
     setCustomId(null);
     setCustomCounts(emptySizeCounts());
     setResult({
@@ -90,10 +94,28 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
     setResult({ tone: "info", title: "הדרישה נדחתה", line: `${r.requester} · ${branchLabel(r.branch)}`, detail: ils(r.amount) });
   }
 
-  function openCustom(r: VoucherRequest) {
+  // Stock cannot supply the request as asked: nothing is allocated, and the admin picks from what exists.
+  async function offerAlternative(r: VoucherRequest) {
+    const fresh = await refresh().catch(() => summary);
+    const cards = alternativeApproval(r, stockFromSummary(fresh?.denominations));
+    const total = fuelSizesAmount(cards);
+    setCustomCounts(countsFromSizes(cards));
+    setCustomNote(
+      total >= r.amount
+        ? "אין במלאי את כל הגדלים שביקשו. הצענו שוברים אחרים באותו סכום, ואפשר לשנות אותם לפני האישור."
+        : total > 0
+          ? `מהמלאי אפשר להרכיב ${ils(total)} מתוך ${ils(r.amount)} שביקשו. אפשר לאשר את זה או לשנות.`
+          : "אין כרגע במלאי שוברים מסוג הדלק שביקשו.",
+    );
     setCustomId(r.id);
-    // Opens with the sizes that were requested; the admin changes them to what exists.
-    setCustomCounts(countsFromSizes(r.sizes));
+  }
+
+  function openCustom(r: VoucherRequest) {
+    if (r.sizes && summary && !fitsStock(r.sizes, customStock)) return void offerAlternative(r);
+    // Opens with what was requested; the admin changes it to what exists.
+    setCustomCounts(countsFromSizes(r.sizes ?? alternativeApproval(r, customStock)));
+    setCustomNote(null);
+    setCustomId(r.id);
   }
 
   const actions = (r: VoucherRequest, mobile = false) =>
@@ -200,7 +222,7 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
         />
       </TableCard>
 
-      <Modal open={!!customReq} onClose={closeCustom} title="אישור סכום אחר" size="lg">
+      <Modal open={!!customReq} onClose={closeCustom} title={customNote ? "בחירת שוברים מהמלאי הקיים" : "אישור סכום אחר"} size="lg">
         {customReq ? (
           <form
             className="flex flex-col gap-3.5"
@@ -215,9 +237,10 @@ export function PendingRequests({ readOnly = false }: { readOnly?: boolean } = {
               <KV label="סכום מבוקש"><span className="ds-num font-bold">{ils(customReq.amount)}</span></KV>
               <KV label="סוג דלק">{fuelSplit(customReq)}</KV>
             </div>
+            {customNote ? <p role="status" className="m-0 rounded-lg bg-pending-bg px-3 py-2 text-sm font-semibold text-pending-fg">{customNote}</p> : null}
             <SizePicker idPrefix="approve" counts={customCounts} onCounts={setCustomCounts} stock={customStock} />
             <p className="m-0 text-sm text-slate-600">
-              סה״כ לאישור: <span className="ds-num font-bold text-navy-900">{ils(customTotal)}</span>
+              סה״כ לאישור: <span className="ds-num font-bold text-navy-900">{ils(customTotal)}</span> מתוך {ils(customReq.amount)} שביקשו
             </p>
             <div className="grid grid-cols-2 gap-2">
               <button type="submit" className={`${okBtn} min-h-11`}>אישור בסכום זה</button>

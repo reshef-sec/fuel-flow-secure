@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { countsFromSizes, emptySizeCounts, pickBySize, readSizeCounts, sizesFor, sizesText, stockFromSummary } from "./allocationSizes";
+import { alternativeApproval, countsFromSizes, emptySizeCounts, fitsStock, fuelSizesAmount, pickBySize, readSizeCounts, sizesFor, sizesText, stockFromSummary } from "./allocationSizes";
 
 const card = (serial: string, amount: number) => ({ serial, amount });
 const pools = {
@@ -52,5 +52,42 @@ describe("requests by voucher size", () => {
     assert.deepEqual(r.split, { "בנזין": 20000, "סולר": 300 });
     assert.deepEqual(countsFromSizes(r.sizes), c);
     assert.equal(sizesText({ 50: 2, 500: 3 }), "3×500 + 2×50");
+  });
+});
+
+describe("alternative cards when stock is short", () => {
+  const ask = (benzine: Record<number, number>, diesel: Record<number, number> = {}) => ({
+    sizes: { "בנזין": benzine, "סולר": diesel },
+    amount: 0,
+  });
+
+  it("keeps the requested cards that exist and tops up to the same amount", () => {
+    const stock = { "בנזין": { 500: 1, 100: 10, 50: 4 }, "סולר": {} };
+    const r = alternativeApproval(ask({ 500: 2 }), stock);
+    assert.deepEqual(r["בנזין"], { 500: 1, 100: 5 });
+    assert.equal(fuelSizesAmount(r), 1000);
+    assert.ok(fitsStock(r, stock));
+    assert.ok(!fitsStock(ask({ 500: 2 }).sizes, stock));
+  });
+
+  it("finds the exact amount even when keeping a requested card would block it", () => {
+    const r = alternativeApproval(ask({ 50: 3 }), { "בנזין": { 50: 2, 100: 1 }, "סולר": {} });
+    assert.equal(fuelSizesAmount(r), 150);
+  });
+
+  it("offers as much as exists when the amount cannot be reached", () => {
+    const r = alternativeApproval(ask({ 500: 2 }, { 100: 3 }), { "בנזין": { 100: 4 }, "סולר": {} });
+    assert.deepEqual(r, { "בנזין": { 100: 4 }, "סולר": {} });
+  });
+
+  it("never swaps one fuel for the other", () => {
+    const r = alternativeApproval(ask({}, { 500: 1 }), { "בנזין": { 500: 9 }, "סולר": {} });
+    assert.equal(fuelSizesAmount(r), 0);
+  });
+
+  it("older requests use their fuel amounts, or petrol when there is no split", () => {
+    const stock = { "בנזין": { 100: 5 }, "סולר": { 100: 5 } };
+    assert.deepEqual(alternativeApproval({ benzineAmount: 100, dieselAmount: 200, amount: 300 }, stock), { "בנזין": { 100: 1 }, "סולר": { 100: 2 } });
+    assert.deepEqual(alternativeApproval({ amount: 300 }, stock), { "בנזין": { 100: 3 }, "סולר": {} });
   });
 });
