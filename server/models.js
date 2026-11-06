@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 import { randomUUID } from "node:crypto";
 import { pazMatchKey } from "./lib/canonical.js";
 import { learningContext } from "./lib/learningContext.js";
+import { forgetAllLinks, forgetLink } from "./lib/linkStatusCache.js";
 
 const { Schema } = mongoose;
 const uuid = { type: String, default: () => randomUUID() };
@@ -177,6 +178,15 @@ const workerLinkSchema = new Schema({
 }, opts("worker_links"));
 workerLinkSchema.index({ id: 1 }, { unique: true });
 workerLinkSchema.index({ branch: 1 });
+// Every write to a link drops its cached public status, before and after the write.
+const LINK_WRITES = ["updateOne", "updateMany", "findOneAndUpdate", "findOneAndDelete", "deleteOne", "deleteMany", "replaceOne"];
+function dropCachedStatus() {
+  const id = this.getFilter?.()?.id;
+  if (typeof id === "string") forgetLink(id); else forgetAllLinks();
+}
+workerLinkSchema.pre(LINK_WRITES, { document: false, query: true }, dropCachedStatus);
+workerLinkSchema.post(LINK_WRITES, { document: false, query: true }, dropCachedStatus);
+workerLinkSchema.post("save", function () { forgetLink(this.id); });
 
 const signatureSchema = new Schema({
   id: uuid, link_id: str(), branch: str(), supervisor_id: str(), employee_name: str(),

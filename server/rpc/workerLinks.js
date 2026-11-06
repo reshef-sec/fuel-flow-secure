@@ -13,8 +13,12 @@ import { Voucher, VoucherCode, WorkerLink, SignatureArchive } from "../models.js
 import { withTransaction } from "../db.js";
 import { STATUS } from "../lib/canonical.js";
 import { forbidden, unauthorized, HttpError } from "../errors.js";
+import { cachedLink, forgetLink, rememberLink } from "../lib/linkStatusCache.js";
 
 const MAX_ATTEMPTS = 3;
+/** Only what each public read needs (lean, projected: these endpoints take the employee traffic). */
+const STATUS_FIELDS = { _id: 0, total: 1, worker_id: 1, employee_name: 1, created_at: 1, created_on: 1, failed_attempts: 1, locked: 1 };
+const WALLET_FIELDS = { _id: 0, id: 1, serials: 1, revealed_serials: 1, worker_id: 1, phone: 1, created_at: 1, created_on: 1, failed_attempts: 1, locked: 1 };
 /** Text parameter coercion: never pass caller objects into a query (NoSQL injection). */
 const text = (v) => (typeof v === "string" ? v : typeof v === "number" ? String(v) : null);
 
@@ -96,11 +100,18 @@ async function workerGate(l, workerId, phone, session) {
 async function workerLinkStatus({ p_id }) {
   const id = text(p_id);
   if (id == null || !/^\d{4,12}$/.test(id)) return { exists: false };
-  const l = await WorkerLink.findOne({ id }).lean();
-  if (!l) return { exists: false };
+  let l = cachedLink(id);
+  if (!l) {
+    const doc = await WorkerLink.findOne({ id }, STATUS_FIELDS).lean();
+    if (!doc) return { exists: false }; // unknown ids are not cached: a new link must work at once
+    // The national id only decides "signed"; it is not kept in memory.
+    const { worker_id: workerId, ...rest } = doc;
+    l = { ...rest, signed: workerId != null };
+    rememberLink(id, l);
+  }
   if (linkExpired(l)) return { exists: true, state: "expired" };
   if (isLocked(l)) return { exists: true, state: "locked" };
-  return { exists: true, state: "ok", total: l.total, signed: l.worker_id != null, employee_name: l.employee_name ?? "" };
+  return { exists: true, state: "ok", total: l.total, signed: l.signed, employee_name: l.employee_name ?? "" };
 }
 
 async function openWorkerWallet({ p_id, p_worker_id, p_phone }) {
@@ -108,12 +119,21 @@ async function openWorkerWallet({ p_id, p_worker_id, p_phone }) {
   if (id == null) return { ok: false, state: "invalid" };
   const workerId = text(p_worker_id);
   const phone = text(p_phone);
-  return withTransaction(async (session) => {
-    const l = await WorkerLink.findOne({ id }).session(session).lean();
+  // The usual visit (right person, nothing to update) is a plain read, without a transaction.
+  const seen = await WorkerLink.findOne({ id }, WALLET_FIELDS).lean();
+  if (seen && !linkExpired(seen) && !isLocked(seen) && !Number(seen.failed_attempts ?? 0)
+    && seen.worker_id != null && seen.phone != null && seen.worker_id === workerId && seen.phone === phone) {
+    return { ok: true, state: "ok", attempts_left: MAX_ATTEMPTS, codes: await walletCodes(seen) };
+  }
+  // Anything else may write (failed-attempt count, lock), so it goes through the full check.
+  const result = await withTransaction(async (session) => {
+    const l = await WorkerLink.findOne({ id }, WALLET_FIELDS).session(session).lean();
     const denied = await workerGate(l, workerId, phone, session);
     if (denied) return denied;
     return { ok: true, state: "ok", attempts_left: MAX_ATTEMPTS, codes: await walletCodes(l, session) };
   });
+  forgetLink(id);
+  return result;
 }
 
 /** Reveals one card of the link, permanently: the code is sent now and on every later visit. */
@@ -123,8 +143,8 @@ async function revealWorkerCode({ p_id, p_worker_id, p_phone, p_serial }) {
   if (id == null || serial == null) return { ok: false, state: "invalid" };
   const workerId = text(p_worker_id);
   const phone = text(p_phone);
-  return withTransaction(async (session) => {
-    const l = await WorkerLink.findOne({ id }).session(session).lean();
+  const result = await withTransaction(async (session) => {
+    const l = await WorkerLink.findOne({ id }, WALLET_FIELDS).session(session).lean();
     const denied = await workerGate(l, workerId, phone, session);
     if (denied) return denied;
     if (!(l.serials ?? []).includes(serial)) return { ok: false, state: "invalid" };
@@ -133,6 +153,8 @@ async function revealWorkerCode({ p_id, p_worker_id, p_phone, p_serial }) {
     await WorkerLink.updateOne({ id }, { $addToSet: { revealed_serials: serial } }, { session });
     return { ok: true, state: "ok", code: { ...card, revealed: true } };
   });
+  forgetLink(id);
+  return result;
 }
 
 async function signWorkerLink({ p_id, p_worker_id, p_phone, p_full_name, p_signature }) {
@@ -146,7 +168,7 @@ async function signWorkerLink({ p_id, p_worker_id, p_phone, p_full_name, p_signa
     || signature == null || !signature.startsWith("data:image/png;base64,") || signature.length > 800000) {
     return { ok: false };
   }
-  return withTransaction(async (session) => {
+  const result = await withTransaction(async (session) => {
     const l = await WorkerLink.findOne({ id }).session(session).lean();
     if (!l || l.worker_id != null || linkExpired(l) || isLocked(l)) return { ok: false };
     const serials = (l.serials ?? []).filter((s) => typeof s === "string");
@@ -166,6 +188,9 @@ async function signWorkerLink({ p_id, p_worker_id, p_phone, p_full_name, p_signa
     }], { session });
     return { ok: true, codes: await walletCodes({ ...l, serials }, session) };
   });
+  // Again after commit: a status read during the transaction may have cached the old state.
+  forgetLink(id);
+  return result;
 }
 
 /** Admin, or the staff member who issued the link (worker_links.supervisor_id). */
@@ -188,7 +213,7 @@ async function unlockWorkerLink({ p_id }, { user }) {
 
 async function unlockVoucherLink({ p_link_id }, { user }) {
   const id = text(p_link_id);
-  return withTransaction(async (session) => {
+  const result = await withTransaction(async (session) => {
     const l = id == null ? null : await WorkerLink.findOne({ id }, { supervisor_id: 1, serials: 1 }).session(session).lean();
     if (!l) throw new HttpError(404, "הלינק לא נמצא", "not_found");
     assertCanUnlock(user, l.supervisor_id);
@@ -197,6 +222,8 @@ async function unlockVoucherLink({ p_link_id }, { user }) {
       { $set: { failed_attempts: 0, is_locked: false } }, { session });
     return true;
   });
+  forgetLink(id);
+  return result;
 }
 
 export default {

@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadUser } from "./auth.js";
 import { HttpError } from "./errors.js";
+import { createRateLimits } from "./lib/rateLimits.js";
 import authRoutes from "./routes/auth.js";
 import accountRoutes from "./routes/accounts.js";
 import tableRoutes from "./routes/table.js";
@@ -19,8 +20,9 @@ import learningRoutes, { learningRouter } from "./routes/learning.js";
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 /** Builds the Express app (no listening / DB connection — tests reuse this). */
-export function createApp({ staticDir = path.resolve(here, "../dist/client") } = {}) {
+export function createApp({ staticDir = path.resolve(here, "../dist/client"), rateLimits } = {}) {
   const app = express();
+  const limits = createRateLimits(rateLimits);
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
   app.use(helmet({
@@ -58,7 +60,9 @@ export function createApp({ staticDir = path.resolve(here, "../dist/client") } =
     if (!allowed.has(originHost.toLowerCase())) return next(new HttpError(403, "Cross-origin request blocked"));
     next();
   });
+  app.use("/api", limits.publicApi);
   app.use("/api", loadUser);
+  app.use("/api", limits.internalApi);
   // Owner's requests run against the learning_* collections while סביבת לימוד is active.
   app.use("/api", learningRouter);
 
