@@ -67,6 +67,8 @@ const POLICIES = {
   },
 };
 
+/** Largest single page of a table read. */
+const MAX_ROWS = 5000;
 const OPS = new Set(["eq", "neq", "gt", "gte", "lt", "lte", "in", "is"]);
 const COL = /^[a-z_][a-z0-9_]*$/;
 
@@ -129,8 +131,8 @@ router.post("/:table", requireAuth, ah(async (req, res) => {
       if (q.order?.col && COL.test(q.order.col)) cursor = cursor.sort({ [q.order.col]: q.order.asc === false ? -1 : 1, _id: 1 });
       else cursor = cursor.sort({ _id: 1 });
       const from = Math.max(0, Number(q.range?.[0] ?? 0));
-      const to = q.range ? Number(q.range[1]) : from + Math.min(Number(q.limit ?? 1000), 1000) - 1;
-      const limit = Math.min(1000, Math.max(0, to - from + 1), q.limit ? Number(q.limit) : 1000);
+      const to = q.range ? Number(q.range[1]) : from + Math.min(Number(q.limit ?? 1000), MAX_ROWS) - 1;
+      const limit = Math.min(MAX_ROWS, Math.max(0, to - from + 1), q.limit ? Number(q.limit) : MAX_ROWS);
       const rows = await cursor.skip(from).limit(limit);
       return res.json({ data: rows.map((r) => shape(r, policy, q.columns)) });
     }

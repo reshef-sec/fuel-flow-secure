@@ -89,6 +89,7 @@ const b2bSchema = new Schema({
 b2bSchema.index({ id: 1 }, { unique: true });
 b2bSchema.index({ standard: 1, client_code: 1 });
 b2bSchema.index({ is_active: 1 });
+b2bSchema.index({ created_at: 1 });
 
 /** מאגר רכב פרטי (private vehicles). Identity = client_id + site_id. */
 const regularSchema = new Schema({
@@ -101,6 +102,7 @@ const regularSchema = new Schema({
 regularSchema.index({ id: 1 }, { unique: true });
 regularSchema.index({ client_id: 1, site_id: 1 }, { unique: true });
 regularSchema.index({ is_active: 1 });
+regularSchema.index({ created_at: 1 });
 
 /** Physical fuel cards. Redemption codes live separately in voucher_codes. */
 const voucherSchema = new Schema({
@@ -128,6 +130,8 @@ voucherSchema.index({ fuel_type: 1, amount: 1, status: 1, branch: 1 });
 voucherSchema.index({ supervisor_id: 1 });
 voucherSchema.index({ paz_match_key: 1 });
 voucherSchema.index({ link_id: 1 });
+// The staff app reads whole tables in created_at order.
+voucherSchema.index({ created_at: 1 });
 /**
  * paz_match_key mirrors the SQL expression index paz_card_match_key(card_number), where
  * card_number was GENERATED ALWAYS AS (serial). Here card_number may be unset on rows
@@ -169,6 +173,7 @@ const requestSchema = new Schema({
   benzine_amount: { type: Number, default: null }, diesel_amount: { type: Number, default: null },
 }, opts("voucher_requests"));
 requestSchema.index({ id: 1 }, { unique: true });
+requestSchema.index({ created_at: 1 });
 requestSchema.index({ branch: 1 });
 
 const workerLinkSchema = new Schema({
@@ -184,6 +189,7 @@ const workerLinkSchema = new Schema({
 }, opts("worker_links"));
 workerLinkSchema.index({ id: 1 }, { unique: true });
 workerLinkSchema.index({ branch: 1 });
+workerLinkSchema.index({ created_at: 1 });
 // Every write to a link drops its cached public status, before and after the write.
 const LINK_WRITES = ["updateOne", "updateMany", "findOneAndUpdate", "findOneAndDelete", "deleteOne", "deleteMany", "replaceOne"];
 function dropCachedStatus() {

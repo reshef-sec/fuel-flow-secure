@@ -1,4 +1,16 @@
 /**
+ * A learning copy from an older version may be incomplete (its users can be gone), and an owner left
+ * inside it would see that instead of the real system. Return them to real data; the next
+ * activation rebuilds the copy.
+ */
+export async function leaveStaleLearning(db, seedVersion) {
+  const meta = await db.collection("learning_meta").findOne({ _id: "seed" });
+  if (meta?.version !== seedVersion) {
+    await db.collection("profiles").updateMany({ learning_mode: true }, { $set: { learning_mode: false } });
+  }
+}
+
+/**
  * Moves users from national id to a stable internal id and email. Runs at startup, before indexes
  * are built, and is safe to repeat. Works on the raw collections because the models no longer
  * have national_id. The old values stay stored (unused and never sent to the browser).

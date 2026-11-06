@@ -7,7 +7,7 @@ import { startTestServer, stopTestServer, resetDb, loginAs, anon } from "./helpe
 import { AppUser, Profile, Voucher } from "../models.js";
 import { isDevToolsOwner } from "../auth.js";
 import { transport } from "../lib/microsoftAuth.js";
-import { migrateUserIdentity } from "../lib/migrateUsers.js";
+import { leaveStaleLearning, migrateUserIdentity } from "../lib/migrateUsers.js";
 
 const CONSUMERS = "9188040d-6c67-4c5b-b112-36a304b66dad";
 const ORG = "aaaaaaaa-1111-4222-8333-bbbbbbbbbbbb";
@@ -150,6 +150,25 @@ describe("owner check", () => {
 });
 
 describe("startup migration", () => {
+  it("returns an owner from an outdated learning copy to real data, and leaves a current one alone", async () => {
+    const db = mongoose.connection.db;
+    const owner = await loginAs("admin");
+    const on = () => Profile.updateOne({ id: owner.profile.id }, { $set: { learning_mode: true } });
+    const mode = async () => (await Profile.findOne({ id: owner.profile.id }).lean()).learning_mode;
+    const meta = db.collection("learning_meta");
+
+    await on();
+    await meta.updateOne({ _id: "seed" }, { $set: { version: 5 } }, { upsert: true });
+    await leaveStaleLearning(db, 5);
+    assert.equal(await mode(), true);
+    await leaveStaleLearning(db, 6);
+    assert.equal(await mode(), false);
+    await on();
+    await meta.deleteOne({ _id: "seed" });
+    await leaveStaleLearning(db, 6);
+    assert.equal(await mode(), false);
+  });
+
   it("gives old users a stable id, keeps their logins and is safe to repeat", async () => {
     const db = mongoose.connection.db;
     const users = db.collection("app_users");
