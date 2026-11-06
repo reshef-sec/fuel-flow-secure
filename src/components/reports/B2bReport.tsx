@@ -43,7 +43,6 @@ const detailColumns: ReportColumn<DetailRow>[] = [
   { header: "שם חשבון", key: "accountName", type: "text", get: (v) => v.accountName ?? v.siteName ?? "—" },
   { header: "תקן", key: "standard", type: "text", get: (v) => v.standard ?? v.standardName ?? "—" },
   { header: "שם עובד", key: "workerName", type: "text", get: (v) => v.workerName ?? "—" },
-  { header: "ת.ז", key: "workerId", type: "text", get: (v) => v.workerId ?? "—" },
   { header: "טלפון", key: "workerPhone", type: "text", get: (v) => v.workerPhone ?? "—" },
   { header: "תאריך מסירה", key: "delivered", type: "date", get: (v) => deliveredDate(v) },
   { header: "סיבת הפקה", key: "reason", type: "text", get: (v) => v.reason ?? "—" },
@@ -163,7 +162,6 @@ export function B2bReport({ filters, generatedBy }: { filters: ReportFilterValue
                     <td>{v.accountName ?? v.siteName ?? "—"}</td>
                     <td><span className="ds-num">{v.standard ?? v.standardName ?? "—"}</span></td>
                     <td>{v.workerName ?? "—"}</td>
-                    <td><span className="ds-num">{v.workerId ?? "—"}</span></td>
                     <td><span className="ds-num" dir="ltr">{v.workerPhone ?? "—"}</span></td>
                     <td><span className="ds-num">{deliveredDate(v)}</span></td>
                     <td>{v.reason ?? "—"}</td>

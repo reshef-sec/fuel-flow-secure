@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
 
 import { Logo } from "@/design-system/delek-1ea111";
@@ -213,7 +214,8 @@ function RecordDialog({ record, onClose }: { record: SignatureRecord; onClose: (
     ["סכום השוברים", <span className="ds-num">{record.total_amount.toLocaleString("he-IL")} ₪</span>],
     ["מספר שוברים", <span className="ds-num">{record.serials.length}</span>],
   ];
-  return (
+  // On the page body, outside the app shell: printing shows this form alone (see styles.css).
+  return createPortal(
     <div className="signature-print fixed inset-0 z-[70] flex items-end justify-center overflow-y-auto print:static print:block min-[900px]:items-center min-[900px]:p-6">
       <button type="button" aria-label="סגירת הטופס" onClick={onClose} className="fixed inset-0 cursor-pointer bg-navy-900/55 print:hidden" />
       <div
@@ -268,6 +270,7 @@ function RecordDialog({ record, onClose }: { record: SignatureRecord; onClose: (
           </p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

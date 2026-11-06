@@ -74,7 +74,6 @@
 }
 
 @media print {
-  body:has(.signature-print) * { visibility: hidden; }
-  .signature-print, .signature-print * { visibility: visible; }
-  .signature-print { position: absolute; inset: 0; }
+  /* The signature form is rendered directly under <body>: print it, and nothing else. */
+  body:has(> .signature-print) > :not(.signature-print) { display: none !important; }
 }

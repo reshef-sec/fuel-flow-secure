@@ -29,7 +29,6 @@ const columns: ReportColumn<Row>[] = [
   { header: "שויך ל", key: "assigned", type: "text", get: (v) => formatAssignment(v) },
   { header: "לקוח", key: "client", type: "text", get: (v) => v.client ?? "—" },
   { header: "שם עובד", key: "workerName", type: "text", get: (v) => v.workerName ?? "—" },
-  { header: "ת.ז", key: "workerId", type: "text", get: (v) => v.workerId ?? "—" },
   { header: "טלפון", key: "workerPhone", type: "text", get: (v) => v.workerPhone ?? "—" },
   { header: "סיבת הפקה", key: "reason", type: "text", get: (v) => v.reason ?? "—" },
   { header: "סטטוס", key: "status", type: "text", get: (v) => statusDisplay(v.status).label },
@@ -106,7 +105,6 @@ export function PrivateReport({
                 <td>{formatAssignment(v)}</td>
                 <td>{v.client ?? "—"}{v.inactive ? <InactiveClientTag /> : null}</td>
                 <td>{v.workerName ?? "—"}</td>
-                <td><span className="ds-num">{v.workerId ?? "—"}</span></td>
                 <td><span className="ds-num" dir="ltr">{v.workerPhone ?? "—"}</span></td>
                 <td>{v.reason ?? "—"}</td>
                 <td><StatusBadge status={v.status} size="sm" /></td>
