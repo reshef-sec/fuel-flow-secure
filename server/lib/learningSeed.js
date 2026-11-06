@@ -310,6 +310,8 @@ export async function seedLearning({ owner } = {}) {
     const ok = BATCHES.slice(0, 5).filter((b) => b.daysAgo >= daysAgo + margin);
     return ok.length ? R.pick(ok) : BATCHES[0];
   };
+  /** Unissued stock is under 3 months old; older cards expire (see lib/expireStock.js). */
+  const recentBatch = () => R.weighted([[BATCHES[2], 20], [BATCHES[3], 40], [BATCHES[4], 40]]);
   const card = (fuel, amount, batch, extra = {}) => {
     const serial = `${batch.prefix}${String(batch.next).padStart(batch.width, "0")}`;
     batch.next += 1;
@@ -455,14 +457,14 @@ export async function seedLearning({ owner } = {}) {
     const requester = requesterOf(b, bi === 1);
     const base = { branch: b, requester: requester.name, approver: ownerName, updated_on: day(allocAt) };
     for (const [fuel, amount, n] of BRANCH_STOCK) {
-      for (let k = 0; k < n; k += 1) { card(fuel, amount, batchBefore(allocDay, 3), { ...base }); sum[fuel] += amount; }
+      for (let k = 0; k < n; k += 1) { card(fuel, amount, recentBatch(), { ...base }); sum[fuel] += amount; }
     }
     for (const sup of supervisorsOf(b).slice(0, 3)) {
       const supAt = at(allocDay - R.int(1, 4), R.int(9, 16), R.int(0, 59));
       const supSum = { "בנזין": 0, "סולר": 0 };
       for (const [fuel, amount, n] of SUP_STOCK) {
         for (let k = 0; k < n; k += 1) {
-          card(fuel, amount, batchBefore(allocDay, 3), { ...base, supervisor: sup.name, supervisor_id: sup.id, updated_on: day(supAt) });
+          card(fuel, amount, recentBatch(), { ...base, supervisor: sup.name, supervisor_id: sup.id, updated_on: day(supAt) });
           sum[fuel] += amount; supSum[fuel] += amount;
         }
       }
@@ -523,12 +525,17 @@ export async function seedLearning({ owner } = {}) {
   for (const [fuel, amount, n] of CENTRAL) {
     for (let k = 0; k < n; k += 1) {
       const batch = forcedZeros > 0 && k % 7 === 3 ? (forcedZeros -= 1, BATCHES[5])
-        : R.weighted([[BATCHES[1], 10], [BATCHES[2], 20], [BATCHES[3], 35], [BATCHES[4], 35]]);
+        : recentBatch();
       card(fuel, amount, batch);
     }
   }
   const centralBalance = vouchers.filter((v) => v.branch === MAIN_POOL && v.status === STATUS.AVAILABLE)
     .reduce((t, v) => t + v.amount, 0);
+
+  // Cards that passed 3 months without being issued.
+  for (let k = 0; k < 14; k += 1) {
+    card(k % 3 ? "בנזין" : "סולר", 100, BATCHES[k % 2], { status: STATUS.BLOCKED, blocked_at: at(5, 3, 0), updated_on: day(at(5, 3, 0)) });
+  }
 
   // ── 5. activity log: every event of the last 3 weeks ──
   const log = [];
@@ -617,7 +624,7 @@ export async function seedLearning({ owner } = {}) {
 }
 
 /** Bumped whenever the dataset's shape changes; an older learning copy is re-seeded on next activation. */
-export const SEED_VERSION = 4;
+export const SEED_VERSION = 5;
 
 /** Drops Mongo internals so a real document can be copied into its learning twin. */
 function stripDoc(doc) {

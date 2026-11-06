@@ -121,6 +121,8 @@ const voucherSchema = new Schema({
   driver_name: str(), standard_name: str(), employee_name: str(), employee_id: str(),
   employee_phone: str(), issue_reason: str(),
   issued_at: { type: Date, default: null }, expires_at: { type: Date, default: null },
+  /** Set when the card expired unissued, 3 months after entering stock (lib/expireStock.js). */
+  blocked_at: { type: Date, default: null },
   redeemed_at: { type: Date, default: null },
   supervisor_id: str(), card_number: str(), paz_match_key: str(),
   failed_attempts: { type: Number, default: 0 }, is_locked: { type: Boolean, default: false },
@@ -131,6 +133,7 @@ voucherSchema.index({ fuel_type: 1, amount: 1, status: 1, branch: 1 });
 voucherSchema.index({ supervisor_id: 1 });
 voucherSchema.index({ paz_match_key: 1 });
 voucherSchema.index({ link_id: 1 });
+voucherSchema.index({ status: 1, created_at: 1 });
 // The staff app reads whole tables in created_at order.
 voucherSchema.index({ created_at: 1 });
 /**

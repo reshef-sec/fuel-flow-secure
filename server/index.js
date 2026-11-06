@@ -1,5 +1,6 @@
 import { createApp } from "./app.js";
 import { connectDb } from "./db.js";
+import { scheduleStockExpiry } from "./lib/expireStock.js";
 
 const port = Number(process.env.PORT ?? 3000);
 
@@ -15,6 +16,7 @@ if (process.env.JWT_SECRET.length < 32) {
 
 try {
   await connectDb();
+  scheduleStockExpiry();
   // Bind on all interfaces so Render's proxy can reach the service on $PORT.
   createApp().listen(port, "0.0.0.0", () => console.log(`רשף ביטחון server listening on :${port}`));
 } catch (err) {

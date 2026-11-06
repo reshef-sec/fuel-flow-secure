@@ -78,7 +78,7 @@ describe("learning demo seed", () => {
     // Cards: only Paz denominations / fuels / three statuses; every card has a code.
     const vouchers = await L.Voucher.find().lean();
     const codes = new Map((await L.VoucherCode.find().lean()).map((x) => [x.serial, x]));
-    const allowedStatus = new Set([STATUS.AVAILABLE, STATUS.ISSUED, STATUS.REDEEMED]);
+    const allowedStatus = new Set([STATUS.AVAILABLE, STATUS.ISSUED, STATUS.REDEEMED, STATUS.BLOCKED]);
     const profileIds = new Set((await L.Profile.find({}, { id: 1 }).lean()).map((p) => p.id));
     for (const v of vouchers) {
       assert.ok(ALLOWED[v.fuel_type]?.includes(v.amount), `${v.serial}: ${v.fuel_type} ${v.amount}`);

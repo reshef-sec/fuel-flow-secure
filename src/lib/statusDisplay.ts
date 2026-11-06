@@ -3,8 +3,8 @@
  * Pure + framework-free so it can be used by React components, Excel exports and tests.
  * Stored values are NEVER changed — only how they are labelled and coloured.
  *
- *   Cards:    טרם שומש → "זמין" (green) · הוקצה לעובד (orange) · מומש סופית (red)
- *             legacy "מומש בפועל" → shown as מומש סופית; legacy "חסום" → neutral grey (never hidden)
+ *   Cards:    טרם שומש → "זמין" (green) · הוקצה לעובד (orange) · מומש סופית (red) · חסום (grey)
+ *             legacy "מומש בפועל" → shown as מומש סופית
  *   Links:    ממתין לחתימה (blue) · נחתם (green) · נעול (red); "פג תוקף" displays as ממתין לחתימה
  *   Vehicles: פעיל (green) · לא פעיל (red)
  *   Requests: ממתין לאישור (amber) · אושר (green) · נדחה (red)
@@ -23,6 +23,7 @@ const MAP: Record<string, StatusDisplay> = {
   "הוקצה לעובד": { label: "הוקצה לעובד", tone: "issued" },
   "מומש סופית": { label: "מומש סופית", tone: "redeemed" },
   "מומש בפועל": { label: "מומש סופית", tone: "redeemed" },
+  "חסום": { label: "חסום", tone: "muted" },
   // Produced links
   "ממתין לחתימה": { label: "ממתין לחתימה", tone: "waiting" },
   "פג תוקף": { label: "ממתין לחתימה", tone: "waiting" },
@@ -37,14 +38,14 @@ const MAP: Record<string, StatusDisplay> = {
   "נדחה": { label: "נדחה", tone: "redeemed" },
 };
 
-/** Label + tone for a stored status. Unknown/legacy values (e.g. "חסום") keep their text in neutral grey. */
+/** Label + tone for a stored status. Unknown values keep their text in neutral grey. */
 export function statusDisplay(status: string | null | undefined): StatusDisplay {
   const key = String(status ?? "").trim();
   return MAP[key] ?? { label: key || "—", tone: "muted" };
 }
 
-/** Card statuses offered in filters/legends (stored values, in display order). "חסום" is intentionally absent. */
-export const CARD_STATUS_FILTERS = ["טרם שומש", "הוקצה לעובד", "מומש סופית"] as const;
+/** Card statuses offered in filters/legends (stored values, in display order). */
+export const CARD_STATUS_FILTERS = ["טרם שומש", "הוקצה לעובד", "מומש סופית", "חסום"] as const;
 
 /** Produced-link statuses offered in filters/legends. */
 export const LINK_STATUS_FILTERS = ["ממתין לחתימה", "נחתם", "נעול"] as const;

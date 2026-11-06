@@ -12,6 +12,7 @@
  */
 import { Voucher, VoucherCode, WorkerLink, AppUser, Profile, InventoryLock } from "../models.js";
 import { scopedLockId } from "../lib/learningContext.js";
+import { blockExpiredStock } from "../lib/expireStock.js";
 import { withTransaction } from "../db.js";
 import { badRequest, forbidden } from "../errors.js";
 import { logAction } from "../lib/audit.js";
@@ -162,6 +163,7 @@ async function issueVoucherToWorker(params, { user }) {
   if (!role.admin && canonicalBranch(p_branch) !== canonicalBranch(callerBranch)) throw forbidden("אין הרשאה לסניף זה");
   const link = validateLink(p_link);
   if (!Array.isArray(p_items) || p_items.length === 0) throw badRequest("יש לבחור שוברים");
+  await blockExpiredStock();
 
   const callerCanon = canonicalBranch(callerBranch);
   const inScope = (v) => {
@@ -260,6 +262,7 @@ async function transferVoucherStock(params, { user }) {
   if (!role.admin && canonicalBranch(p_branch) !== canonicalBranch(callerBranch)) throw forbidden("אין הרשאה לסניף זה");
   if (p_link == null && role.sup) throw forbidden("אין הרשאה להקצאה");
   if (!Array.isArray(p_items) || p_items.length === 0) throw badRequest("יש לבחור שוברים");
+  await blockExpiredStock();
 
   let targetId = null;
   if (p_supervisor != null) {
