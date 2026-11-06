@@ -132,7 +132,7 @@ for (const k of ["admin2", "hf", "sup", "viewer"]) {
 const demo = await owner.rpc("generate_demo_data");
 check("owner: demo seeding creates cards", demo.status === 200 && demo.data?.vouchers_created > 0, fmt(demo));
 const seeded = await owner.db("vouchers", { op: "select" });
-check("demo cards respect denominations", seeded.data?.length > 0 && seeded.data.every((v) => (v.fuel_type === "סולר" ? v.amount % 50 === 0 : v.amount % 100 === 0)));
+check("demo cards respect denominations", seeded.data?.length > 0 && seeded.data.every((v) => (v.fuel_type === "סולר" ? v.amount % 100 === 0 : v.amount % 50 === 0)));
 check("reset without exact confirmation → rejected", (await owner.rpc("reset_development_data", { p_confirmation: "איפוס" })).status !== 200);
 const reset = await owner.rpc("reset_development_data", { p_confirmation: "איפוס וניקוי נתונים" });
 check("owner: system reset succeeds", reset.status === 200, fmt(reset));
@@ -143,7 +143,7 @@ check("reset kept staff & branches", (await owner.db("app_users", { op: "select"
 sec("3a. Inventory import");
 const rows = [
   ...[1, 2, 3, 4, 5, 6].map((i) => ({ serial: `P100-${i}`, real_code: `RC-P${i}`, amount: 100, fuel_type: "בנזין" })),
-  ...[1, 2, 3, 4].map((i) => ({ serial: `D50-${i}`, real_code: `RC-D${i}`, amount: 50, fuel_type: "סולר" })),
+  ...[1, 2, 3, 4].map((i) => ({ serial: `D100-${i}`, real_code: `RC-D${i}`, amount: 100, fuel_type: "סולר" })),
   { serial: "000777", real_code: "RC-777", amount: 200, fuel_type: "בנזין" },
   { serial: "888", real_code: "RC-888", amount: 200, fuel_type: "בנזין" },
 ];
@@ -198,21 +198,21 @@ check("20 concurrent issuances for 6 cards → exactly 6 succeed", won.length ==
 check("zero duplicate card assignments", new Set(serials).size === serials.length && serials.length === 6, serials.join(","));
 check("losers get the shortage error (no inventory, no issuance)", race.filter((r) => r.status !== 200).every((r) => r.status === 400));
 
-const tr = await owner.rpc("transfer_voucher_stock", { p_items: [{ amount: 100, fuel_type: "סולר", serials: ["D50-1", "D50-2"] }], p_branch: "חיפה", p_supervisor: "כהן דני" });
+const tr = await owner.rpc("transfer_voucher_stock", { p_items: [{ amount: 200, fuel_type: "סולר", serials: ["D100-1", "D100-2"] }], p_branch: "חיפה", p_supervisor: "כהן דני" });
 check("admin allocates 2 diesel cards to חיפה / supervisor כהן דני", tr.status === 200, fmt(tr));
-const tr2 = await owner.rpc("transfer_voucher_stock", { p_items: [{ amount: 50, fuel_type: "סולר", serials: ["D50-3"] }], p_branch: "תל אביב" });
+const tr2 = await owner.rpc("transfer_voucher_stock", { p_items: [{ amount: 100, fuel_type: "סולר", serials: ["D100-3"] }], p_branch: "תל אביב" });
 check("admin allocates 1 diesel card to תל אביב", tr2.status === 200, fmt(tr2));
 const ser = (r) => (r.data ?? []).map((v) => v.serial).sort().join(",");
-check("branch manager חיפה sees only חיפה cards", ser(await U.hf.db("vouchers", { op: "select" })) === "D50-1,D50-2", ser(await U.hf.db("vouchers", { op: "select" })));
-check("branch manager תל אביב sees only תל אביב cards", ser(await U.ta.db("vouchers", { op: "select" })) === "D50-3", ser(await U.ta.db("vouchers", { op: "select" })));
-check("supervisor sees only cards assigned to them", ser(await U.sup.db("vouchers", { op: "select" })) === "D50-1,D50-2", ser(await U.sup.db("vouchers", { op: "select" })));
-await U.hf.db("vouchers", { op: "update", values: { status: "חסום" }, filters: [{ col: "serial", op: "eq", value: "D50-3" }] });
-check("branch manager cannot modify another branch's card", (await owner.db("vouchers", { op: "select", filters: [{ col: "serial", op: "eq", value: "D50-3" }] })).data?.[0]?.status === "טרם שומש");
-check("branch manager cannot issue for another branch → 403", (await issue(U.hf, [{ amount: 50, fuel_type: "סולר", details: REG }], "תל אביב", "730001")).status === 403);
-const supIssue = await issue(U.sup, [{ amount: 50, fuel_type: "סולר", details: REG }], "חיפה", "730002", "כהן דני");
+check("branch manager חיפה sees only חיפה cards", ser(await U.hf.db("vouchers", { op: "select" })) === "D100-1,D100-2", ser(await U.hf.db("vouchers", { op: "select" })));
+check("branch manager תל אביב sees only תל אביב cards", ser(await U.ta.db("vouchers", { op: "select" })) === "D100-3", ser(await U.ta.db("vouchers", { op: "select" })));
+check("supervisor sees only cards assigned to them", ser(await U.sup.db("vouchers", { op: "select" })) === "D100-1,D100-2", ser(await U.sup.db("vouchers", { op: "select" })));
+await U.hf.db("vouchers", { op: "update", values: { status: "חסום" }, filters: [{ col: "serial", op: "eq", value: "D100-3" }] });
+check("branch manager cannot modify another branch's card", (await owner.db("vouchers", { op: "select", filters: [{ col: "serial", op: "eq", value: "D100-3" }] })).data?.[0]?.status === "טרם שומש");
+check("branch manager cannot issue for another branch → 403", (await issue(U.hf, [{ amount: 100, fuel_type: "סולר", details: REG }], "תל אביב", "730001")).status === 403);
+const supIssue = await issue(U.sup, [{ amount: 100, fuel_type: "סולר", details: REG }], "חיפה", "730002", "כהן דני");
 check("supervisor issues from own stock", supIssue.status === 200, fmt(supIssue));
 check("supervisor cannot issue fuel they don't hold (shortage)", (await issue(U.sup, [{ amount: 100, fuel_type: "בנזין", details: REG }], "חיפה", "730003", "כהן דני")).status !== 200);
-check("supervisor cannot allocate stock → 403", (await U.sup.rpc("transfer_voucher_stock", { p_items: [{ amount: 50, fuel_type: "סולר", serials: ["D50-4"] }], p_branch: "חיפה" })).status === 403);
+check("supervisor cannot allocate stock → 403", (await U.sup.rpc("transfer_voucher_stock", { p_items: [{ amount: 100, fuel_type: "סולר", serials: ["D100-4"] }], p_branch: "חיפה" })).status === 403);
 const reqIns = await U.sup.db("voucher_requests", { op: "insert", values: { id: "e2e-req-1", requester: "כהן דני", branch: "חיפה", amount: 300, reason: "E2E" } });
 check("supervisor can submit a voucher request", reqIns.status === 200, fmt(reqIns));
 const notif = await owner.get(`/api/notifications?since=${encodeURIComponent(new Date(Date.now() - 60000).toISOString())}`);
@@ -221,8 +221,8 @@ check("admin is notified of the new request", notif.status === 200 && notif.body
 sec("2b. Viewer is strictly read-only");
 check("viewer reads all cards", (await U.viewer.db("vouchers", { op: "select" })).data?.length === 12);
 for (const [name, params] of [
-  ["issue_voucher_to_worker", { p_items: [{ amount: 50, fuel_type: "סולר", details: REG }], p_branch: "מאגר ראשי", p_link: link("740001") }],
-  ["transfer_voucher_stock", { p_items: [{ amount: 50, fuel_type: "סולר", serials: ["D50-4"] }], p_branch: "חיפה" }],
+  ["issue_voucher_to_worker", { p_items: [{ amount: 100, fuel_type: "סולר", details: REG }], p_branch: "מאגר ראשי", p_link: link("740001") }],
+  ["transfer_voucher_stock", { p_items: [{ amount: 100, fuel_type: "סולר", serials: ["D100-4"] }], p_branch: "חיפה" }],
   ["import_voucher_inventory", { p_rows: [{ serial: "V1", real_code: "x", amount: 100, fuel_type: "בנזין" }] }],
   ["store_voucher_codes", { p_codes: [] }],
   ["reconcile_redeemed_vouchers", { card_numbers: ["888"] }],
@@ -234,7 +234,7 @@ for (const [name, params] of [
 ]) check(`viewer RPC ${name} → 403`, (await U.viewer.rpc(name, params)).status === 403);
 for (const [t, body] of [
   ["branches", { op: "insert", values: { id: "x", name: "x" } }],
-  ["vouchers", { op: "update", values: { status: "חסום" }, filters: [{ col: "serial", op: "eq", value: "D50-4" }] }],
+  ["vouchers", { op: "update", values: { status: "חסום" }, filters: [{ col: "serial", op: "eq", value: "D100-4" }] }],
   ["voucher_requests", { op: "insert", values: { id: "v-req" } }],
   ["app_users", { op: "delete", filters: [{ col: "national_id", op: "eq", value: "300000005" }] }],
 ]) check(`viewer table ${t} ${body.op} → 403`, (await U.viewer.db(t, body)).status === 403);

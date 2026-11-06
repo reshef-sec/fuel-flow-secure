@@ -23,6 +23,7 @@ import { useAuthContext } from "@/lib/auth-context";
 import { userDisplayName } from "@/lib/userDisplay";
 import { useIsSuperAdmin } from "@/lib/superAdmin";
 import { signOut } from "@/lib/useAuth";
+import { getLearningPersona, setLearningPersona } from "@/lib/apiClient";
 import { RealtimeNotifications } from "@/components/layout/RealtimeNotifications";
 import { DemoChip, LearningBanner, LearningSwitch } from "@/components/learning/LearningMode";
 import { roleLabels, storedRole, useAppStore, useCurrentUser, type Role } from "@/store/appStore";
@@ -78,7 +79,16 @@ export function InternalLayout({ title, children }: { title: string; children: R
   const learningOn = profile?.learning_mode === true;
   useEffect(() => setLearningActive(learningOn), [learningOn, setLearningActive]);
   const persona = useCurrentUser();
-  const personaName = learningOn && persona && persona.role === role && role !== profile?.role ? `${persona.lastName} ${persona.firstName}`.trim() : "";
+  const actingAs = learningOn && persona && persona.role === role && role !== profile?.role ? persona : null;
+  const personaName = actingAs ? `${actingAs.lastName} ${actingAs.firstName}`.trim() : "";
+  // Learning role preview: the server acts as this demo person, and the store reloads their view.
+  const loadFromCloud = useAppStore((s) => s.loadFromCloud);
+  const personaId = actingAs?.id ?? null;
+  useEffect(() => {
+    if (getLearningPersona() === personaId) return;
+    setLearningPersona(personaId);
+    void loadFromCloud();
+  }, [personaId, loadFromCloud]);
   const navigate = useNavigate();
 
   // Restore the simulated role after hydration so permissions survive a reload.

@@ -7,7 +7,7 @@ import { api, apiFetch } from "./apiClient";
 import { normalizePhone } from "./phoneLogin";
 
 type FuelType = "בנזין" | "סולר";
-export type Code = { serial: string; realCode: string; amount: number; fuelType: FuelType };
+export type Code = { serial: string; realCode: string; amount: number; fuelType: FuelType; revealed: boolean };
 type Args<T> = { data: T };
 
 async function rpc<T>(name: string, params: Record<string, unknown>): Promise<T> {
@@ -20,6 +20,7 @@ const mapCodes = (rows: unknown): Code[] =>
   ((rows as Record<string, any>[] | null) ?? []).map((r) => ({
     serial: String(r.serial),
     realCode: String(r.real_code ?? ""),
+    revealed: r.revealed === true,
     amount: Number(r.amount ?? 0),
     fuelType: r.fuel_type === "סולר" ? "סולר" : "בנזין",
   }));
@@ -50,6 +51,18 @@ export async function openWorkerWallet({ data }: Args<{ id: string; workerId: st
     state: (r?.state ?? "invalid") as "ok" | "invalid" | "expired" | "locked" | "mismatch",
     attemptsLeft: Number(r?.attempts_left ?? 0),
     codes: mapCodes(r?.codes),
+  };
+}
+
+/** Reveals one code, permanently; the server re-checks the employee's identity. */
+export async function revealWorkerCode({ data }: Args<{ id: string; workerId: string; phone: string; serial: string; demo?: boolean }>) {
+  const r = await rpc<Record<string, any>>("reveal_worker_code", {
+    p_id: data.id, p_worker_id: data.workerId, p_phone: data.phone, p_serial: data.serial, ...demoParam(data.demo),
+  });
+  return {
+    ok: Boolean(r?.ok),
+    state: (r?.state ?? "invalid") as "ok" | "invalid" | "expired" | "locked" | "mismatch",
+    code: r?.code ? mapCodes([r.code])[0] : null,
   };
 }
 

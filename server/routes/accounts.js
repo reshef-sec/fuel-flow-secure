@@ -7,6 +7,7 @@ import { AppUser, Profile, REAL } from "../models.js";
 import { ah, badRequest, forbidden, unauthorized } from "../errors.js";
 import { hashPassword, normalizePhone, passwordPolicyError, issueSession, verifyPassword } from "../auth.js";
 import { logAction } from "../lib/audit.js";
+import { claimHeldCards } from "../lib/claimHeldCards.js";
 import { ROLES } from "../models.js";
 
 const router = Router();
@@ -60,10 +61,10 @@ router.post("/", ah(async (req, res) => {
         if (roleChanged) existing.token_version = (existing.token_version ?? 0) + 1;
         await existing.save();
       } else {
-        await Profile.create({
+        await claimHeldCards(await Profile.create({
           phone: d.phone, national_id: d.nationalId, full_name: d.fullName, branch: d.branch, role: d.role,
           password_hash: await hashPassword(d.nationalId), requires_password_change: true,
-        });
+        }));
       }
       logAction(req.user, "סנכרון חשבון משתמש", d.nationalId);
       return res.json({ ok: true });
@@ -73,10 +74,10 @@ router.post("/", ah(async (req, res) => {
       const d = input(body);
       const p = await Profile.findOne({ national_id: d.nationalId });
       if (!p) {
-        await Profile.create({
+        await claimHeldCards(await Profile.create({
           phone: d.phone, national_id: d.nationalId, full_name: d.fullName, branch: d.branch, role: d.role,
           password_hash: await hashPassword(d.nationalId), requires_password_change: true,
-        });
+        }));
       } else {
         p.password_hash = await hashPassword(d.nationalId);
         p.requires_password_change = true;

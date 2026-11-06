@@ -24,7 +24,7 @@ const OWNER = {
   full_name: "קורן מאיה", branch: "", role: "admin",
 };
 const inRange = (n, lo, hi, what) => assert.ok(n >= lo && n <= hi, `${what}: ${n} not in [${lo}, ${hi}]`);
-const ALLOWED = { "בנזין": [100, 500], "סולר": [50, 100, 500] };
+const ALLOWED = { "בנזין": [50, 100, 500], "סולר": [100, 500] };
 
 describe("learning demo seed", () => {
   it("builds a consistent dataset only in the learning collections", async () => {
@@ -157,8 +157,8 @@ describe("learning demo seed", () => {
     assert.equal(pending.length, 4);
     for (const r of reqs) {
       assert.equal(r.amount, r.benzine_amount + r.diesel_amount);
-      assert.equal(r.benzine_amount % 100, 0);
-      assert.equal(r.diesel_amount % 50, 0);
+      assert.equal(r.benzine_amount % 50, 0);
+      assert.equal(r.diesel_amount % 100, 0);
       assert.ok(users.some((u) => u.national_id === r.requester_id && (u.role === "branch" || u.can_request)));
     }
     assert.ok(reqs.some((r) => r.status === "אושר" && r.approved_amount !== r.amount));
@@ -217,7 +217,9 @@ describe("learning demo seed", () => {
     const wallet = await rpc(a, "open_worker_wallet", { p_id: signedLink.id, p_worker_id: signedLink.workerId, p_phone: signedLink.phone, p_demo: true });
     assert.equal(wallet.data.ok, true);
     assert.equal(wallet.data.codes.length, signedLink.cards);
-    for (const c of wallet.data.codes) assert.match(c.real_code, /^\d{12}$/);
+    for (const c of wallet.data.codes) assert.equal(c.real_code, null);
+    const revealed = await rpc(a, "reveal_worker_code", { p_id: signedLink.id, p_worker_id: signedLink.workerId, p_phone: signedLink.phone, p_serial: wallet.data.codes[0].serial, p_demo: true });
+    assert.match(revealed.data.code.real_code, /^\d{12}$/);
     // The same link is unknown to the real data.
     assert.equal((await rpc(a, "worker_link_status", { p_id: signedLink.id })).data.exists, false);
 

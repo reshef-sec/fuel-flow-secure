@@ -4,7 +4,9 @@
  * _link_codes / _link_expired helpers (database/legacy_live_functions.sql).
  *
  * Anonymous access is token-scoped: the link id alone reveals only status/total/name;
- * redemption codes are returned only after signing, or to the matching worker id + phone.
+ * after signing, or to the matching worker id + phone, the wallet lists the cards but hides every
+ * code until the employee reveals it (reveal_worker_code). A revealed code stays revealed; an
+ * unrevealed code never leaves the server.
  * Three failed identity attempts lock the link until its issuer or an admin unlocks it.
  */
 import { Voucher, VoucherCode, WorkerLink, SignatureArchive } from "../models.js";
@@ -61,6 +63,36 @@ export async function linkCodes(serials, session) {
     });
 }
 
+/** The wallet as the employee's phone receives it: a code only once that card was revealed. */
+async function walletCodes(link, session) {
+  const revealed = new Set(link.revealed_serials ?? []);
+  return (await linkCodes(link.serials, session)).map((c) => (revealed.has(c.serial)
+    ? { ...c, revealed: true }
+    : { ...c, real_code: null, revealed: false }));
+}
+
+/**
+ * Identity gate shared by the wallet and code reveal: null when the caller may proceed, otherwise
+ * the failure to return. A wrong id/phone counts as a failed attempt (3 lock the link).
+ */
+async function workerGate(l, workerId, phone, session) {
+  if (!l) return { ok: false, state: "invalid" };
+  if (linkExpired(l)) return { ok: false, state: "expired" };
+  if (isLocked(l)) return { ok: false, state: "locked" };
+  // Unlike SQL's IS DISTINCT FROM, NULL never matches NULL: an unsigned link cannot be
+  // opened with empty credentials (codes are only reachable by signing or by the signer).
+  const matches = l.worker_id != null && l.phone != null && l.worker_id === workerId && l.phone === phone;
+  if (!matches) {
+    const n = Number(l.failed_attempts ?? 0) + 1;
+    const set = { failed_attempts: n, locked: n >= MAX_ATTEMPTS };
+    if (n >= MAX_ATTEMPTS) set.locked_at = new Date();
+    await WorkerLink.updateOne({ id: l.id }, { $set: set }, { session });
+    return { ok: false, state: n >= MAX_ATTEMPTS ? "locked" : "mismatch", attempts_left: Math.max(0, MAX_ATTEMPTS - n) };
+  }
+  if (Number(l.failed_attempts ?? 0) > 0) await WorkerLink.updateOne({ id: l.id }, { $set: { failed_attempts: 0 } }, { session });
+  return null;
+}
+
 async function workerLinkStatus({ p_id }) {
   const id = text(p_id);
   if (id == null || !/^\d{4,12}$/.test(id)) return { exists: false };
@@ -78,21 +110,28 @@ async function openWorkerWallet({ p_id, p_worker_id, p_phone }) {
   const phone = text(p_phone);
   return withTransaction(async (session) => {
     const l = await WorkerLink.findOne({ id }).session(session).lean();
-    if (!l) return { ok: false, state: "invalid" };
-    if (linkExpired(l)) return { ok: false, state: "expired" };
-    if (isLocked(l)) return { ok: false, state: "locked" };
-    // Unlike SQL's IS DISTINCT FROM, NULL never matches NULL: an unsigned link cannot be
-    // opened with empty credentials (codes are only reachable by signing or by the signer).
-    const matches = l.worker_id != null && l.phone != null && l.worker_id === workerId && l.phone === phone;
-    if (!matches) {
-      const n = Number(l.failed_attempts ?? 0) + 1;
-      const set = { failed_attempts: n, locked: n >= MAX_ATTEMPTS };
-      if (n >= MAX_ATTEMPTS) set.locked_at = new Date();
-      await WorkerLink.updateOne({ id }, { $set: set }, { session });
-      return { ok: false, state: n >= MAX_ATTEMPTS ? "locked" : "mismatch", attempts_left: Math.max(0, MAX_ATTEMPTS - n) };
-    }
-    if (Number(l.failed_attempts ?? 0) > 0) await WorkerLink.updateOne({ id }, { $set: { failed_attempts: 0 } }, { session });
-    return { ok: true, state: "ok", attempts_left: MAX_ATTEMPTS, codes: await linkCodes(l.serials, session) };
+    const denied = await workerGate(l, workerId, phone, session);
+    if (denied) return denied;
+    return { ok: true, state: "ok", attempts_left: MAX_ATTEMPTS, codes: await walletCodes(l, session) };
+  });
+}
+
+/** Reveals one card of the link, permanently: the code is sent now and on every later visit. */
+async function revealWorkerCode({ p_id, p_worker_id, p_phone, p_serial }) {
+  const id = text(p_id);
+  const serial = text(p_serial);
+  if (id == null || serial == null) return { ok: false, state: "invalid" };
+  const workerId = text(p_worker_id);
+  const phone = text(p_phone);
+  return withTransaction(async (session) => {
+    const l = await WorkerLink.findOne({ id }).session(session).lean();
+    const denied = await workerGate(l, workerId, phone, session);
+    if (denied) return denied;
+    if (!(l.serials ?? []).includes(serial)) return { ok: false, state: "invalid" };
+    const [card] = await linkCodes([serial], session);
+    if (!card) return { ok: false, state: "invalid" };
+    await WorkerLink.updateOne({ id }, { $addToSet: { revealed_serials: serial } }, { session });
+    return { ok: true, state: "ok", code: { ...card, revealed: true } };
   });
 }
 
@@ -125,7 +164,7 @@ async function signWorkerLink({ p_id, p_worker_id, p_phone, p_full_name, p_signa
       employee_id_number: workerId, employee_phone: phone, total_amount: total,
       voucher_record_ids: l.serials ?? [], signature_image_url: signature,
     }], { session });
-    return { ok: true, codes: await linkCodes(serials, session) };
+    return { ok: true, codes: await walletCodes({ ...l, serials }, session) };
   });
 }
 
@@ -163,6 +202,7 @@ async function unlockVoucherLink({ p_link_id }, { user }) {
 export default {
   worker_link_status: { auth: "public", handler: workerLinkStatus },
   open_worker_wallet: { auth: "public", handler: openWorkerWallet },
+  reveal_worker_code: { auth: "public", handler: revealWorkerCode },
   sign_worker_link: { auth: "public", handler: signWorkerLink },
   // Public at the dispatcher only so the SQL's own 'נדרשת התחברות' message is preserved;
   // the handler enforces sign-in + password change itself.

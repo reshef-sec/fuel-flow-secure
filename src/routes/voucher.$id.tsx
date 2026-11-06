@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { Logo } from "@/design-system/delek-1ea111";
 import { cn } from "@/design-system/delek-1ea111/design-system/lib/utils";
-import { getWorkerLinkStatus, openWorkerWallet, signWorkerLink } from "@/lib/backend";
+import { getWorkerLinkStatus, openWorkerWallet, revealWorkerCode, signWorkerLink } from "@/lib/backend";
 import { isDemoSearchValue } from "@/lib/publicUrl";
 import { StepIndicator } from "@/components/worker/StepIndicator";
 import { WalletCodeCard } from "@/components/worker/WalletCodeCard";
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/voucher/$id")({
 
 type Step = "identify" | "sign" | "wallet";
 
-type Code = { serial: string; realCode: string; amount: number; fuelType?: "בנזין" | "סולר" };
+type Code = { serial: string; realCode: string; amount: number; fuelType?: "בנזין" | "סולר"; revealed: boolean };
 
 const STEP_NAMES = ["הזדהות", "חתימה", "ארנק"] as const;
 const STEP_KEYS: Step[] = ["identify", "sign", "wallet"];
@@ -136,6 +136,17 @@ function VoucherWallet() {
     setError(null);
     setStep("wallet");
     toast.success("החתימה נשמרה — הקודים זמינים");
+  }
+
+  async function reveal(serial: string) {
+    const r = await revealWorkerCode({ data: { id, workerId: idNumber, phone, serial, ...demoArg } }).catch(() => null);
+    if (r?.ok && r.code) {
+      const code = r.code;
+      setCodes((list) => list.map((c) => (c.serial === serial ? code : c)));
+      return;
+    }
+    if (r?.state === "locked" || r?.state === "expired") return setBlocked(r.state);
+    toast.error("לא ניתן לחשוף את הקוד כרגע. נסו שוב");
   }
 
   async function copyCode(code: string) {
@@ -297,7 +308,7 @@ function VoucherWallet() {
                 </span>
                 <div className="flex flex-col gap-px">
                   <strong className="text-[14.5px]">הקודים זמינים</strong>
-                  <span className="text-[12.5px]">הציגו את הקוד בתחנת הדלק בעת התדלוק.</span>
+                  <span className="text-[12.5px]">לחצו על קוד כדי לחשוף אותו בתחנת הדלק. קוד שנחשף נשאר גלוי.</span>
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
@@ -312,7 +323,7 @@ function VoucherWallet() {
                 ) : null}
               </div>
               {codes.map((v) => (
-                <WalletCodeCard key={v.serial} fuelType={v.fuelType} amount={v.amount} code={v.realCode} onCopy={() => copyCode(v.realCode)} />
+                <WalletCodeCard key={v.serial} fuelType={v.fuelType} amount={v.amount} code={v.revealed ? v.realCode : null} onReveal={() => reveal(v.serial)} onCopy={() => copyCode(v.realCode)} />
               ))}
             </section>
           )}

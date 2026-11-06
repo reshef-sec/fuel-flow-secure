@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { branchLabel } from "@/lib/branchLabels";
 import { FUEL_TYPES, fuelOf, type FuelType } from "@/components/fuel/fuel";
 import { create } from "zustand";
 import { toast } from "sonner";
@@ -15,6 +16,7 @@ import { fuelStockError, issuanceAmountError, STOCK_SHORTAGE } from "@/lib/issua
 import { transferInventory, issueVoucherToWorker } from "@/lib/transferInventory";
 import { cardsOfFuel, issuancePool } from "@/lib/issuanceStock";
 import { pickExact } from "@/lib/inventorySelection";
+import { pickBySize } from "@/lib/allocationSizes";
 export { pickExact } from "@/lib/inventorySelection";
 import { centralPoolOf, centralFuelLimitError } from "@/lib/centralInventory";
 import { notifyCentralInventoryChanged } from "@/lib/centralInventorySummary";
@@ -203,6 +205,8 @@ export interface AllocationMeta {
   requester?: string;
   approver?: string;
   fuelType?: FuelType;
+  /** Admin's choice of card sizes (face value → how many). Absent = the system picks the cards. */
+  sizes?: Record<number, number>;
 }
 
 /** תקן for a given client + site, or "—" when unknown. */
@@ -331,7 +335,7 @@ export const useAppStore = create<AppState>()(
     if (limitError) return limitError;
     const pool = centralPoolOf(get().vouchers, fuel);
     if (!pool.length) return STOCK_SHORTAGE;
-    const pick = pickExact(pool, amount);
+    const pick = meta?.sizes ? pickBySize(pool, meta.sizes) : pickExact(pool, amount);
     if (!pick) return `${STOCK_SHORTAGE}. המלאי הזמין: ${groupStock(pool)}.`;
     const ids = new Set(pick.map((v) => v.serial));
     const changed: VoucherRecord[] = [];
@@ -364,7 +368,7 @@ export const useAppStore = create<AppState>()(
     try { set({ vouchers: await loadIssuanceStock() }); }
     catch { return "בדיקת המלאי נכשלה — ההקצאה לא בוצעה"; }
     const candidates = get().vouchers.filter(
-      (v) => v.branch === branch && !v.supervisor && v.status === "טרם שומש" && (!fuelType || fuelOf(v) === fuelType),
+      (v) => branchLabel(v.branch) === branchLabel(branch) && !v.supervisor && v.status === "טרם שומש" && (!fuelType || fuelOf(v) === fuelType),
     );
     const selection = pickExact(candidates, amount);
     if (!selection) return STOCK_SHORTAGE;
@@ -414,8 +418,9 @@ export const useAppStore = create<AppState>()(
     const asked = (req.benzineAmount ?? 0) + (req.dieselAmount ?? 0);
     if (asked > 0) {
       // Keep the requested fuel split; scale down proportionally if approving less.
-      let diesel = Math.round(((req.dieselAmount ?? 0) * Math.min(amount, asked)) / asked / 50) * 50;
-      if (amount > asked) diesel = req.dieselAmount ?? 0;
+      // Diesel moves in 100 ₪ steps; any remainder goes to petrol (50 ₪ steps).
+      let diesel = Math.floor(((req.dieselAmount ?? 0) * Math.min(amount, asked)) / asked / 100) * 100;
+      if (amount > asked) diesel = Math.floor((req.dieselAmount ?? 0) / 100) * 100;
       const benzine = Math.max(0, amount - diesel);
       const fail = poolShortage({ "בנזין": benzine, "סולר": diesel }, get().vouchers);
       if (fail) return void toast.error(fail);
@@ -734,13 +739,19 @@ export function useCurrentUser() {
  */
 export function learningPersona(users: UserRecord[], vouchers: VoucherRecord[], role: Role): UserRecord | undefined {
   if (role !== "branch" && role !== "supervisor") return undefined;
+  // Stay the same person: once acting as them, the store only holds that person's own cards.
+  const kept = chosenPersona.get(role);
+  if (kept) return kept;
   const branchOf = (b: string | null | undefined) => (b ?? "").replace(/\s*\([^)]*\)\s*$/, "").replace(/^סניף\s+/, "").trim();
   const score = (u: UserRecord) => role === "branch"
     ? vouchers.filter((v) => branchOf(v.branch) === branchOf(u.branch)).length
     : vouchers.filter((v) => (v.supervisor ?? "").trim() === fullName(u)).length;
   const candidates = users.filter((u) => u.role === role && u.branch?.trim());
-  return candidates.map((u) => [u, score(u)] as const).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const pick = candidates.map((u) => [u, score(u)] as const).sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (pick) chosenPersona.set(role, pick);
+  return pick;
 }
+const chosenPersona = new Map<Role, UserRecord>();
 
 export { MAIN_POOL };
 

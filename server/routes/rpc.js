@@ -26,7 +26,7 @@ const VIEWER_READ = new Set([
 ]);
 
 /** Public employee-page functions that may be pointed at the learning environment with p_demo. */
-const DEMO_PUBLIC = new Set(["worker_link_status", "open_worker_wallet", "sign_worker_link"]);
+const DEMO_PUBLIC = new Set(["worker_link_status", "open_worker_wallet", "reveal_worker_code", "sign_worker_link"]);
 
 const router = Router();
 

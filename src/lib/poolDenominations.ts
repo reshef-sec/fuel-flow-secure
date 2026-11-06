@@ -1,6 +1,7 @@
 import type { CentralDenomination } from "./centralInventorySummary";
+import { FACE_VALUES } from "./issuanceInventory";
 
-const dieselValues = new Set([50, 100, 500]);
+const dieselValues = new Set(FACE_VALUES["סולר"]);
 
 export function poolDenominations(rows: CentralDenomination[], fuel: CentralDenomination["fuel_type"]) {
   const fuelRows = rows.filter(row => row.fuel_type === fuel);

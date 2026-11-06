@@ -12,6 +12,10 @@ describe("validateStockSheet", () => {
   it("rejects amounts not in multiples of 50", () => {
     assert.equal(typeof validateStockSheet([H, ["1", "x", "120", "בנזין 95", ""]]), "string");
   });
+  it("rejects a diesel card that is not a multiple of 100", () => {
+    assert.equal(typeof validateStockSheet([H, ["1", "x", "50", "סולר", ""]]), "string");
+    assert.notEqual(typeof validateStockSheet([H, ["1", "x", "50", "בנזין 95", ""]]), "string");
+  });
   it("rejects unknown fuel type", () => {
     assert.equal(typeof validateStockSheet([H, ["1", "x", "100", "גז", ""]]), "string");
   });

@@ -64,15 +64,15 @@ async function generateDemoData(_params, { user }) {
       for (const fuel of ["בנזין", "סולר"]) {
         for (let i = 1; i <= 10; i += 1) {
           n += 1;
-          // Denominations: petrol 100 (multiple of 100), diesel 50 (multiple of 50).
+          // Denominations: petrol 50, diesel 100 (the smallest card of each fuel).
           docs.push({
-            serial: `DEMO-${batch}-${n}`, real_code: "", amount: fuel === "בנזין" ? 100 : 50,
+            serial: `DEMO-${batch}-${n}`, real_code: "", amount: fuel === "בנזין" ? 50 : 100,
             fuel_type: fuel, branch: pool, status: STATUS.AVAILABLE, updated_on: today,
           });
         }
       }
     }
-    // Each pool gets 1,000 NIS petrol + 500 NIS diesel of real test inventory, never a fake saved budget.
+    // Each pool gets 500 NIS petrol + 1,000 NIS diesel of real test inventory, never a fake saved budget.
     await Voucher.insertMany(docs, { session });
     await logAction(user, "טעינת נתוני הדגמה", `${n} שוברים לבדיקה בלבד`, { vouchers_created: n }, session);
     return { vouchers_created: n };

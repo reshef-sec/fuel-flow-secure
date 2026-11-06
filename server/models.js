@@ -172,6 +172,8 @@ const workerLinkSchema = new Schema({
   employee_name: str(), branch: str(), supervisor_id: str(),
   failed_attempts: { type: Number, default: 0 }, locked: { type: Boolean, default: false },
   locked_at: { type: Date, default: null },
+  /** Cards whose code the employee chose to reveal; every other code stays hidden in the wallet. */
+  revealed_serials: { type: [String], default: [] },
 }, opts("worker_links"));
 workerLinkSchema.index({ id: 1 }, { unique: true });
 workerLinkSchema.index({ branch: 1 });

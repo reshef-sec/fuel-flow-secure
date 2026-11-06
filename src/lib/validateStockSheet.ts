@@ -26,6 +26,7 @@ export function validateStockSheet(rows: string[][], existing: Set<string> = new
     const amount = Number((r[2] ?? "").replace(/[₪,\s]/g, ""));
     if (!Number.isInteger(amount) || amount <= 0 || amount % 50 !== 0) return `${line}ערך חייב להיות מספר בכפולות של 50 ₪.`;
     if (!/בנזין|סולר|דיזל|diesel|benzin|petrol/i.test(r[3] ?? "")) return `${line}סוג דלק חייב להיות "בנזין 95" או "סולר".`;
+    if (/סולר|דיזל|diesel/i.test(r[3] ?? "") && amount % 100 !== 0) return `${line}ערך לסולר חייב להיות בכפולות של 100 ₪.`;
     const exp = (r[4] ?? "").trim();
     if (exp && Number.isNaN(Date.parse(exp)) && !/^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(exp))
       return `${line}תאריך תוקף לא תקין.`;

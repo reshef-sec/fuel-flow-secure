@@ -115,4 +115,30 @@ describe("learning environment — real reference data, sterile", () => {
     const login = await anon().post("/api/auth/login").send({ phone: "0531313131", password: "Passw0rd!" });
     assert.notEqual(login.status, 200);
   });
+
+  it("the role preview acts as the demo branch manager, on demo data only", async () => {
+    const { mgrN } = await seedRealReference();
+    const o = await loginAs("admin", { fullName: "קורן מאיה" });
+    process.env.DEV_TOOLS_OWNER_NATIONAL_ID = o.nationalId;
+    await o.agent.post("/api/learning").send({ action: "activate" });
+    const before = await snapshotReal();
+
+    const card = await LEARNING.Voucher.findOne({ branch: "סניף צפון", supervisor: null, status: "טרם שומש", fuel_type: "בנזין", amount: 100 }).lean();
+    assert.ok(card);
+    const items = [{ amount: 100, fuel_type: "בנזין", serials: [card.serial] }];
+    const params = { p_items: items, p_branch: "סניף צפון", p_supervisor: "צפוני מפקח" };
+
+    // Without the preview the owner is the admin, who may only move central-pool cards.
+    assert.equal((await rpc(o.agent, "transfer_voucher_stock", params)).status, 400);
+    const r = await o.agent.post("/api/rpc/transfer_voucher_stock").set("X-Learning-Persona", mgrN.nationalId).send(params);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal((await LEARNING.Voucher.findOne({ serial: card.serial }).lean()).supervisor, "צפוני מפקח");
+    assert.deepEqual(await snapshotReal(), before, "real data must be untouched");
+
+    // Nobody else can use the header: an ordinary admin stays an admin, on real data.
+    const other = await loginAs("admin");
+    const stranger = await other.agent.post("/api/rpc/transfer_voucher_stock").set("X-Learning-Persona", mgrN.nationalId).send(params);
+    assert.equal(stranger.status, 400);
+    assert.equal(await LEARNING.ActivityLog.countDocuments({ user_id: other.profile.id }), 0);
+  });
 });

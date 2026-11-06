@@ -13,12 +13,12 @@ const SIG = "data:image/png;base64,iVBORw0KGgo=";
 async function seedLink({ id = "123456", supervisorId = null, signed = false, createdAt } = {}) {
   await Voucher.create([
     { serial: "S1", real_code: "fallback-1", amount: 100, fuel_type: "בנזין", status: "הוקצה לעובד", link_id: id },
-    { serial: "S2", real_code: "fallback-2", amount: 50, fuel_type: "סולר", status: "הוקצה לעובד", link_id: id },
+    { serial: "S2", real_code: "fallback-2", amount: 100, fuel_type: "סולר", status: "הוקצה לעובד", link_id: id },
     { serial: "S3", real_code: "blocked", amount: 100, fuel_type: "בנזין", status: "חסום", link_id: id },
   ]);
   await VoucherCode.create({ serial: "S1", real_code: "REAL-1" });
   await WorkerLink.create({
-    id, total: 250, serials: ["S1", "S2", "S3"], created_on: "2026-01-01", employee_name: "יוסי כהן",
+    id, total: 300, serials: ["S1", "S2", "S3"], created_on: "2026-01-01", employee_name: "יוסי כהן",
     branch: "חיפה", supervisor_id: supervisorId,
     ...(signed ? { worker_id: "123456789", phone: "0521234567", signed_at: "2026-01-01" } : {}),
   });
@@ -30,7 +30,7 @@ describe("worker_link_status", () => {
     await seedLink();
     const a = anon();
     assert.deepEqual((await rpc(a, "worker_link_status", { p_id: "123456" })).data,
-      { exists: true, state: "ok", total: 250, signed: false, employee_name: "יוסי כהן" });
+      { exists: true, state: "ok", total: 300, signed: false, employee_name: "יוסי כהן" });
     assert.deepEqual((await rpc(a, "worker_link_status", { p_id: "999999" })).data, { exists: false });
     assert.deepEqual((await rpc(a, "worker_link_status", { p_id: "abc" })).data, { exists: false });
     assert.deepEqual((await rpc(a, "worker_link_status", { p_id: { $ne: null } })).data, { exists: false });
@@ -71,9 +71,10 @@ describe("sign_worker_link + open_worker_wallet", () => {
 
     const s = await rpc(a, "sign_worker_link", { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567", p_full_name: "  יוסי כהן ", p_signature: SIG });
     assert.equal(s.data.ok, true);
+    // After signing the employee sees the cards, but every code is hidden until revealed.
     assert.deepEqual(s.data.codes, [
-      { serial: "S1", real_code: "REAL-1", amount: 100, fuel_type: "בנזין" },
-      { serial: "S2", real_code: "fallback-2", amount: 50, fuel_type: "סולר" },
+      { serial: "S1", real_code: null, amount: 100, fuel_type: "בנזין", revealed: false },
+      { serial: "S2", real_code: null, amount: 100, fuel_type: "סולר", revealed: false },
     ]);
     const link = await WorkerLink.findOne({ id: "123456" }).lean();
     assert.equal(link.worker_id, "123456789");
@@ -85,7 +86,7 @@ describe("sign_worker_link + open_worker_wallet", () => {
     assert.equal(v.employee_phone, "0521234567");
     const arch = await SignatureArchive.find({ link_id: "123456" }).lean();
     assert.equal(arch.length, 1);
-    assert.equal(arch[0].total_amount, 250);
+    assert.equal(arch[0].total_amount, 300);
     assert.equal(arch[0].employee_id_number, "123456789");
     assert.equal(arch[0].branch, "חיפה");
     assert.deepEqual(arch[0].voucher_record_ids, ["S1", "S2", "S3"]);
@@ -97,6 +98,22 @@ describe("sign_worker_link + open_worker_wallet", () => {
     const o = await rpc(anon(), "open_worker_wallet", { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567" });
     assert.deepEqual(o.data, { ok: true, state: "ok", attempts_left: 3, codes: s.data.codes });
     assert.equal((await rpc(anon(), "worker_link_status", { p_id: "123456" })).data.signed, true);
+
+    // Revealing one code keeps it visible on later visits; the other stays off the phone.
+    const who = { p_id: "123456", p_worker_id: "123456789", p_phone: "0521234567" };
+    const rev = await rpc(anon(), "reveal_worker_code", { ...who, p_serial: "S1" });
+    assert.deepEqual(rev.data, { ok: true, state: "ok", code: { serial: "S1", real_code: "REAL-1", amount: 100, fuel_type: "בנזין", revealed: true } });
+    const again = await rpc(anon(), "open_worker_wallet", who);
+    assert.deepEqual(again.data.codes, [
+      { serial: "S1", real_code: "REAL-1", amount: 100, fuel_type: "בנזין", revealed: true },
+      { serial: "S2", real_code: null, amount: 100, fuel_type: "סולר", revealed: false },
+    ]);
+    // Not this link's card (S3 is blocked, X1 unknown), or the wrong person: nothing is revealed.
+    assert.equal((await rpc(anon(), "reveal_worker_code", { ...who, p_serial: "X1" })).data.ok, false);
+    assert.equal((await rpc(anon(), "reveal_worker_code", { ...who, p_serial: "S3" })).data.ok, false);
+    const wrong = await rpc(anon(), "reveal_worker_code", { ...who, p_worker_id: "111111111", p_serial: "S2" });
+    assert.deepEqual([wrong.data.ok, wrong.data.state, wrong.data.code], [false, "mismatch", undefined]);
+    await WorkerLink.updateOne({ id: "123456" }, { $set: { failed_attempts: 0 } });
     assert.deepEqual((await rpc(anon(), "open_worker_wallet", { p_id: "000000", p_worker_id: "123456789", p_phone: "0521234567" })).data,
       { ok: false, state: "invalid" });
   });

@@ -28,9 +28,9 @@ export function cardHolder(supervisor, branch) {
   return h || null;
 }
 
-/** Denomination rules: petrol in 100 ₪ steps, diesel in 50 ₪ steps. */
+/** Denomination rules: petrol cards 50/100/500 (50 ₪ steps), diesel cards 100/500 (100 ₪ steps). */
 export function denominationStep(fuel) {
-  return canonicalFuel(fuel) === "סולר" ? 50 : 100;
+  return canonicalFuel(fuel) === "סולר" ? 100 : 50;
 }
 export function isValidDenomination(fuel, amount) {
   const n = Number(amount);

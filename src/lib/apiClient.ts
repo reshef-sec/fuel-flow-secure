@@ -23,6 +23,11 @@ export function onAuthChange(l: Listener) {
 }
 
 /** Low-level JSON call. Resolves with the parsed body or a normalized error; never throws. */
+/** סביבת לימוד role preview: the demo person the owner is viewing as (ignored by the server otherwise). */
+let learningPersona: string | null = null;
+export const getLearningPersona = () => learningPersona;
+export const setLearningPersona = (nationalId: string | null) => { learningPersona = nationalId; };
+
 export async function apiFetch<T = unknown>(
   path: string,
   init: { method?: "GET" | "POST" | "DELETE"; body?: unknown } = {},
@@ -32,7 +37,10 @@ export async function apiFetch<T = unknown>(
     const res = await fetch(path, {
       method,
       credentials: "same-origin",
-      headers: method === "GET" ? { Accept: "application/json" } : { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        ...(method === "GET" ? { Accept: "application/json" } : { "Content-Type": "application/json", Accept: "application/json" }),
+        ...(learningPersona ? { "X-Learning-Persona": learningPersona } : {}),
+      },
       body: method === "GET" ? undefined : JSON.stringify(init.body ?? {}),
     });
     let body: unknown = null;

@@ -5,6 +5,7 @@ import {
   clearSession, hashPassword, issueSession, normalizePhone, passwordPolicyError, publicProfile, verifyPassword,
 } from "../auth.js";
 import { logAction } from "../lib/audit.js";
+import { claimHeldCards } from "../lib/claimHeldCards.js";
 
 const router = Router();
 const MAX_FAILED = 5;
@@ -31,6 +32,7 @@ router.post("/login", ah(async (req, res) => {
         phone, national_id: staff.national_id, full_name: fullNameOf(staff), branch: staff.branch ?? "",
         role: staff.role, password_hash: await hashPassword(password), requires_password_change: true,
       });
+      await claimHeldCards(profile);
     }
   }
   if (!profile) throw unauthorized(INVALID);

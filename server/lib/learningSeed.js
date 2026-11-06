@@ -123,8 +123,8 @@ const REGULAR_CLIENTS = [
   ["פארק מים גלים", ["שער כניסה", "מתחם בריכות", "חניון"]],
 ];
 
-/** Paz denominations only: petrol 100/500, diesel 50/100/500. */
-const DENOMS = { "בנזין": [[100, 80], [500, 20]], "סולר": [[50, 45], [100, 40], [500, 15]] };
+/** Paz denominations only: petrol 50/100/500, diesel 100/500. */
+const DENOMS = { "בנזין": [[50, 45], [100, 40], [500, 15]], "סולר": [[100, 80], [500, 20]] };
 
 // ───────────────────────────── generator ─────────────────────────────
 
@@ -445,8 +445,8 @@ export async function seedLearning({ owner } = {}) {
   const allocations = []; // { branch, fuel, amount, time, kind: 'branch'|'supervisor', sup }
   const requests = [];
   const requestId = (t) => `req-${t.getTime()}-${R.int(100, 998)}`;
-  const BRANCH_STOCK = [["בנזין", 100, 8], ["בנזין", 500, 2], ["סולר", 50, 6], ["סולר", 100, 4], ["סולר", 500, 1]];
-  const SUP_STOCK = [["בנזין", 100, 3], ["בנזין", 500, 1], ["סולר", 50, 2], ["סולר", 100, 2]];
+  const BRANCH_STOCK = [["בנזין", 50, 6], ["בנזין", 100, 4], ["בנזין", 500, 1], ["סולר", 100, 8], ["סולר", 500, 2]];
+  const SUP_STOCK = [["בנזין", 50, 2], ["בנזין", 100, 2], ["סולר", 100, 3], ["סולר", 500, 1]];
   ACT.forEach((b, bi) => {
     const manager = managerOf(b) ?? ownerActor;
     const allocDay = [17, 14, 12, 19, 16, 13][bi % 6];
@@ -503,7 +503,7 @@ export async function seedLearning({ owner } = {}) {
   const PENDING = [
     [false, 1500, 500, 1, "תגבור משמרות לילה"],
     [true, 1200, 0, 2, "אירוע אבטחה אצל לקוח — צוות מורחב"],
-    [false, 2000, 1050, 3, "פתיחת אתר חדש"],
+    [false, 2000, 1000, 3, "פתיחת אתר חדש"],
     [true, 300, 500, 0, "סיורי לילה מוגברים"],
   ];
   PENDING.forEach(([bySupervisor, benz, dies, dAgo, reason], k) => {
@@ -518,7 +518,7 @@ export async function seedLearning({ owner } = {}) {
   });
 
   // ── 4. healthy central pool (מאגר ראשי) ──
-  const CENTRAL = [["בנזין", 100, 100], ["בנזין", 500, 30], ["סולר", 50, 60], ["סולר", 100, 48], ["סולר", 500, 18]];
+  const CENTRAL = [["בנזין", 50, 60], ["בנזין", 100, 48], ["בנזין", 500, 18], ["סולר", 100, 100], ["סולר", 500, 30]];
   let forcedZeros = 12;
   for (const [fuel, amount, n] of CENTRAL) {
     for (let k = 0; k < n; k += 1) {
@@ -617,7 +617,7 @@ export async function seedLearning({ owner } = {}) {
 }
 
 /** Bumped whenever the dataset's shape changes; an older learning copy is re-seeded on next activation. */
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 /** Drops Mongo internals so a real document can be copied into its learning twin. */
 function stripDoc(doc) {

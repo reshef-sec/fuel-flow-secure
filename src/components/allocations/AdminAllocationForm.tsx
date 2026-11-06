@@ -9,10 +9,13 @@ import type { CentralInventorySummary } from "@/lib/centralInventorySummary";
 import { STOCK_SHORTAGE } from "@/lib/issuanceInventory";
 import { branchLabel } from "@/lib/branchLabels";
 import { pickExact } from "@/lib/inventorySelection";
+import { emptySizeCounts, pickBySize, readSizeCounts } from "@/lib/allocationSizes";
 import { fullName, poolShortage, useAppStore, useCurrentUser } from "@/store/appStore";
 import { AllocationFormFields, cardsText } from "./AllocationForm";
+import { SizePicker } from "./SizePicker";
 import { adminRecipients, recipientRoleText, recipientTarget } from "./allocationRecipients";
 
+const FUELS = ["בנזין", "סולר"] as const;
 const fmt = (n: number) => n.toLocaleString("he-IL");
 const fuelWord = (f: FuelType) => (f === "בנזין" ? "בנזין 95" : "סולר");
 
@@ -57,10 +60,14 @@ export function AdminAllocationForm({
 
   const [target, setTarget] = useState("");
   const [split, setSplit] = useState(emptySplit);
+  const [bySize, setBySize] = useState(false);
+  const [sizeCounts, setSizeCounts] = useState(emptySizeCounts);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const currentSplit = readSplit(split);
-  const stockError = typeof currentSplit === "string" ? null : poolShortage(currentSplit, stock);
+  const sizeSelection = readSizeCounts(sizeCounts, pools);
+  const sizeTotal = typeof sizeSelection === "string" ? 0 : sizeSelection.split["בנזין"] + sizeSelection.split["סולר"];
+  const currentSplit = bySize ? (typeof sizeSelection === "string" ? sizeSelection : sizeSelection.split) : readSplit(split);
+  const stockError = typeof currentSplit === "string" || bySize ? null : poolShortage(currentSplit, stock);
 
   useEffect(() => {
     if (!active) return;
@@ -69,18 +76,20 @@ export function AdminAllocationForm({
       : undefined;
     setTarget(preset?.id ?? "");
     setSplit(emptySplit());
+    setSizeCounts(emptySizeCounts());
     setError(null);
     setLoading(false);
   }, [active, presetTarget, recipients]);
-  useEffect(() => { setError(null); }, [target, split]);
+  useEffect(() => { setError(null); }, [target, split, sizeCounts, bySize]);
 
   const picked = recipients.find((u) => u.id === target);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = readSplit(split);
+    const parsed = currentSplit;
     if (!picked) return setError("יש לבחור מקבל הקצאה");
     if (typeof parsed === "string") return setError(parsed);
+    const sizes = bySize && typeof sizeSelection !== "string" ? sizeSelection.sizes : null;
     const { branch, supervisor } = recipientTarget(picked);
     setError(null);
     setLoading(true);
@@ -94,18 +103,23 @@ export function AdminAllocationForm({
       }
       const latest = await loadIssuanceStock();
       useAppStore.setState({ vouchers: latest });
-      const shortage = poolShortage(parsed, latest);
+      // Fresh stock may have changed since the form opened: re-check the chosen sizes against it.
+      const shortage = sizes
+        ? (FUELS.some((f) => parsed[f] > 0 && !pickBySize(centralPoolOf(latest, f), sizes[f])) ? STOCK_SHORTAGE : null)
+        : poolShortage(parsed, latest);
       if (shortage) { setError(shortage); toast.error(shortage); return; }
       const approver = me ? fullName(me) : "אדמין מרכזי";
-      for (const f of ["בנזין", "סולר"] as const)
+      for (const f of FUELS)
         if (parsed[f]) {
-          // Preview of the cards the store will pick (same pickExact over the same pool).
-          const preview = pickExact(centralPoolOf(useAppStore.getState().vouchers, f), parsed[f]);
-          const err = await allocate(branch, supervisor, parsed[f], { approver, fuelType: f });
+          // Preview of the cards the store will pick (same selection over the same pool).
+          const pool = centralPoolOf(useAppStore.getState().vouchers, f);
+          const preview = sizes ? pickBySize(pool, sizes[f]) : pickExact(pool, parsed[f]);
+          const err = await allocate(branch, supervisor, parsed[f], { approver, fuelType: f, ...(sizes ? { sizes: sizes[f] } : {}) });
           if (err) {
             if (done.length) {
               // Partial success: clear the fuel that was already allocated so a retry can't double it.
               setSplit((s) => ({ ...s, "בנזין": "" }));
+              setSizeCounts((c) => ({ ...c, "בנזין": emptySizeCounts()["בנזין"] }));
               onDone({ tone: "warning", title: "ההקצאה בוצעה חלקית", line: `הוקצו ${done.join(" ו-")} ל${fullName(picked)}. ${fuelWord(f)} לא הוקצה: ${err}`, detail: cards.join(" · ") || undefined });
             }
             setError(err); toast.error(err); return;
@@ -117,6 +131,7 @@ export function AdminAllocationForm({
         }
       setTarget("");
       setSplit(emptySplit());
+      setSizeCounts(emptySizeCounts());
       onDone({
         tone: "success",
         title: "ההקצאה בוצעה",
@@ -136,6 +151,12 @@ export function AdminAllocationForm({
     <form onSubmit={submit} noValidate>
       <AllocationFormFields
         idPrefix={idPrefix}
+        sizeMode={{
+          on: bySize,
+          onToggle: setBySize,
+          total: sizeTotal,
+          picker: <SizePicker idPrefix={idPrefix} counts={sizeCounts} onCounts={setSizeCounts} pools={pools} />,
+        }}
         recipientLabel="מקבל ההקצאה"
         recipientPlaceholder="בחירת מנהל סניף או מורשה דרישה…"
         recipients={recipients.map((u) => ({

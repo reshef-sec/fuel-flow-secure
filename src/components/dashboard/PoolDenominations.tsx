@@ -4,10 +4,11 @@ import { ChevronLeft } from "lucide-react";
 import { FUEL_TYPES, FuelBadge, type FuelType } from "@/components/fuel/fuel";
 import type { CentralDenomination, CentralInventorySummary } from "@/lib/centralInventorySummary";
 import { poolDenominations } from "@/lib/poolDenominations";
+import { FACE_VALUES } from "@/lib/issuanceInventory";
 
-/** Face values always shown per fuel (client rule): petrol 100/500, diesel 50/100/500. */
-const SHOWN: Record<FuelType, number[]> = { "בנזין": [100, 500], "סולר": [50, 100, 500] };
-const RULE: Record<FuelType, string> = { "בנזין": "כפולות של 100 ₪", "סולר": "כפולות של 50 ₪" };
+/** Face values always shown per fuel (client rule). */
+const SHOWN = FACE_VALUES;
+const RULE: Record<FuelType, string> = { "בנזין": "כפולות של 50 ₪", "סולר": "כפולות של 100 ₪" };
 
 /**
  * Cards fixed at the client's face values (missing ones show 0), plus any other value that

@@ -1,7 +1,9 @@
 export type IssuanceFuel = "בנזין" | "סולר";
+/** Physical card face values per fuel (the client's rule; single source for every screen). */
+export const FACE_VALUES: Record<IssuanceFuel, number[]> = { "בנזין": [50, 100, 500], "סולר": [100, 500] };
 export const issuanceAmountRules = (fuel: IssuanceFuel | "") => fuel === "סולר"
-  ? { min: 50, step: 50, hint: "בכפולות של 50 ₪" }
-  : { min: 100, step: 100, hint: "בכפולות של 100 ₪" };
+  ? { min: 100, step: 100, hint: "בכפולות של 100 ₪" }
+  : { min: 50, step: 50, hint: "בכפולות של 50 ₪" };
 export function issuanceAmountError(fuel: IssuanceFuel, amount: number): string | null {
   const { min, step, hint } = issuanceAmountRules(fuel);
   return !Number.isSafeInteger(amount) || amount < min || amount % step !== 0

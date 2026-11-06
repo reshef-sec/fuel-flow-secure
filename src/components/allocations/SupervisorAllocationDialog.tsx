@@ -35,14 +35,14 @@ export function SupervisorAllocationDialog({
   const assignToSupervisor = useAppStore((s) => s.assignToSupervisor);
   const allVouchers = useAppStore((s) => s.vouchers);
   const free = useMemo(
-    () => allVouchers.filter((v) => v.branch === branch && !v.supervisor && isAvailable(v) && v.status === "טרם שומש"),
+    () => allVouchers.filter((v) => branchLabel(v.branch) === branchLabel(branch) && !v.supervisor && isAvailable(v) && v.status === "טרם שומש"),
     [allVouchers, branch],
   );
   const pools = useMemo(() => ({ "בנזין": free.filter((v) => fuelOf(v) === "בנזין"), "סולר": free.filter((v) => fuelOf(v) === "סולר") }), [free]);
   const avail = { "בנזין": 0, "סולר": 0 } as Record<FuelType, number>;
   for (const v of free) avail[fuelOf(v)] += v.amount;
 
-  const supervisors = users.filter((u) => u.role === "supervisor" && u.branch.trim() === branch.trim());
+  const supervisors = users.filter((u) => u.role === "supervisor" && branchLabel(u.branch) === branchLabel(branch));
   const [supervisor, setSupervisor] = useState("");
   const [split, setSplit] = useState(emptySplit);
   const [error, setError] = useState<string | null>(null);

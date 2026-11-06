@@ -4,12 +4,12 @@
  */
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { startTestServer, stopTestServer, resetDb, loginAs, rpc } from "./helpers.js";
-import { Voucher, VoucherCode, WorkerLink, RegularClient, B2BClient, ActivityLog } from "../models.js";
+import { startTestServer, stopTestServer, resetDb, loginAs, rpc, anon } from "./helpers.js";
+import { Voucher, VoucherCode, WorkerLink, RegularClient, B2BClient, ActivityLog, AppUser, Profile } from "../models.js";
 import { STATUS, MAIN_POOL } from "../lib/canonical.js";
 
 const SHORTAGE = "אין מספיק מלאי זמין במאגר עבור סוג דלק וסכום זה";
-const DENOMINATION = "בנזין בכפולות של 100 ₪ וסולר בכפולות של 50 ₪";
+const DENOMINATION = "בנזין בכפולות של 50 ₪ וסולר בכפולות של 100 ₪";
 const AMBIGUOUS = "נמצאו מספרי כרטיסים דו־משמעיים לאחר הסרת אפסים מובילים; יש לבדוק את המלאי לפני הייבוא";
 const REG = { route: "regular", client_id: "C1", site_id: "S1" };
 
@@ -30,8 +30,8 @@ beforeEach(async () => {
 
 test("central snapshot totals, summary wrapper, counts and stock", async () => {
   await seed([
-    { serial: "A1" }, { serial: "A2", amount: 200 }, { serial: "A3", amount: 50, fuel_type: "סולר" },
-    { serial: "A4", amount: 50, fuel_type: " Diesel " }, // lower(btrim) → diesel
+    { serial: "A1" }, { serial: "A2", amount: 200 }, { serial: "A3", amount: 100, fuel_type: "סולר" },
+    { serial: "A4", amount: 100, fuel_type: " Diesel " }, // lower(btrim) → diesel
     { serial: "A5", branch: "מאגר מרכזי" },
     { serial: "X1", branch: "צפון" }, // branch stock
     { serial: "X2", supervisor: "Someone" }, // held by supervisor
@@ -41,23 +41,23 @@ test("central snapshot totals, summary wrapper, counts and stock", async () => {
   const snap = await rpc(admin, "get_central_inventory_snapshot");
   assert.equal(snap.status, 200);
   assert.deepEqual(snap.data, {
-    total_available_amount: 500, gasoline_amount: 400, diesel_amount: 100,
+    total_available_amount: 600, gasoline_amount: 400, diesel_amount: 200,
     denominations: [
-      { amount: 50, fuel_type: "סולר", count: 2 },
       { amount: 100, fuel_type: "בנזין", count: 2 },
+      { amount: 100, fuel_type: "סולר", count: 2 },
       { amount: 200, fuel_type: "בנזין", count: 1 },
     ],
   });
   const sum = await rpc(admin, "get_central_inventory_summary");
-  assert.deepEqual(sum.data, [{ total_available_amount: 500, gasoline_amount: 400, diesel_amount: 100 }]);
+  assert.deepEqual(sum.data, [{ total_available_amount: 600, gasoline_amount: 400, diesel_amount: 200 }]);
 
   const counts = await rpc(admin, "central_inventory_counts");
   // strict SQL filter: branch='מאגר ראשי', supervisor IS NULL, exact fuel_type grouping
   assert.deepEqual(counts.data, [
-    { fuel_type: " Diesel ", amount: 50, cards: 1, total: 50 },
+    { fuel_type: " Diesel ", amount: 100, cards: 1, total: 100 },
     { fuel_type: "בנזין", amount: 100, cards: 1, total: 100 },
     { fuel_type: "בנזין", amount: 200, cards: 1, total: 200 },
-    { fuel_type: "סולר", amount: 50, cards: 1, total: 50 },
+    { fuel_type: "סולר", amount: 100, cards: 1, total: 100 },
   ]);
   assert.equal((await rpc(admin, "central_stock_available", { _fuel: "בנזין" })).data, 300);
 
@@ -72,21 +72,21 @@ test("central snapshot totals, summary wrapper, counts and stock", async () => {
 // ───────────── issuance ─────────────
 
 test("issuance rejects invalid denominations", async () => {
-  await seed([{ serial: "B1" }, { serial: "B2", amount: 50, fuel_type: "סולר" }]);
-  for (const item of [{ amount: 150, fuel_type: "בנזין" }, { amount: 75, fuel_type: "סולר" }, { amount: 0, fuel_type: "סולר" }, { amount: null, fuel_type: "בנזין" }]) {
+  await seed([{ serial: "B1" }, { serial: "B2", amount: 100, fuel_type: "סולר" }]);
+  for (const item of [{ amount: 120, fuel_type: "בנזין" }, { amount: 75, fuel_type: "סולר" }, { amount: 0, fuel_type: "סולר" }, { amount: null, fuel_type: "בנזין" }]) {
     const r = await rpc(admin, "issue_voucher_to_worker", { p_items: [{ ...item, details: REG }], p_branch: MAIN_POOL, p_supervisor: null, p_link: { id: "123456", employee_name: "Worker" } });
     assert.equal(r.status, 400, JSON.stringify(item));
     assert.equal(r.error, DENOMINATION);
   }
-  const t = await rpc(admin, "transfer_voucher_stock", { p_items: [{ amount: 150, fuel_type: "בנזין", serials: ["B1"] }], p_branch: "צפון" });
+  const t = await rpc(admin, "transfer_voucher_stock", { p_items: [{ amount: 120, fuel_type: "בנזין", serials: ["B1"] }], p_branch: "צפון" });
   assert.equal(t.error, DENOMINATION);
   assert.equal(await WorkerLink.countDocuments(), 0);
 });
 
 test("issuance shortage rolls back every item and creates no link", async () => {
-  await seed([{ serial: "S1" }, { serial: "S2" }, { serial: "D1", amount: 50, fuel_type: "סולר" }]);
+  await seed([{ serial: "S1" }, { serial: "S2" }, { serial: "D1", amount: 100, fuel_type: "סולר" }]);
   const r = await rpc(admin, "issue_voucher_to_worker", {
-    p_items: [{ amount: 200, fuel_type: "בנזין", details: REG }, { amount: 100, fuel_type: "סולר", details: REG }],
+    p_items: [{ amount: 200, fuel_type: "בנזין", details: REG }, { amount: 200, fuel_type: "סולר", details: REG }],
     p_branch: MAIN_POOL, p_supervisor: null, p_link: { id: "777777", employee_name: "Worker" },
   });
   assert.equal(r.status, 400);
@@ -97,16 +97,16 @@ test("issuance shortage rolls back every item and creates no link", async () => 
 
 test("issuance returns the safe JSONB envelope and persists the link atomically", async () => {
   await seed([
-    { serial: "0001", fuel_type: "בנזין 95" }, { serial: "0002", amount: 50, fuel_type: "סולר" },
+    { serial: "0001", fuel_type: "בנזין 95" }, { serial: "0002", amount: 100, fuel_type: "סולר" },
     { serial: "0003", amount: 200 }, { serial: "0004" },
   ]);
   const r = await rpc(admin, "issue_voucher_to_worker", {
-    p_items: [{ amount: 300, fuel_type: "בנזין", details: { ...REG, requester: "R" } }, { amount: 50, fuel_type: "סולר", details: REG }],
+    p_items: [{ amount: 300, fuel_type: "בנזין", details: { ...REG, requester: "R" } }, { amount: 100, fuel_type: "סולר", details: REG }],
     p_branch: MAIN_POOL, p_supervisor: null, p_link: { id: "123456", employee_name: "  Test Employee " },
   });
   assert.equal(r.status, 200, r.error);
   assert.equal(r.data.link_id, "123456");
-  assert.equal(r.data.total, 350);
+  assert.equal(r.data.total, 400);
   assert.equal(r.data.vouchers.length, 3);
   // largest-first greedy: 200 (0003) + 100 (0001, lowest serial)
   assert.deepEqual(r.data.vouchers.map((v) => [v.serial, v.item_index]), [["0001", 0], ["0003", 0], ["0002", 1]]);
@@ -119,7 +119,7 @@ test("issuance returns the safe JSONB envelope and persists the link atomically"
   assert.ok(!JSON.stringify(r.data).includes("SECRET"));
   assert.ok(!JSON.stringify(r.data).includes("real_code"));
   const link = await WorkerLink.findOne({ id: "123456" }).lean();
-  assert.equal(link.total, 350);
+  assert.equal(link.total, 400);
   assert.deepEqual([...link.serials].sort(), ["0001", "0002", "0003"]);
   assert.equal(link.employee_name, "Test Employee");
   const card = await Voucher.findOne({ serial: "0001" }).lean();
@@ -200,10 +200,29 @@ test("branch isolation and role checks", async () => {
   }
 });
 
+test("a branch manager allocates to a supervisor who has never signed in; the cards are theirs on first login", async () => {
+  await seed([{ serial: "F1", branch: "צפון" }]);
+  const { agent: mgr } = await loginAs("branch", { branch: "צפון", fullName: "Dana Levi" });
+  await AppUser.create({ national_id: "212121212", first_name: "Roni", last_name: "Peretz", role: "supervisor", phone: "0521212121", branch: "צפון", can_request: false });
+  const r = await rpc(mgr, "transfer_voucher_stock", { p_items: [{ amount: 100, fuel_type: "בנזין", serials: ["F1"] }], p_branch: "צפון", p_supervisor: "Peretz Roni" });
+  assert.equal(r.status, 200, r.error);
+  const card = await Voucher.findOne({ serial: "F1" }).lean();
+  assert.equal(card.supervisor, "Peretz Roni");
+  assert.equal(card.supervisor_id, null);
+  const other = await rpc(mgr, "transfer_voucher_stock", { p_items: [{ amount: 100, fuel_type: "בנזין", serials: ["F1"] }], p_branch: "צפון", p_supervisor: "Not Here" });
+  assert.equal(other.error, "המפקח אינו משויך לסניף");
+
+  // First login activates the account (the national id is the first password) and links the card.
+  const first = await anon().post("/api/auth/login").send({ phone: "0521212121", password: "212121212" });
+  assert.equal(first.status, 200);
+  const profile = await Profile.findOne({ national_id: "212121212" }).lean();
+  assert.equal((await Voucher.findOne({ serial: "F1" }).lean()).supervisor_id, profile.id);
+});
+
 test("transfer allocates exact serials to a supervisor, who can then issue them", async () => {
-  await seed([{ serial: "T1" }, { serial: "T2", amount: 50, fuel_type: "סולר" }, { serial: "T3" }]);
+  await seed([{ serial: "T1" }, { serial: "T2", amount: 100, fuel_type: "סולר" }, { serial: "T3" }]);
   const { agent: sup, profile } = await loginAs("supervisor", { branch: "צפון", fullName: "Avi Cohen" });
-  const items = [{ amount: 100, fuel_type: "בנזין", serials: ["T1"] }, { amount: 50, fuel_type: "סולר", serials: ["T2"] }];
+  const items = [{ amount: 100, fuel_type: "בנזין", serials: ["T1"] }, { amount: 100, fuel_type: "סולר", serials: ["T2"] }];
 
   assert.equal((await rpc(admin, "transfer_voucher_stock", { p_items: items, p_branch: "צפון", p_supervisor: "Nobody" })).error, "המפקח אינו משויך לסניף");
   assert.equal((await rpc(admin, "transfer_voucher_stock", { p_items: [{ amount: 200, fuel_type: "בנזין", serials: ["T1", "T1"] }], p_branch: "צפון" })).error, "כרטיס נבחר יותר מפעם אחת");
@@ -231,7 +250,7 @@ test("transfer allocates exact serials to a supervisor, who can then issue them"
 
   // Supervisor transfer-with-link of own stock (legacy physical issuance path).
   const linked = await rpc(sup, "transfer_voucher_stock", {
-    p_items: [{ amount: 50, fuel_type: "סולר", serials: ["T2"], details: REG }], p_branch: "צפון", p_supervisor: "Cohen Avi",
+    p_items: [{ amount: 100, fuel_type: "סולר", serials: ["T2"], details: REG }], p_branch: "צפון", p_supervisor: "Cohen Avi",
     p_link: { id: "3002", employee_name: "Worker Two" },
   });
   assert.equal(linked.status, 200, linked.error);
@@ -239,7 +258,7 @@ test("transfer allocates exact serials to a supervisor, who can then issue them"
   assert.equal(t2.status, STATUS.ISSUED);
   assert.equal(t2.link_id, "3002");
   assert.ok(t2.issued_at && t2.expires_at);
-  assert.equal((await WorkerLink.findOne({ id: "3002" }).lean()).total, 50);
+  assert.equal((await WorkerLink.findOne({ id: "3002" }).lean()).total, 100);
 });
 
 // ───────────── concurrency ─────────────
@@ -335,9 +354,9 @@ test("stock import never overwrites existing cards and stores codes separately",
   await seed([{ serial: "E1", amount: 200 }]);
   const r = await rpc(admin, "import_voucher_inventory", { p_rows: [
     { serial: " N1 ", real_code: " CODE1 ", amount: 100, fuel_type: "בנזין" },
-    { serial: "E1", real_code: "X", amount: 50, fuel_type: "סולר" },
+    { serial: "E1", real_code: "X", amount: 100, fuel_type: "סולר" },
     { serial: "N1", real_code: "DUP", amount: 100, fuel_type: "בנזין" },
-    { serial: "N2", real_code: "CODE2", amount: "50", fuel_type: "סולר" },
+    { serial: "N2", real_code: "CODE2", amount: "100", fuel_type: "סולר" },
   ] });
   assert.equal(r.status, 200, r.error);
   assert.deepEqual(r.data, { added: 2, skipped: 2, serials: ["N1", "N2"] });

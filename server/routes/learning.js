@@ -14,7 +14,7 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { ah, badRequest, forbidden, unauthorized } from "../errors.js";
 import { isDevToolsOwner } from "../auth.js";
-import { LEARNING } from "../models.js";
+import { LEARNING, Profile } from "../models.js";
 import { runInLearning } from "../lib/learningContext.js";
 import { seedLearning, SEED_VERSION } from "../lib/learningSeed.js";
 import { logAction } from "../lib/audit.js";
@@ -90,8 +90,28 @@ router.post("/", ah(async (req, res) => {
  */
 export function learningRouter(req, _res, next) {
   if (/^\/(auth|learning|training)(\/|$)/.test(req.path)) return next();
-  if (req.user?.learning_mode && isDevToolsOwner(req.user)) return runInLearning(next);
-  next();
+  if (!(req.user?.learning_mode && isDevToolsOwner(req.user))) return next();
+  return runInLearning(async () => {
+    try {
+      await actAsPersona(req);
+      next();
+    } catch (e) { next(e); }
+  });
+}
+
+/**
+ * Role preview inside סביבת לימוד: the owner's "תצוגה" picks a demo branch manager / supervisor, and
+ * data and RPC calls then run as that person (same permissions, same stock rules). Reachable only
+ * from the owner's active learning session, and the persona is loaded from the learning copy, so
+ * this can never act on real data or as a real login.
+ */
+async function actAsPersona(req) {
+  const nationalId = String(req.get("x-learning-persona") ?? "");
+  if (!/^\d{9}$/.test(nationalId) || !/^\/(db|rpc|notifications)(\/|$)/.test(req.path)) return;
+  const persona = await Profile.findOne({ national_id: nationalId });
+  if (!persona || !["branch", "supervisor"].includes(persona.role)) return;
+  persona.requires_password_change = false;
+  req.user = persona;
 }
 
 export default router;

@@ -73,10 +73,10 @@ if (!(await M.Profile.countDocuments())) {
       vouchers.push({ serial: `70${String(418200 + n).padStart(7, "0")}`, card_number: `70${String(418200 + n).padStart(7, "0")}`, amount, fuel_type: fuel, branch: "מאגר ראשי", status: "טרם שומש", ...extra });
     }
   };
-  add("בנזין", 100, 40); add("בנזין", 500, 12); add("סולר", 50, 30); add("סולר", 100, 20); add("סולר", 500, 6);
+  add("בנזין", 50, 30); add("בנזין", 100, 20); add("בנזין", 500, 6); add("סולר", 100, 40); add("סולר", 500, 12);
   const sup = await M.Profile.findOne({ national_id: "300000005" });
   add("בנזין", 100, 8, { branch: "חיפה", supervisor: "כהן דני", supervisor_id: sup.id });
-  add("סולר", 50, 6, { branch: "חיפה", supervisor: "כהן דני", supervisor_id: sup.id });
+  add("סולר", 100, 6, { branch: "חיפה", supervisor: "כהן דני", supervisor_id: sup.id });
   add("בנזין", 100, 5, { branch: "חיפה", supervisor: "כהן דני", supervisor_id: sup.id, status: "הוקצה לעובד", employee_name: "ישראלי אבי", worker_name: "ישראלי אבי", route: "regular", client_id: "5521", site_id: "12", site_name: "סניף מרכזי", issued_at: new Date(), expires_at: new Date(Date.now() + 90 * 864e5) });
   add("בנזין", 500, 4, { branch: "תל אביב", status: "מומש סופית", redeemed_at: new Date() });
   await M.Voucher.insertMany(vouchers);

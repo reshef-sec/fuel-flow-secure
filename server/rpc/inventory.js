@@ -24,7 +24,7 @@ import {
 } from "../lib/issuanceGuard.js";
 
 const SHORTAGE = "אין מספיק מלאי זמין במאגר עבור סוג דלק וסכום זה";
-const DENOMINATION = "בנזין בכפולות של 100 ₪ וסולר בכפולות של 50 ₪";
+const DENOMINATION = "בנזין בכפולות של 50 ₪ וסולר בכפולות של 100 ₪";
 const ADMIN_REQUIRED = "Admin access required";
 /** status IN ('טרם שומש', 'available') — legacy English statuses may exist in migrated data. */
 const AVAILABLE_STATUSES = [STATUS.AVAILABLE, "available"];
@@ -257,17 +257,19 @@ async function transferVoucherStock(params, { user }) {
   const callerBranch = user.branch ?? null;
   const callerName = await staffName(user.national_id);
   if (p_branch == null || sqlTrim(p_branch).length === 0) throw badRequest("יש לבחור סניף");
-  if (!role.admin && p_branch !== callerBranch) throw forbidden("אין הרשאה לסניף זה");
+  if (!role.admin && canonicalBranch(p_branch) !== canonicalBranch(callerBranch)) throw forbidden("אין הרשאה לסניף זה");
   if (p_link == null && role.sup) throw forbidden("אין הרשאה להקצאה");
   if (!Array.isArray(p_items) || p_items.length === 0) throw badRequest("יש לבחור שוברים");
 
   let targetId = null;
   if (p_supervisor != null) {
-    const sups = await Profile.find({ branch: p_branch, role: "supervisor" }, { id: 1, national_id: 1 }).sort({ _id: 1 }).lean();
-    for (const s of sups) {
-      if ((await staffName(s.national_id)) === p_supervisor) { targetId = s.id; break; }
-    }
-    if (targetId == null) throw badRequest("המפקח אינו משויך לסניף");
+    // The users directory decides who belongs to a branch. A supervisor who never signed in has no
+    // login profile yet: the cards are held by name and are theirs as soon as they sign in.
+    const staff = await AppUser.find({ role: "supervisor" }, { national_id: 1, last_name: 1, first_name: 1, branch: 1 }).sort({ _id: 1 }).lean();
+    const target = staff.find((s) => canonicalBranch(s.branch) === canonicalBranch(p_branch)
+      && [s.last_name, s.first_name].filter((x) => x != null).join(" ").trim() === p_supervisor);
+    if (!target) throw badRequest("המפקח אינו משויך לסניף");
+    targetId = (await Profile.findOne({ national_id: target.national_id }, { id: 1 }).lean())?.id ?? null;
     if (p_link != null && !role.admin && !role.branch && targetId !== user.id) throw forbidden("אין הרשאה למפקח זה");
   }
   const link = p_link != null ? validateLink(p_link) : null;
@@ -278,7 +280,7 @@ async function transferVoucherStock(params, { user }) {
     const requested = intParam(txt(item, "amount"));
     const fuel = txt(item, "fuel_type");
     if ((fuel !== "בנזין" && fuel !== "סולר") || requested == null || Number.isNaN(requested) || requested <= 0
-      || (fuel === "בנזין" && requested % 100 !== 0) || (fuel === "סולר" && requested % 50 !== 0)) {
+      || !isValidDenomination(fuel, requested)) {
       throw badRequest(DENOMINATION);
     }
     const raw = item && typeof item === "object" ? item.serials : null;
@@ -308,7 +310,7 @@ async function transferVoucherStock(params, { user }) {
         if (role.admin) {
           if ((card.branch != null && card.branch !== MAIN_POOL) || !blank(card.supervisor)) throw badRequest(SHORTAGE);
         } else {
-          if (card.branch !== callerBranch) throw forbidden("אין הרשאה למלאי זה");
+          if (canonicalBranch(card.branch) !== canonicalBranch(callerBranch)) throw forbidden("אין הרשאה למלאי זה");
           if (role.branch && !blank(card.supervisor)) throw badRequest("המלאי כבר הוקצה למפקח");
           if (!role.branch && (card.supervisor_id ?? null) !== user.id
             && !(card.supervisor_id == null && callerName !== "" && card.supervisor === callerName)) {
@@ -399,7 +401,7 @@ async function importVoucherInventory({ p_rows }, { user }) {
       const amount = intParam(txt(r, "amount"));
       const fuel = txt(r, "fuel_type");
       if (realCode == null || sqlTrim(realCode) === "" || amount == null || Number.isNaN(amount) || amount <= 0
-        || amount % 50 !== 0 || fuel == null || (fuel !== "בנזין" && fuel !== "סולר")) {
+        || fuel == null || (fuel !== "בנזין" && fuel !== "סולר") || !isValidDenomination(fuel, amount)) {
         throw badRequest("Invalid stock row");
       }
       vouchers.push({ serial, card_number: serial, real_code: "", amount, fuel_type: fuel, branch: MAIN_POOL, status: STATUS.AVAILABLE, updated_on: day });

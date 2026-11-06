@@ -41,7 +41,7 @@ describe("can_use_development_tools", () => {
 });
 
 describe("generate_demo_data", () => {
-  it("creates petrol 100 / diesel 50 cards per pool for the owner only", async () => {
+  it("creates petrol 50 / diesel 100 cards per pool for the owner only", async () => {
     await Branch.create([{ id: "b1", name: "חיפה" }, { id: "b2", name: "  " }, { id: "b3", name: "אילת" }]);
     for (const role of ["admin", "branch", "supervisor", "viewer"]) {
       const r = await rpc((await loginAs(role)).agent, "generate_demo_data");
@@ -63,8 +63,8 @@ describe("generate_demo_data", () => {
     }
     assert.deepEqual([...new Set(cards.map((c) => c.branch))].sort(), ["אילת", "חיפה", "מאגר ראשי"].sort());
     const main = cards.filter((c) => c.branch === "מאגר ראשי");
-    assert.equal(main.filter((c) => c.fuel_type === "בנזין").reduce((s, c) => s + c.amount, 0), 1000);
-    assert.equal(main.filter((c) => c.fuel_type === "סולר").reduce((s, c) => s + c.amount, 0), 500);
+    assert.equal(main.filter((c) => c.fuel_type === "בנזין").reduce((s, c) => s + c.amount, 0), 500);
+    assert.equal(main.filter((c) => c.fuel_type === "סולר").reduce((s, c) => s + c.amount, 0), 1000);
     assert.ok(await ActivityLog.exists({ action: "טעינת נתוני הדגמה", target: "60 שוברים לבדיקה בלבד" }));
 
     const again = await rpc(o.agent, "generate_demo_data");
